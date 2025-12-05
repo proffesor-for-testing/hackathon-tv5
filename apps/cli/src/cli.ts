@@ -8,14 +8,16 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { createRequire } from 'module';
 
 import { initCommand, toolsCommand, statusCommand, infoCommand, helpCommand } from './commands/index.js';
 import { startSseServer } from './mcp/sse.js';
 import { BANNER, DISCORD_URL, WEBSITE_URL, HACKATHON_NAME } from './constants.js';
 import { logger } from './utils/index.js';
 
-// Package version
-const version = '1.2.0';
+// Read version from package.json
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json');
 
 const program = new Command();
 

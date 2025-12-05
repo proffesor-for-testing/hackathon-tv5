@@ -1,6 +1,6 @@
 {
   "name": "agentics-hackathon",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "CLI and MCP server for the Agentics Foundation TV5 Hackathon - Build the future of agentic AI with Google Cloud, Gemini, Claude, and open-source tools",
   "type": "module",
   "main": "dist/index.js",
