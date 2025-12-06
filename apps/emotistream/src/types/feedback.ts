@@ -74,6 +74,17 @@ export interface FeedbackRecord extends FeedbackSubmission {
 }
 
 /**
+ * StoredFeedback - Compatible with FeedbackRecord (used by PostgreSQL store)
+ */
+export interface StoredFeedback extends FeedbackSubmission {
+  feedbackId: string;
+  reward: number;
+  qValueBefore: number;
+  qValueAfter: number;
+  processed: boolean;
+}
+
+/**
  * Reward calculation result
  */
 export interface RewardCalculation {

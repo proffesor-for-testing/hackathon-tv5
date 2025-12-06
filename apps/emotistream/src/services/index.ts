@@ -14,6 +14,7 @@ import { ContentProfiler } from '../content/profiler.js';
 import { JWTService } from '../auth/jwt-service.js';
 import { PasswordService } from '../auth/password-service.js';
 import { UserStore } from '../persistence/user-store.js';
+import { initializeDatabase, checkConnection } from '../persistence/postgres-client.js';
 
 export class ServiceContainer {
   private static instance: ServiceContainer;
@@ -32,6 +33,8 @@ export class ServiceContainer {
   public readonly jwtService: JWTService;
   public readonly passwordService: PasswordService;
   public readonly userStore: UserStore;
+
+  private initialized: boolean = false;
 
   private constructor() {
     // Step 1: Initialize foundational services
@@ -64,30 +67,60 @@ export class ServiceContainer {
     this.jwtService = new JWTService();
     this.passwordService = new PasswordService();
     this.userStore = new UserStore();
-
-    // Step 7: Load seed content for demo
-    this.loadSeedContent();
   }
 
-  private async loadSeedContent(): Promise<void> {
-    const seedContent = [
-      { contentId: 'calming-001', title: 'Ocean Waves Meditation', category: 'meditation' as const, genres: ['relaxation', 'nature'], description: 'Soothing ocean sounds for deep relaxation', platform: 'mock' as const, tags: ['calm', 'sleep'], duration: 30 },
-      { contentId: 'uplifting-001', title: 'Feel Good Comedy Special', category: 'movie' as const, genres: ['comedy', 'standup'], description: 'A hilarious comedy special to lift your spirits', platform: 'mock' as const, tags: ['funny', 'happy'], duration: 60 },
-      { contentId: 'inspiring-001', title: 'Nature Documentary: Earth', category: 'documentary' as const, genres: ['nature', 'science'], description: 'Beautiful nature documentary showcasing earths wonders', platform: 'mock' as const, tags: ['inspiring', 'beautiful'], duration: 90 },
-      { contentId: 'exciting-001', title: 'Action Adventure Movie', category: 'movie' as const, genres: ['action', 'adventure'], description: 'Heart-pounding action adventure', platform: 'mock' as const, tags: ['thrilling', 'exciting'], duration: 120 },
-      { contentId: 'peaceful-001', title: 'Yoga for Stress Relief', category: 'meditation' as const, genres: ['yoga', 'wellness'], description: 'Gentle yoga session for stress relief', platform: 'mock' as const, tags: ['peaceful', 'calm'], duration: 45 },
-      { contentId: 'drama-001', title: 'Heartwarming Drama Series', category: 'series' as const, genres: ['drama', 'family'], description: 'Emotional drama about family bonds', platform: 'mock' as const, tags: ['emotional', 'touching'], duration: 50 },
-      { contentId: 'music-001', title: 'Classical Piano Collection', category: 'music' as const, genres: ['classical', 'instrumental'], description: 'Beautiful piano pieces for relaxation', platform: 'mock' as const, tags: ['calming', 'focus'], duration: 60 },
-      { contentId: 'thriller-001', title: 'Mystery Thriller Movie', category: 'movie' as const, genres: ['thriller', 'mystery'], description: 'Gripping mystery with unexpected twists', platform: 'mock' as const, tags: ['suspense', 'engaging'], duration: 110 },
-      { contentId: 'short-001', title: 'Funny Animal Compilation', category: 'short' as const, genres: ['comedy', 'animals'], description: 'Hilarious animal clips to brighten your day', platform: 'mock' as const, tags: ['cute', 'funny'], duration: 15 },
-      { contentId: 'documentary-002', title: 'Mind Science Documentary', category: 'documentary' as const, genres: ['science', 'psychology'], description: 'Fascinating exploration of the human mind', platform: 'mock' as const, tags: ['educational', 'thought-provoking'], duration: 75 },
-    ];
+  /**
+   * Initialize async services (database, TMDB content loading)
+   * Must be called after getInstance() before using recommendations
+   */
+  public async initialize(): Promise<void> {
+    if (this.initialized) return;
 
-    const profiler = this.recommendationEngine.getProfiler();
-    for (const content of seedContent) {
-      await profiler.profile(content);
+    console.log('🚀 Initializing EmotiStream services...');
+
+    // Initialize PostgreSQL database if enabled
+    const usePostgres = process.env.USE_POSTGRES === 'true';
+    if (usePostgres) {
+      console.log('🗄️  PostgreSQL mode enabled');
+      try {
+        const connected = await checkConnection();
+        if (connected) {
+          console.log('✅ Database connection established');
+          await initializeDatabase();
+          console.log('✅ Database schema initialized');
+        } else {
+          console.warn('⚠️  Database connection failed, falling back to in-memory storage');
+        }
+      } catch (error) {
+        console.error('❌ Database initialization error:', error);
+        console.warn('⚠️  Falling back to in-memory storage');
+      }
+    } else {
+      console.log('📦 Using in-memory storage (set USE_POSTGRES=true for persistence)');
     }
-    console.log(`🎬 Loaded ${seedContent.length} seed content items`);
+
+    // Initialize recommendation engine with TMDB content (or mock fallback)
+    await this.recommendationEngine.initialize(100);
+
+    const source = this.recommendationEngine.isUsingTMDB() ? 'TMDB (real movies/TV)' : 'Mock data';
+    console.log(`🎬 Content source: ${source}`);
+
+    this.initialized = true;
+    console.log('✅ EmotiStream services ready');
+  }
+
+  /**
+   * Check if services are initialized
+   */
+  public isInitialized(): boolean {
+    return this.initialized;
+  }
+
+  /**
+   * Check if using real TMDB data
+   */
+  public isUsingTMDB(): boolean {
+    return this.recommendationEngine.isUsingTMDB();
   }
 
   public static getInstance(): ServiceContainer {

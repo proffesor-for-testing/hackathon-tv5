@@ -3,18 +3,18 @@
  * Combines RL policy (Q-values) with semantic vector search
  */
 
-import { ContentProfiler } from '../content/profiler';
-import { QTable } from '../rl/q-table';
-import { HybridRanker, SearchCandidate } from './ranker';
-import { OutcomePredictor } from './outcome-predictor';
-import { ReasoningGenerator } from './reasoning';
-import { ExplorationStrategy } from './exploration';
+import { ContentProfiler } from '../content/profiler.js';
+import { QTable } from '../rl/q-table.js';
+import { HybridRanker, SearchCandidate } from './ranker.js';
+import { OutcomePredictor } from './outcome-predictor.js';
+import { ReasoningGenerator } from './reasoning.js';
+import { ExplorationStrategy } from './exploration.js';
 import {
   RecommendationRequest,
   Recommendation,
   DesiredState
-} from './types';
-import { EmotionalContentProfile } from '../content/types';
+} from './types.js';
+import { EmotionalContentProfile } from '../content/types.js';
 
 export class RecommendationEngine {
   private profiler: ContentProfiler;
@@ -23,6 +23,7 @@ export class RecommendationEngine {
   private outcomePredictor: OutcomePredictor;
   private reasoningGenerator: ReasoningGenerator;
   private explorationStrategy: ExplorationStrategy;
+  private initialized: boolean = false;
 
   constructor() {
     this.profiler = new ContentProfiler();
@@ -31,6 +32,25 @@ export class RecommendationEngine {
     this.outcomePredictor = new OutcomePredictor();
     this.reasoningGenerator = new ReasoningGenerator();
     this.explorationStrategy = new ExplorationStrategy();
+  }
+
+  /**
+   * Initialize the recommendation engine with content
+   */
+  async initialize(contentCount: number = 100): Promise<void> {
+    if (this.initialized) return;
+
+    console.log('Initializing RecommendationEngine...');
+    await this.profiler.initialize(contentCount);
+    this.initialized = true;
+    console.log('RecommendationEngine ready');
+  }
+
+  /**
+   * Check if using real TMDB data
+   */
+  isUsingTMDB(): boolean {
+    return this.profiler.isUsingTMDB();
   }
 
   /**

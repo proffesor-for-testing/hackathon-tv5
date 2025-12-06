@@ -2,21 +2,87 @@
  * ContentProfiler - Main orchestrator for content profiling
  */
 
-import { ContentMetadata, EmotionalContentProfile, SearchResult as TypeSearchResult } from './types';
-import { EmbeddingGenerator } from './embedding-generator';
-import { VectorStore, SearchResult as StoreSearchResult } from './vector-store';
-import { BatchProcessor } from './batch-processor';
+import { ContentMetadata, EmotionalContentProfile, SearchResult as TypeSearchResult } from './types.js';
+import { EmbeddingGenerator } from './embedding-generator.js';
+import { VectorStore, SearchResult as StoreSearchResult } from './vector-store.js';
+import { BatchProcessor } from './batch-processor.js';
+import { tmdbCatalog, TMDBCatalog } from './tmdb-catalog.js';
+import { MockCatalogGenerator } from './mock-catalog.js';
 
 export class ContentProfiler {
   private embeddingGenerator: EmbeddingGenerator;
   private vectorStore: VectorStore;
   private batchProcessor: BatchProcessor;
   private profiles: Map<string, EmotionalContentProfile> = new Map();
+  private metadata: Map<string, ContentMetadata> = new Map();
+  private tmdbCatalog: TMDBCatalog;
+  private mockCatalog: MockCatalogGenerator;
+  private initialized: boolean = false;
 
   constructor() {
     this.embeddingGenerator = new EmbeddingGenerator();
     this.vectorStore = new VectorStore();
     this.batchProcessor = new BatchProcessor();
+    this.tmdbCatalog = tmdbCatalog;
+    this.mockCatalog = new MockCatalogGenerator();
+  }
+
+  /**
+   * Initialize the profiler with content catalog
+   * Uses TMDB if configured, falls back to mock data
+   */
+  async initialize(contentCount: number = 100): Promise<void> {
+    if (this.initialized) return;
+
+    console.log('Initializing ContentProfiler...');
+
+    let catalog: ContentMetadata[];
+
+    // Try TMDB first, fall back to mock
+    if (this.tmdbCatalog.isAvailable()) {
+      console.log('TMDB configured - fetching real content...');
+      catalog = await this.tmdbCatalog.fetchCatalog(contentCount);
+
+      if (catalog.length === 0) {
+        console.warn('TMDB fetch failed, falling back to mock data');
+        catalog = this.mockCatalog.generate(contentCount);
+      }
+    } else {
+      console.log('TMDB not configured - using mock data');
+      catalog = this.mockCatalog.generate(contentCount);
+    }
+
+    console.log(`Processing ${catalog.length} content items...`);
+
+    // Profile all content
+    for (const content of catalog) {
+      await this.profile(content);
+      this.metadata.set(content.contentId, content);
+    }
+
+    this.initialized = true;
+    console.log(`ContentProfiler initialized with ${catalog.length} items`);
+  }
+
+  /**
+   * Check if using real TMDB data
+   */
+  isUsingTMDB(): boolean {
+    return this.tmdbCatalog.isAvailable();
+  }
+
+  /**
+   * Get content metadata by ID
+   */
+  getMetadata(contentId: string): ContentMetadata | undefined {
+    return this.metadata.get(contentId);
+  }
+
+  /**
+   * Get all content metadata
+   */
+  getAllMetadata(): ContentMetadata[] {
+    return Array.from(this.metadata.values());
   }
 
   /**
@@ -122,6 +188,11 @@ export class ContentProfiler {
   }
 
   private createMetadataFromStore(result: StoreSearchResult): ContentMetadata {
+    // Try to get cached metadata first
+    const cached = this.metadata.get(result.id);
+    if (cached) return cached;
+
+    // Fallback to basic metadata from store
     return {
       contentId: result.id,
       title: result.metadata.title || result.id,

@@ -90,7 +90,7 @@ router.get('/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
-    const feedbackHistory = feedbackStore.getUserFeedback(userId);
+    const feedbackHistory = await feedbackStore.getUserFeedback(userId);
     const progress = progressAnalytics.calculateProgress(userId, feedbackHistory);
 
     res.json(apiResponse({
@@ -142,7 +142,7 @@ router.get('/:userId/convergence', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
-    const feedbackHistory = feedbackStore.getUserFeedback(userId);
+    const feedbackHistory = await feedbackStore.getUserFeedback(userId);
     const convergence = progressAnalytics.analyzeConvergence(feedbackHistory);
 
     res.json(apiResponse({
@@ -178,7 +178,7 @@ router.get('/:userId/journey', async (req: Request, res: Response) => {
     const { userId } = req.params;
     const { limit } = req.query;
 
-    const feedbackHistory = feedbackStore.getUserFeedback(userId);
+    const feedbackHistory = await feedbackStore.getUserFeedback(userId);
     const progress = progressAnalytics.calculateProgress(userId, feedbackHistory);
 
     let journey = progress.emotionalJourney;
@@ -229,7 +229,7 @@ router.get('/:userId/rewards', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
-    const feedbackHistory = feedbackStore.getUserFeedback(userId);
+    const feedbackHistory = await feedbackStore.getUserFeedback(userId);
 
     const timeline = feedbackHistory.map((feedback, index) => ({
       experienceNumber: index + 1,
@@ -267,7 +267,7 @@ router.get('/:userId/content', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
-    const feedbackHistory = feedbackStore.getUserFeedback(userId);
+    const feedbackHistory = await feedbackStore.getUserFeedback(userId);
     const progress = progressAnalytics.calculateProgress(userId, feedbackHistory);
 
     res.json(apiResponse({
@@ -304,7 +304,7 @@ router.get('/:userId/experiences', async (req: Request, res: Response) => {
     const { userId } = req.params;
     const { limit = '10' } = req.query;
 
-    const feedbackHistory = feedbackStore.getUserFeedback(userId);
+    const feedbackHistory = await feedbackStore.getUserFeedback(userId);
     const limitNum = Math.min(50, Math.max(1, Number(limit)));
 
     const experiences = feedbackHistory

@@ -7,11 +7,18 @@ export interface ContentMetadata {
   contentId: string;
   title: string;
   description: string;
-  platform: 'mock';
+  platform: 'mock' | 'tmdb';
   genres: string[];
   category: 'movie' | 'series' | 'documentary' | 'music' | 'meditation' | 'short';
   tags: string[];
   duration: number; // minutes
+  // TMDB-specific fields (optional for backward compatibility)
+  tmdbId?: number;
+  posterUrl?: string | null;
+  backdropUrl?: string | null;
+  releaseDate?: string;
+  rating?: number;
+  popularity?: number;
 }
 
 export interface TargetState {

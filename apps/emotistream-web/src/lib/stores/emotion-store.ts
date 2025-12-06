@@ -1,18 +1,18 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { EmotionAnalysis } from '../../types';
+import type { EmotionState, DesiredState } from '../../types';
 
-interface EmotionState {
-  currentEmotion: EmotionAnalysis | null;
-  desiredState: string | null;
-  emotionHistory: EmotionAnalysis[];
-  setCurrentEmotion: (emotion: EmotionAnalysis) => void;
-  setDesiredState: (state: string) => void;
-  addToHistory: (emotion: EmotionAnalysis) => void;
+interface EmotionStoreState {
+  currentEmotion: EmotionState | null;
+  desiredState: DesiredState | null;
+  emotionHistory: EmotionState[];
+  setCurrentEmotion: (emotion: EmotionState) => void;
+  setDesiredState: (state: DesiredState) => void;
+  addToHistory: (emotion: EmotionState) => void;
   clearHistory: () => void;
 }
 
-export const useEmotionStore = create<EmotionState>()(
+export const useEmotionStore = create<EmotionStoreState>()(
   persist(
     (set) => ({
       currentEmotion: null,

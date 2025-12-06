@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEmotionStore } from '../stores/emotion-store';
 import * as emotionApi from '../api/emotion';
 import type { AnalyzeEmotionRequest } from '../api/emotion';
+import type { EmotionState } from '../../types';
 
 /**
  * Hook to analyze emotion from text
@@ -13,8 +14,16 @@ export const useAnalyzeEmotion = () => {
   return useMutation({
     mutationFn: (data: AnalyzeEmotionRequest) => emotionApi.analyzeEmotion(data),
     onSuccess: (response) => {
-      setCurrentEmotion(response.analysis);
-      addToHistory(response.analysis);
+      // Transform API response to EmotionState format
+      const emotionState: EmotionState = {
+        valence: response.emotionalState.valence,
+        arousal: response.emotionalState.arousal,
+        stressLevel: response.emotionalState.stressLevel,
+        primaryEmotion: response.emotionalState.primaryEmotion,
+        confidence: response.emotionalState.confidence,
+      };
+      setCurrentEmotion(emotionState);
+      addToHistory(emotionState);
       queryClient.invalidateQueries({ queryKey: ['emotion-history'] });
     },
   });

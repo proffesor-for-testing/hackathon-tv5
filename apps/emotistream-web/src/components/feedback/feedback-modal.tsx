@@ -79,6 +79,7 @@ export function FeedbackModal({
       const response = await submitContentFeedback({
         userId,
         contentId,
+        contentTitle,
         actualPostState: {
           valence: emotionAfter.valence,
           arousal: emotionAfter.arousal,

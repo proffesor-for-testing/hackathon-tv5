@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
-import { createApp } from './api';
+import { createApp } from './api/index.js';
+import { getServices } from './services/index.js';
 
 // Load environment variables
 dotenv.config();
@@ -12,6 +13,13 @@ const HOST = process.env.HOST || '0.0.0.0';
  */
 async function start() {
   try {
+    // Initialize services (loads TMDB content or mock data)
+    console.log('\n🎬 EmotiStream API Server Starting...\n');
+    const services = getServices();
+    await services.initialize();
+
+    const contentSource = services.isUsingTMDB() ? '🎥 TMDB (real movies/TV)' : '📦 Mock data';
+
     const app = createApp();
 
     const server = app.listen(PORT, HOST, () => {
@@ -20,6 +28,7 @@ async function start() {
       console.log(`🚀 Server running at http://${HOST}:${PORT}`);
       console.log(`📊 Health check: http://${HOST}:${PORT}/health`);
       console.log(`🎯 API base: http://${HOST}:${PORT}/api/v1`);
+      console.log(`🎬 Content: ${contentSource}`);
       console.log('═'.repeat(50));
       console.log('\n📍 Available endpoints:');
       console.log('  POST /api/v1/emotion/analyze       - Analyze emotional state');

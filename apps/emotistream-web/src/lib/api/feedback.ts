@@ -13,6 +13,7 @@ interface BackendResponse<T> {
 export interface ContentFeedbackRequest {
   userId: string;
   contentId: string;
+  contentTitle: string;
   actualPostState: {
     valence: number;
     arousal: number;

@@ -2,10 +2,12 @@
  * Content Profiler Module - Public API
  */
 
-export { ContentProfiler } from './profiler';
-export { EmbeddingGenerator } from './embedding-generator';
-export { VectorStore } from './vector-store';
-export { BatchProcessor } from './batch-processor';
-export { MockCatalogGenerator } from './mock-catalog';
+export { ContentProfiler } from './profiler.js';
+export { EmbeddingGenerator } from './embedding-generator.js';
+export { VectorStore } from './vector-store.js';
+export { BatchProcessor } from './batch-processor.js';
+export { MockCatalogGenerator } from './mock-catalog.js';
+export { TMDBCatalog, tmdbCatalog } from './tmdb-catalog.js';
+export * from './tmdb-client.js';
 
-export * from './types';
+export * from './types.js';

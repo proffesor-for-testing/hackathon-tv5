@@ -146,7 +146,7 @@ router.post(
       const submission: FeedbackSubmission = {
         userId: feedbackRequest.userId,
         contentId: feedbackRequest.contentId,
-        contentTitle: feedbackRequest.contentId, // Use contentId as title fallback
+        contentTitle: feedbackRequest.contentTitle || feedbackRequest.contentId, // Use contentTitle if provided
         sessionId: sessionKey,
         emotionBefore: {
           valence: stateBefore.valence,

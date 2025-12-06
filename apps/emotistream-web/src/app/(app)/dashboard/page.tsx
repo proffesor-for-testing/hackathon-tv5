@@ -10,14 +10,7 @@ import { analyzeEmotion } from '@/lib/api/emotion';
 import { getRecommendations } from '@/lib/api/recommend';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { ContentFeedbackResponse } from '@/lib/api/feedback';
-
-interface EmotionState {
-  valence: number;
-  arousal: number;
-  stressLevel: number;
-  primaryEmotion: string;
-  confidence: number;
-}
+import type { EmotionState, DesiredState } from '@/types';
 
 interface Recommendation {
   contentId: string;
@@ -109,7 +102,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDesiredStateChange = async (state: { valence: number; arousal: number; stress: number }) => {
+  const handleDesiredStateChange = async (state: DesiredState) => {
     setDesiredState(state);
     if (currentEmotion) {
       await fetchRecommendations(currentEmotion);
@@ -203,7 +196,6 @@ export default function DashboardPage() {
               recommendations={recommendations}
               isLoading={isLoadingRecs}
               onWatch={handleWatch}
-              onInfo={(id) => console.log('Info:', id)}
             />
           </motion.div>
         )}

@@ -1,14 +1,15 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Recommendation, ContentItem } from '../../types';
+import type { ContentItem } from '../../types';
+import type { RecommendationItem } from '../api/recommend';
 
 interface RecommendationState {
-  recommendations: Recommendation[];
+  recommendations: RecommendationItem[];
   selectedContent: ContentItem | null;
-  currentRecommendation: Recommendation | null;
+  currentRecommendation: RecommendationItem | null;
   explorationMode: boolean;
-  setRecommendations: (recommendations: Recommendation[]) => void;
-  selectContent: (content: ContentItem, recommendation: Recommendation) => void;
+  setRecommendations: (recommendations: RecommendationItem[]) => void;
+  selectContent: (content: ContentItem, recommendation: RecommendationItem) => void;
   clearSelected: () => void;
   toggleExplorationMode: () => void;
 }

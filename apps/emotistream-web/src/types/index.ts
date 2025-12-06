@@ -18,6 +18,26 @@ export interface EmotionAnalysis {
   timestamp: string;
 }
 
+/**
+ * Extended emotion state used by the UI components
+ */
+export interface EmotionState {
+  valence: number;
+  arousal: number;
+  stressLevel: number;
+  primaryEmotion: string;
+  confidence: number;
+}
+
+/**
+ * Desired emotional state for recommendations
+ */
+export interface DesiredState {
+  valence: number;
+  arousal: number;
+  stress: number;
+}
+
 export interface ContentItem {
   contentId: string;
   title: string;

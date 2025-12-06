@@ -11,6 +11,7 @@ import type { EmotionalState, DesiredState } from '../emotion/types';
 export interface FeedbackRequest {
   userId: string;
   contentId: string;
+  contentTitle?: string; // Display name for the content
   actualPostState: EmotionalState;
   watchDuration: number;
   completed: boolean;

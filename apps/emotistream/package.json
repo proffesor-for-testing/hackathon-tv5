@@ -2,7 +2,6 @@
   "name": "@hackathon/emotistream",
   "version": "1.0.0",
   "description": "EmotiStream Nexus - Emotion-Driven Content Recommendations",
-  "type": "module",
   "bin": {
     "emotistream": "./dist/cli/index.js"
   },
@@ -31,7 +30,8 @@
     "uuid": "^9.0.1",
     "@google/generative-ai": "^0.21.0",
     "jsonwebtoken": "^9.0.2",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "pg": "^8.11.3"
   },
   "devDependencies": {
     "@types/node": "^20.10.5",
@@ -44,6 +44,7 @@
     "@types/supertest": "^6.0.2",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/bcryptjs": "^2.4.6",
+    "@types/pg": "^8.10.9",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "ts-node": "^10.9.2",
