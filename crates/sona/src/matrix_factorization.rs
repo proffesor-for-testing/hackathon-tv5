@@ -5,7 +5,6 @@
 
 use anyhow::{Context, Result};
 use ndarray::{Array1, Array2};
-use ndarray_linalg::LeastSquaresSvd;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -99,10 +98,7 @@ impl MatrixFactorization {
     }
 
     /// Build sparse matrix from user-item interactions
-    pub fn build_matrix(
-        &mut self,
-        interactions: Vec<(Uuid, Uuid, f32)>,
-    ) -> Result<SparseMatrix> {
+    pub fn build_matrix(&mut self, interactions: Vec<(Uuid, Uuid, f32)>) -> Result<SparseMatrix> {
         let mut matrix = SparseMatrix::new();
         self.user_id_map.clear();
         self.item_id_map.clear();
@@ -171,9 +167,13 @@ impl MatrixFactorization {
                     .collect();
 
                 if !user_items.is_empty() {
-                    user_factors
-                        .row_mut(u)
-                        .assign(&self.solve_user(u, &user_items, &item_factors, lambda, alpha)?);
+                    user_factors.row_mut(u).assign(&self.solve_user(
+                        u,
+                        &user_items,
+                        &item_factors,
+                        lambda,
+                        alpha,
+                    )?);
                 }
             }
 
@@ -187,9 +187,13 @@ impl MatrixFactorization {
                     .collect();
 
                 if !item_users.is_empty() {
-                    item_factors
-                        .row_mut(i)
-                        .assign(&self.solve_item(i, &item_users, &user_factors, lambda, alpha)?);
+                    item_factors.row_mut(i).assign(&self.solve_item(
+                        i,
+                        &item_users,
+                        &user_factors,
+                        lambda,
+                        alpha,
+                    )?);
                 }
             }
 
@@ -203,6 +207,56 @@ impl MatrixFactorization {
         self.item_factors = Some(item_factors);
 
         Ok(())
+    }
+
+    /// Solve least squares system A * x = b using Cholesky decomposition
+    /// For positive definite matrix A (which we guarantee by adding regularization)
+    fn solve_least_squares(a: &Array2<f64>, b: &Array1<f64>) -> Result<Array1<f64>> {
+        let n = a.nrows();
+
+        // Perform Cholesky decomposition: A = L * L^T
+        let mut l = Array2::<f64>::zeros((n, n));
+
+        for i in 0..n {
+            for j in 0..=i {
+                let mut sum = 0.0;
+                for k in 0..j {
+                    sum += l[[i, k]] * l[[j, k]];
+                }
+
+                if i == j {
+                    let diag = a[[i, i]] - sum;
+                    if diag <= 0.0 {
+                        anyhow::bail!("Matrix is not positive definite");
+                    }
+                    l[[i, j]] = diag.sqrt();
+                } else {
+                    l[[i, j]] = (a[[i, j]] - sum) / l[[j, j]];
+                }
+            }
+        }
+
+        // Forward substitution: L * y = b
+        let mut y = Array1::<f64>::zeros(n);
+        for i in 0..n {
+            let mut sum = 0.0;
+            for j in 0..i {
+                sum += l[[i, j]] * y[j];
+            }
+            y[i] = (b[i] - sum) / l[[i, i]];
+        }
+
+        // Backward substitution: L^T * x = y
+        let mut x = Array1::<f64>::zeros(n);
+        for i in (0..n).rev() {
+            let mut sum = 0.0;
+            for j in (i + 1)..n {
+                sum += l[[j, i]] * x[j];
+            }
+            x[i] = (y[i] - sum) / l[[i, i]];
+        }
+
+        Ok(x)
     }
 
     /// Solve for user factors (least squares)
@@ -242,10 +296,8 @@ impl MatrixFactorization {
         }
 
         // Solve A * x = b using least squares
-        let x = a
-            .least_squares(&b)
-            .context("Failed to solve least squares for user factors")?
-            .solution;
+        let x = Self::solve_least_squares(&a, &b)
+            .context("Failed to solve least squares for user factors")?;
 
         Ok(x.mapv(|v| v as f32))
     }
@@ -287,10 +339,8 @@ impl MatrixFactorization {
         }
 
         // Solve A * x = b using least squares
-        let x = a
-            .least_squares(&b)
-            .context("Failed to solve least squares for item factors")?
-            .solution;
+        let x = Self::solve_least_squares(&a, &b)
+            .context("Failed to solve least squares for item factors")?;
 
         Ok(x.mapv(|v| v as f32))
     }
@@ -338,7 +388,9 @@ impl MatrixFactorization {
             .as_ref()
             .context("Model not trained yet")?;
 
-        Ok(user_factors.row(*user_idx).dot(&item_factors.row(*item_idx)))
+        Ok(user_factors
+            .row(*user_idx)
+            .dot(&item_factors.row(*item_idx)))
     }
 
     /// Get user embedding

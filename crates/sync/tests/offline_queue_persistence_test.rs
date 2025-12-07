@@ -4,7 +4,6 @@
 /// 1. Queue operations persist across database connections
 /// 2. FIFO ordering is maintained
 /// 3. Rusqlite dependency is correctly integrated
-
 use media_gateway_sync::{OfflineSyncQueue, SyncOperation};
 use std::sync::Arc;
 use uuid::Uuid;

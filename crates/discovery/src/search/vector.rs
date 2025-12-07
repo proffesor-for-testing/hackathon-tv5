@@ -1,12 +1,12 @@
-use qdrant_client::Qdrant;
 use qdrant_client::qdrant::{
     Condition, Filter, Range, SearchParams, SearchPoints, SearchResponse as QdrantSearchResponse,
 };
+use qdrant_client::Qdrant;
 use uuid::Uuid;
 
-use crate::embedding::EmbeddingClient;
 use super::filters::SearchFilters;
 use super::{ContentSummary, SearchResult};
+use crate::embedding::EmbeddingClient;
 
 /// Vector search using Qdrant HNSW
 pub struct VectorSearch {
@@ -21,11 +21,7 @@ pub struct VectorSearch {
 
 impl VectorSearch {
     /// Create new vector search instance
-    pub fn new(
-        qdrant_url: String,
-        collection_name: String,
-        dimension: usize,
-    ) -> Self {
+    pub fn new(qdrant_url: String, collection_name: String, dimension: usize) -> Self {
         let client = Qdrant::from_url(&qdrant_url).build().unwrap();
 
         Self {
@@ -143,16 +139,14 @@ impl VectorSearch {
     /// Generate embedding for query with fallback
     async fn generate_embedding(&self, query: &str) -> anyhow::Result<Vec<f32>> {
         match &self.embedding_client {
-            Some(client) => {
-                match client.generate(query).await {
-                    Ok(embedding) => Ok(embedding),
-                    Err(e) => {
-                        tracing::error!("Embedding generation failed: {}", e);
-                        tracing::warn!("Embedding service failed, vector search will use fallback");
-                        Err(e)
-                    }
+            Some(client) => match client.generate(query).await {
+                Ok(embedding) => Ok(embedding),
+                Err(e) => {
+                    tracing::error!("Embedding generation failed: {}", e);
+                    tracing::warn!("Embedding service failed, vector search will use fallback");
+                    Err(e)
                 }
-            }
+            },
             None => {
                 tracing::warn!("No embedding client configured, vector search unavailable");
                 Err(anyhow::anyhow!("Embedding client not configured"))
@@ -267,10 +261,7 @@ impl VectorSearch {
     fn matches_filters(&self, content: &ContentSummary, filters: &SearchFilters) -> bool {
         // Genre filter
         if !filters.genres.is_empty() {
-            let has_genre = content
-                .genres
-                .iter()
-                .any(|g| filters.genres.contains(g));
+            let has_genre = content.genres.iter().any(|g| filters.genres.contains(g));
             if !has_genre {
                 return false;
             }
@@ -304,11 +295,8 @@ mod tests {
 
     #[test]
     fn test_filter_matching() {
-        let vector_search = VectorSearch::new(
-            "http://localhost:6333".to_string(),
-            "test".to_string(),
-            768,
-        );
+        let vector_search =
+            VectorSearch::new("http://localhost:6333".to_string(), "test".to_string(), 768);
 
         let content = ContentSummary {
             id: Uuid::new_v4(),
@@ -332,11 +320,8 @@ mod tests {
 
     #[test]
     fn test_filter_mismatch() {
-        let vector_search = VectorSearch::new(
-            "http://localhost:6333".to_string(),
-            "test".to_string(),
-            768,
-        );
+        let vector_search =
+            VectorSearch::new("http://localhost:6333".to_string(), "test".to_string(), 768);
 
         let content = ContentSummary {
             id: Uuid::new_v4(),

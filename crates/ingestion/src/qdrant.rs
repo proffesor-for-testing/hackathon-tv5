@@ -9,12 +9,12 @@
 //! - Health checking and error handling
 //! - Integration with CanonicalContent and embedding pipeline
 
-use crate::{normalizer::CanonicalContent, Result, IngestionError};
+use crate::{normalizer::CanonicalContent, IngestionError, Result};
 use qdrant_client::{
     prelude::*,
     qdrant::{
-        vectors_config::Config, CreateCollection, Distance, PointStruct, VectorParams,
-        VectorsConfig, Value as QdrantValue,
+        vectors_config::Config, CreateCollection, Distance, PointStruct, UpsertPoints,
+        Value as QdrantValue, VectorParams, VectorsConfig,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -184,11 +184,9 @@ impl QdrantClient {
         let point = self.create_point_struct(id, vector, payload)?;
 
         self.client
-            .upsert_points_blocking(self.collection_name.clone(), None, vec![point], None)
+            .upsert_points_blocking(&self.collection_name, None, vec![point], None)
             .await
-            .map_err(|e| {
-                IngestionError::DatabaseError(format!("Failed to upsert point: {}", e))
-            })?;
+            .map_err(|e| IngestionError::DatabaseError(format!("Failed to upsert point: {}", e)))?;
 
         debug!("Upserted point {} to Qdrant", id);
         Ok(())
@@ -226,16 +224,9 @@ impl QdrantClient {
             .collect::<Result<Vec<_>>>()?;
 
         self.client
-            .upsert_points_blocking(
-                self.collection_name.clone(),
-                None,
-                point_structs.clone(),
-                None,
-            )
+            .upsert_points_blocking(&self.collection_name, None, point_structs.clone(), None)
             .await
-            .map_err(|e| {
-                IngestionError::DatabaseError(format!("Failed to upsert batch: {}", e))
-            })?;
+            .map_err(|e| IngestionError::DatabaseError(format!("Failed to upsert batch: {}", e)))?;
 
         info!(
             "Upserted batch of {} points to Qdrant collection '{}'",
@@ -260,10 +251,7 @@ impl QdrantClient {
             QdrantValue::from(payload.content_id.to_string()),
         );
         payload_map.insert("title".to_string(), QdrantValue::from(payload.title));
-        payload_map.insert(
-            "platform".to_string(),
-            QdrantValue::from(payload.platform),
-        );
+        payload_map.insert("platform".to_string(), QdrantValue::from(payload.platform));
         payload_map.insert(
             "release_year".to_string(),
             QdrantValue::from(payload.release_year as i64),
@@ -274,27 +262,24 @@ impl QdrantClient {
         );
 
         // Convert genres to list value
-        let genre_values: Vec<QdrantValue> = payload
-            .genres
-            .into_iter()
-            .map(QdrantValue::from)
-            .collect();
+        let genre_values: Vec<QdrantValue> =
+            payload.genres.into_iter().map(QdrantValue::from).collect();
         payload_map.insert(
             "genres".to_string(),
             QdrantValue {
                 kind: Some(qdrant_client::qdrant::value::Kind::ListValue(
                     qdrant_client::qdrant::ListValue {
                         values: genre_values,
-                    }
+                    },
                 )),
             },
         );
 
-        Ok(PointStruct::new(
-            id.to_string(),
-            vector,
-            payload_map.into(),
-        ))
+        use qdrant_client::Payload;
+
+        let payload: Payload = payload_map.into();
+
+        Ok(PointStruct::new(id.to_string(), vector, payload))
     }
 
     /// Search for similar content by vector
@@ -330,8 +315,14 @@ impl QdrantClient {
             .filter_map(|point| {
                 let point_id = point.id?;
                 let id_str = match point_id {
-                    qdrant_client::qdrant::PointId { point_id_options: Some(qdrant_client::qdrant::point_id::PointIdOptions::Uuid(uuid_str)) } => uuid_str,
-                    qdrant_client::qdrant::PointId { point_id_options: Some(qdrant_client::qdrant::point_id::PointIdOptions::Num(num)) } => num.to_string(),
+                    qdrant_client::qdrant::PointId {
+                        point_id_options:
+                            Some(qdrant_client::qdrant::point_id::PointIdOptions::Uuid(uuid_str)),
+                    } => uuid_str,
+                    qdrant_client::qdrant::PointId {
+                        point_id_options:
+                            Some(qdrant_client::qdrant::point_id::PointIdOptions::Num(num)),
+                    } => num.to_string(),
                     _ => return None,
                 };
                 let id = Uuid::parse_str(&id_str).ok()?;

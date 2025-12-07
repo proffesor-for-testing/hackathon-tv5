@@ -78,7 +78,11 @@ impl IntentParser {
         let normalized_query = query.trim().to_lowercase();
 
         // Check cache first
-        match self.cache.get_intent::<String, ParsedIntent>(&normalized_query).await {
+        match self
+            .cache
+            .get_intent::<String, ParsedIntent>(&normalized_query)
+            .await
+        {
             Ok(Some(cached_intent)) => {
                 tracing::debug!(query = %query, "Intent cache hit");
                 return Ok(cached_intent);
@@ -105,7 +109,11 @@ impl IntentParser {
                 let fallback_intent = self.fallback_parse(query);
 
                 // Cache fallback result with lower confidence
-                if let Err(cache_err) = self.cache.cache_intent(&normalized_query, &fallback_intent).await {
+                if let Err(cache_err) = self
+                    .cache
+                    .cache_intent(&normalized_query, &fallback_intent)
+                    .await
+                {
                     tracing::warn!(error = %cache_err, "Failed to cache fallback intent");
                 }
 
@@ -361,11 +369,7 @@ mod tests {
             }
         };
 
-        let parser = IntentParser::new(
-            String::new(),
-            String::new(),
-            cache.clone(),
-        );
+        let parser = IntentParser::new(String::new(), String::new(), cache.clone());
 
         let query = "action movies on netflix";
         let normalized = query.trim().to_lowercase();
@@ -429,11 +433,7 @@ mod tests {
             }
         };
 
-        let parser = IntentParser::new(
-            String::new(),
-            String::new(),
-            cache.clone(),
-        );
+        let parser = IntentParser::new(String::new(), String::new(), cache.clone());
 
         // Different case/whitespace should normalize to same key
         let query1 = "  Action Movies  ";
@@ -441,11 +441,20 @@ mod tests {
         let query3 = "ACTION MOVIES";
 
         let intent = parser.fallback_parse(query1);
-        cache.cache_intent(&query1.trim().to_lowercase(), &intent).await.unwrap();
+        cache
+            .cache_intent(&query1.trim().to_lowercase(), &intent)
+            .await
+            .unwrap();
 
         // All variations should hit cache
-        let cached2: Option<ParsedIntent> = cache.get_intent(&query2.trim().to_lowercase()).await.unwrap();
-        let cached3: Option<ParsedIntent> = cache.get_intent(&query3.trim().to_lowercase()).await.unwrap();
+        let cached2: Option<ParsedIntent> = cache
+            .get_intent(&query2.trim().to_lowercase())
+            .await
+            .unwrap();
+        let cached3: Option<ParsedIntent> = cache
+            .get_intent(&query3.trim().to_lowercase())
+            .await
+            .unwrap();
 
         assert!(cached2.is_some());
         assert!(cached3.is_some());

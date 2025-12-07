@@ -1,7 +1,5 @@
 use crate::error::{AuthError, Result};
-use jsonwebtoken::{
-    decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation,
-};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -10,7 +8,7 @@ const REFRESH_TOKEN_TTL: i64 = 7 * 24 * 3600; // 7 days
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,        // User ID
+    pub sub: String, // User ID
     pub email: Option<String>,
     pub roles: Vec<String>,
     pub scopes: Vec<String>,
@@ -23,7 +21,12 @@ pub struct Claims {
 }
 
 impl Claims {
-    pub fn new_access_token(user_id: String, email: Option<String>, roles: Vec<String>, scopes: Vec<String>) -> Self {
+    pub fn new_access_token(
+        user_id: String,
+        email: Option<String>,
+        roles: Vec<String>,
+        scopes: Vec<String>,
+    ) -> Self {
         let now = chrono::Utc::now().timestamp();
         Self {
             sub: user_id,
@@ -38,7 +41,12 @@ impl Claims {
         }
     }
 
-    pub fn new_refresh_token(user_id: String, email: Option<String>, roles: Vec<String>, scopes: Vec<String>) -> Self {
+    pub fn new_refresh_token(
+        user_id: String,
+        email: Option<String>,
+        roles: Vec<String>,
+        scopes: Vec<String>,
+    ) -> Self {
         let now = chrono::Utc::now().timestamp();
         Self {
             sub: user_id,
@@ -155,7 +163,8 @@ impl JwtManager {
         scopes: Vec<String>,
         family_id: Uuid,
     ) -> Result<String> {
-        let claims = Claims::new_refresh_token_with_family(user_id, email, roles, scopes, family_id);
+        let claims =
+            Claims::new_refresh_token_with_family(user_id, email, roles, scopes, family_id);
         self.encode_token(&claims)
     }
 

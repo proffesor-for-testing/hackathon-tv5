@@ -1,12 +1,9 @@
 use media_gateway_auth::{
-    jwt::JwtManager,
-    oauth::OAuthConfig,
-    session::SessionManager,
-    storage::AuthStorage,
+    api_keys, email, jwt::JwtManager, mfa, middleware::RateLimitConfig, oauth::OAuthConfig,
+    server::start_server, session::SessionManager, storage::AuthStorage,
     token_family::TokenFamilyManager,
-    middleware::RateLimitConfig,
-    server::start_server,
 };
+use sqlx::postgres::PgPoolOptions;
 use std::{env, fs, sync::Arc};
 
 #[actix_web::main]
@@ -32,15 +29,13 @@ async fn main() -> std::io::Result<()> {
     let public_key_path = env::var("JWT_PUBLIC_KEY_PATH")
         .unwrap_or_else(|_| "/secrets/jwt_public_key.pem".to_string());
 
-    let private_key = fs::read(&private_key_path)
-        .expect("Failed to read JWT private key");
-    let public_key = fs::read(&public_key_path)
-        .expect("Failed to read JWT public key");
+    let private_key = fs::read(&private_key_path).expect("Failed to read JWT private key");
+    let public_key = fs::read(&public_key_path).expect("Failed to read JWT public key");
 
-    let jwt_issuer = env::var("JWT_ISSUER")
-        .unwrap_or_else(|_| "https://api.mediagateway.io".to_string());
-    let jwt_audience = env::var("JWT_AUDIENCE")
-        .unwrap_or_else(|_| "mediagateway-users".to_string());
+    let jwt_issuer =
+        env::var("JWT_ISSUER").unwrap_or_else(|_| "https://api.mediagateway.io".to_string());
+    let jwt_audience =
+        env::var("JWT_AUDIENCE").unwrap_or_else(|_| "mediagateway-users".to_string());
 
     // Initialize JWT manager
     let jwt_manager = Arc::new(
@@ -49,15 +44,12 @@ async fn main() -> std::io::Result<()> {
     );
 
     // Initialize session manager
-    let session_manager = Arc::new(
-        SessionManager::new(&redis_url)
-            .expect("Failed to initialize session manager"),
-    );
+    let session_manager =
+        Arc::new(SessionManager::new(&redis_url).expect("Failed to initialize session manager"));
 
     // Initialize token family manager
     let token_family_manager = Arc::new(
-        TokenFamilyManager::new(&redis_url)
-            .expect("Failed to initialize token family manager"),
+        TokenFamilyManager::new(&redis_url).expect("Failed to initialize token family manager"),
     );
 
     // Initialize OAuth config (load from environment)
@@ -66,10 +58,11 @@ async fn main() -> std::io::Result<()> {
     // Add Google OAuth provider if configured
     if let (Ok(client_id), Ok(client_secret)) = (
         env::var("GOOGLE_CLIENT_ID"),
-        env::var("GOOGLE_CLIENT_SECRET")
+        env::var("GOOGLE_CLIENT_SECRET"),
     ) {
-        let redirect_uri = env::var("GOOGLE_REDIRECT_URI")
-            .unwrap_or_else(|_| "https://api.mediagateway.io/auth/oauth/google/callback".to_string());
+        let redirect_uri = env::var("GOOGLE_REDIRECT_URI").unwrap_or_else(|_| {
+            "https://api.mediagateway.io/auth/oauth/google/callback".to_string()
+        });
 
         providers.insert(
             "google".to_string(),
@@ -92,10 +85,18 @@ async fn main() -> std::io::Result<()> {
     let oauth_config = OAuthConfig { providers };
 
     // Initialize auth storage (Redis-backed)
-    let auth_storage = Arc::new(
-        AuthStorage::new(&redis_url)
-            .expect("Failed to initialize auth storage"),
-    );
+    let auth_storage =
+        Arc::new(AuthStorage::new(&redis_url).expect("Failed to initialize auth storage"));
+
+    // Initialize PostgreSQL connection pool
+    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost:5432/media_gateway".to_string()
+    });
+    let db_pool = PgPoolOptions::new()
+        .max_connections(10)
+        .connect(&database_url)
+        .await
+        .expect("Failed to create database connection pool");
 
     // Initialize Redis client for rate limiting
     let redis_client = redis::Client::open(redis_url.as_str())
@@ -119,6 +120,14 @@ async fn main() -> std::io::Result<()> {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(10),
+        env::var("RATE_LIMIT_REGISTER")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5),
+        env::var("RATE_LIMIT_LOGIN")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(10),
     );
 
     let rate_limit_config = if let Ok(secret) = env::var("INTERNAL_SERVICE_SECRET") {
@@ -127,12 +136,19 @@ async fn main() -> std::io::Result<()> {
         rate_limit_config
     };
 
-    tracing::info!("Rate limiting configured: token={}, device={}, authorize={}, revoke={}",
+    tracing::info!("Rate limiting configured: token={}, device={}, authorize={}, revoke={}, register={}, login={}",
         rate_limit_config.token_endpoint_limit,
         rate_limit_config.device_endpoint_limit,
         rate_limit_config.authorize_endpoint_limit,
-        rate_limit_config.revoke_endpoint_limit
+        rate_limit_config.revoke_endpoint_limit,
+        rate_limit_config.register_endpoint_limit,
+        rate_limit_config.login_endpoint_limit
     );
+
+    // Initialize optional managers (None for now, can be configured via env vars)
+    let mfa_manager: Option<Arc<mfa::MfaManager>> = None;
+    let api_key_manager: Option<Arc<api_keys::ApiKeyManager>> = None;
+    let email_manager: Option<Arc<email::EmailManager>> = None;
 
     // Start server with rate limiting
     start_server(
@@ -144,5 +160,10 @@ async fn main() -> std::io::Result<()> {
         auth_storage,
         redis_client,
         rate_limit_config,
-    ).await
+        mfa_manager,
+        api_key_manager,
+        email_manager,
+        db_pool,
+    )
+    .await
 }

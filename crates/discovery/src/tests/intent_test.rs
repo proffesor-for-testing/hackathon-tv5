@@ -100,7 +100,11 @@ async fn test_intent_parser_temporal_pattern_recent() {
     let parser = IntentParser::new(String::new(), String::new(), cache);
 
     let intent = parser.fallback_parse("recent sci-fi movies");
-    assert!(intent.filters.genre.iter().any(|g| g.contains("science") || g == "sci-fi"));
+    assert!(intent
+        .filters
+        .genre
+        .iter()
+        .any(|g| g.contains("science") || g == "sci-fi"));
 }
 
 #[tokio::test]
@@ -130,10 +134,16 @@ async fn test_fallback_parse_genre_extraction_sci_fi() {
     let parser = IntentParser::new(String::new(), String::new(), cache);
 
     let intent1 = parser.fallback_parse("sci-fi movies");
-    assert!(intent1.filters.genre.contains(&"science_fiction".to_string()));
+    assert!(intent1
+        .filters
+        .genre
+        .contains(&"science_fiction".to_string()));
 
     let intent2 = parser.fallback_parse("scifi shows");
-    assert!(intent2.filters.genre.contains(&"science_fiction".to_string()));
+    assert!(intent2
+        .filters
+        .genre
+        .contains(&"science_fiction".to_string()));
 }
 
 #[tokio::test]
@@ -210,8 +220,17 @@ async fn test_fallback_parse_case_insensitive() {
 async fn test_extract_genres_comprehensive() {
     let cache = create_test_cache().await;
     let parser = IntentParser::new(String::new(), String::new(), cache);
-    let tokens = vec!["action", "comedy", "drama", "horror", "thriller", "romance",
-                     "sci-fi", "fantasy", "documentary"];
+    let tokens = vec![
+        "action",
+        "comedy",
+        "drama",
+        "horror",
+        "thriller",
+        "romance",
+        "sci-fi",
+        "fantasy",
+        "documentary",
+    ];
 
     let genres = parser.extract_genres(&tokens);
 

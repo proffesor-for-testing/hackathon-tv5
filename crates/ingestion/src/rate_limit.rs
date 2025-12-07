@@ -1,9 +1,9 @@
 //! Rate limiting for API calls with multi-key rotation
 
-use crate::{Result, IngestionError};
-use governor::{Quota, RateLimiter, Jitter};
+use crate::{IngestionError, Result};
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
+use governor::{Jitter, Quota, RateLimiter};
 use nonzero_ext::nonzero;
 use std::collections::HashMap;
 use std::num::NonZeroU32;
@@ -38,7 +38,9 @@ impl ApiRateLimiter {
             return String::new();
         }
 
-        let index = self.current_key_index.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let index = self
+            .current_key_index
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.api_keys[index % self.api_keys.len()].clone()
     }
 
@@ -46,7 +48,9 @@ impl ApiRateLimiter {
     async fn check_and_wait(&self) -> Result<()> {
         // Try to acquire permit with jitter to avoid thundering herd
         // until_ready_with_jitter returns () not Result, it always waits until ready
-        self.limiter.until_ready_with_jitter(Jitter::up_to(Duration::from_millis(100))).await;
+        self.limiter
+            .until_ready_with_jitter(Jitter::up_to(Duration::from_millis(100)))
+            .await;
         Ok(())
     }
 }
@@ -132,7 +136,8 @@ impl RateLimitManager {
             100,
             Duration::from_secs(60),
             vec![], // Keys provided separately
-        ).await;
+        )
+        .await;
 
         // Watchmode API: 1000 req/day
         self.register_platform(
@@ -140,7 +145,8 @@ impl RateLimitManager {
             1000,
             Duration::from_secs(86400),
             vec![],
-        ).await;
+        )
+        .await;
 
         // YouTube Data API: 100 searches per day per key
         // With 5 keys, we can do 500 searches per day
@@ -149,15 +155,12 @@ impl RateLimitManager {
             100,
             Duration::from_secs(86400),
             vec![], // Keys provided separately
-        ).await;
+        )
+        .await;
 
         // TMDb API: 40 req per 10 seconds
-        self.register_platform(
-            "tmdb".to_string(),
-            40,
-            Duration::from_secs(10),
-            vec![],
-        ).await;
+        self.register_platform("tmdb".to_string(), 40, Duration::from_secs(10), vec![])
+            .await;
 
         debug!("Initialized default rate limiters");
     }
@@ -177,12 +180,14 @@ mod tests {
     async fn test_rate_limiter_registration() {
         let manager = RateLimitManager::new();
 
-        manager.register_platform(
-            "test_platform".to_string(),
-            10,
-            Duration::from_secs(1),
-            vec!["key1".to_string(), "key2".to_string()],
-        ).await;
+        manager
+            .register_platform(
+                "test_platform".to_string(),
+                10,
+                Duration::from_secs(1),
+                vec!["key1".to_string(), "key2".to_string()],
+            )
+            .await;
 
         // Should not fail
         let result = manager.check_and_wait("test_platform").await;
@@ -193,12 +198,14 @@ mod tests {
     async fn test_api_key_rotation() {
         let manager = RateLimitManager::new();
 
-        manager.register_platform(
-            "test_platform".to_string(),
-            10,
-            Duration::from_secs(1),
-            vec!["key1".to_string(), "key2".to_string(), "key3".to_string()],
-        ).await;
+        manager
+            .register_platform(
+                "test_platform".to_string(),
+                10,
+                Duration::from_secs(1),
+                vec!["key1".to_string(), "key2".to_string(), "key3".to_string()],
+            )
+            .await;
 
         let key1 = manager.get_api_key("test_platform").await;
         let key2 = manager.get_api_key("test_platform").await;

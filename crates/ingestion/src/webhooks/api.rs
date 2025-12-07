@@ -1,9 +1,9 @@
 //! Webhook API endpoints
 
+use crate::webhooks::{WebhookError, WebhookReceiver, WebhookRegistration};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use crate::webhooks::{WebhookReceiver, WebhookRegistration, WebhookError};
 
 /// Webhook API routes
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
@@ -12,7 +12,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .route("/{platform}", web::post().to(receive_webhook))
             .route("/register", web::post().to(register_webhook))
             .route("/metrics", web::get().to(get_metrics))
-            .route("/stats", web::get().to(get_stats))
+            .route("/stats", web::get().to(get_stats)),
     );
 }
 
@@ -29,13 +29,17 @@ async fn receive_webhook(
     let signature = match req.headers().get("X-Webhook-Signature") {
         Some(sig) => match sig.to_str() {
             Ok(s) => s,
-            Err(_) => return HttpResponse::BadRequest().json(ErrorResponse {
-                error: "Invalid signature header".to_string(),
-            }),
+            Err(_) => {
+                return HttpResponse::BadRequest().json(ErrorResponse {
+                    error: "Invalid signature header".to_string(),
+                })
+            }
         },
-        None => return HttpResponse::BadRequest().json(ErrorResponse {
-            error: "Missing X-Webhook-Signature header".to_string(),
-        }),
+        None => {
+            return HttpResponse::BadRequest().json(ErrorResponse {
+                error: "Missing X-Webhook-Signature header".to_string(),
+            })
+        }
     };
 
     // Process webhook
@@ -150,15 +154,15 @@ struct ErrorResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix_web::{test, App};
     use crate::webhooks::{
-        queue::RedisWebhookQueue, WebhookDeduplicator, WebhookMetrics,
-        WebhookQueue, handlers::NetflixWebhookHandler, PlatformWebhookConfig,
+        handlers::NetflixWebhookHandler, queue::RedisWebhookQueue, PlatformWebhookConfig,
+        WebhookDeduplicator, WebhookMetrics, WebhookQueue,
     };
+    use actix_web::{test, App};
 
     async fn create_test_receiver() -> Option<Arc<WebhookReceiver>> {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
         let queue = match RedisWebhookQueue::new(&redis_url, None, None, None) {
             Ok(q) => Arc::new(q) as Arc<dyn WebhookQueue>,
@@ -200,8 +204,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(receiver.clone()))
-                .configure(configure_routes)
-        ).await;
+                .configure(configure_routes),
+        )
+        .await;
 
         let webhook_payload = serde_json::json!({
             "event_type": "content_added",
@@ -240,8 +245,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(receiver))
-                .configure(configure_routes)
-        ).await;
+                .configure(configure_routes),
+        )
+        .await;
 
         let req = test::TestRequest::post()
             .uri("/api/v1/webhooks/netflix")
@@ -265,8 +271,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(receiver))
-                .configure(configure_routes)
-        ).await;
+                .configure(configure_routes),
+        )
+        .await;
 
         let req = test::TestRequest::get()
             .uri("/api/v1/webhooks/metrics")
@@ -289,8 +296,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(receiver))
-                .configure(configure_routes)
-        ).await;
+                .configure(configure_routes),
+        )
+        .await;
 
         let registration = WebhookRegistration {
             platform: "hulu".to_string(),

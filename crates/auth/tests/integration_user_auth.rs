@@ -1,14 +1,15 @@
 use actix_web::{test, web, App};
 use media_gateway_auth::{
-    CreateUserRequest, JwtManager, LoginRequest, PasswordHasher, PostgresUserRepository,
-    UserHandlerState, login, register,
+    login, register, CreateUserRequest, JwtManager, LoginRequest, PasswordHasher,
+    PostgresUserRepository, UserHandlerState,
 };
 use sqlx::PgPool;
 use std::sync::Arc;
 
 async fn setup_test_db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:password@localhost:5432/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:password@localhost:5432/media_gateway_test".to_string()
+    });
 
     let pool = PgPool::connect(&database_url)
         .await

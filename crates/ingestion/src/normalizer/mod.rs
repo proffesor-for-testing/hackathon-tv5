@@ -1,22 +1,22 @@
 //! Platform normalizers for converting platform-specific data to canonical format
 
+use crate::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::Result;
 
-pub mod netflix;
-pub mod prime_video;
+pub mod apple_tv_plus;
+pub mod circuit_breaker_integration;
 pub mod disney_plus;
-pub mod youtube;
+pub mod generic;
 pub mod hbo_max;
 pub mod hulu;
-pub mod apple_tv_plus;
+pub mod netflix;
 pub mod paramount_plus;
 pub mod peacock;
-pub mod generic;
-pub mod circuit_breaker_integration;
+pub mod prime_video;
+pub mod youtube;
 
 /// Raw content item from a platform API
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -179,7 +179,10 @@ pub(crate) fn extract_f64(value: &serde_json::Value, key: &str) -> Option<f64> {
 }
 
 /// Helper function to extract array from JSON value
-pub(crate) fn extract_array<'a>(value: &'a serde_json::Value, key: &str) -> Option<&'a Vec<serde_json::Value>> {
+pub(crate) fn extract_array<'a>(
+    value: &'a serde_json::Value,
+    key: &str,
+) -> Option<&'a Vec<serde_json::Value>> {
     value.get(key)?.as_array()
 }
 
@@ -203,7 +206,10 @@ mod tests {
             "genres": ["action", "thriller"]
         });
 
-        assert_eq!(extract_string(&json, "name"), Some("Test Movie".to_string()));
+        assert_eq!(
+            extract_string(&json, "name"),
+            Some("Test Movie".to_string())
+        );
         assert_eq!(extract_i64(&json, "year"), Some(2024));
         assert_eq!(extract_f64(&json, "rating"), Some(8.5));
         assert!(extract_array(&json, "genres").is_some());

@@ -51,7 +51,8 @@ impl ApplyDiversityFilter {
                     let mut max_sim: f32 = 0.0;
                     for s in &selected {
                         let selected_embedding = get_content_embedding(s.content_id)?;
-                        let sim = Self::cosine_similarity(&candidate_embedding, &selected_embedding);
+                        let sim =
+                            Self::cosine_similarity(&candidate_embedding, &selected_embedding);
                         max_sim = max_sim.max(sim);
                     }
                     max_sim

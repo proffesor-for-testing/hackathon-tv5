@@ -1,16 +1,16 @@
 //! Redis-backed storage for OAuth authentication state
 
-use redis::{AsyncCommands, Client, aio::MultiplexedConnection};
-use serde::{de::DeserializeOwned, Serialize};
-use std::time::Duration;
 use crate::error::{AuthError, Result};
 use crate::oauth::{
     device::DeviceCode,
     pkce::{AuthorizationCode, PkceChallenge},
 };
+use redis::{aio::MultiplexedConnection, AsyncCommands, Client};
+use serde::{de::DeserializeOwned, Serialize};
+use std::time::Duration;
 
 /// TTL constants for different token types
-const PKCE_TTL_SECS: u64 = 600;      // 10 minutes
+const PKCE_TTL_SECS: u64 = 600; // 10 minutes
 const AUTH_CODE_TTL_SECS: u64 = 300; // 5 minutes
 const DEVICE_CODE_TTL_SECS: u64 = 900; // 15 minutes
 
@@ -30,8 +30,8 @@ impl AuthStorage {
 
     /// Create from REDIS_URL environment variable
     pub fn from_env() -> Result<Self> {
-        let url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+        let url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
         Self::new(&url)
     }
 
@@ -64,7 +64,8 @@ impl AuthStorage {
         let mut conn = self.get_conn().await?;
         let key = format!("pkce:{}", state);
 
-        let value: Option<String> = conn.get(&key)
+        let value: Option<String> = conn
+            .get(&key)
             .await
             .map_err(|e| AuthError::Internal(format!("Redis GET error: {}", e)))?;
 
@@ -109,7 +110,8 @@ impl AuthStorage {
         let mut conn = self.get_conn().await?;
         let key = format!("authcode:{}", code);
 
-        let value: Option<String> = conn.get(&key)
+        let value: Option<String> = conn
+            .get(&key)
             .await
             .map_err(|e| AuthError::Internal(format!("Redis GET error: {}", e)))?;
 
@@ -129,7 +131,8 @@ impl AuthStorage {
         let key = format!("authcode:{}", code);
 
         // Get remaining TTL
-        let ttl: i64 = conn.ttl::<_, i64>(&key)
+        let ttl: i64 = conn
+            .ttl::<_, i64>(&key)
             .await
             .map_err(|e| AuthError::Internal(format!("Redis TTL error: {}", e)))?;
 
@@ -182,7 +185,8 @@ impl AuthStorage {
         let mut conn = self.get_conn().await?;
         let key = format!("devicecode:{}", device_code);
 
-        let value: Option<String> = conn.get(&key)
+        let value: Option<String> = conn
+            .get(&key)
             .await
             .map_err(|e| AuthError::Internal(format!("Redis GET error: {}", e)))?;
 
@@ -201,7 +205,8 @@ impl AuthStorage {
         let mut conn = self.get_conn().await?;
         let key = format!("devicecode:{}", device_code);
 
-        let ttl: i64 = conn.ttl::<_, i64>(&key)
+        let ttl: i64 = conn
+            .ttl::<_, i64>(&key)
             .await
             .map_err(|e| AuthError::Internal(format!("Redis TTL error: {}", e)))?;
 
@@ -217,12 +222,16 @@ impl AuthStorage {
     }
 
     /// Get device code by user_code
-    pub async fn get_device_code_by_user_code(&self, user_code: &str) -> Result<Option<DeviceCode>> {
+    pub async fn get_device_code_by_user_code(
+        &self,
+        user_code: &str,
+    ) -> Result<Option<DeviceCode>> {
         let mut conn = self.get_conn().await?;
         let user_code_key = format!("devicecode:user:{}", user_code);
 
         // Get device_code from user_code mapping
-        let device_code: Option<String> = conn.get(&user_code_key)
+        let device_code: Option<String> = conn
+            .get(&user_code_key)
             .await
             .map_err(|e| AuthError::Internal(format!("Redis GET error: {}", e)))?;
 
@@ -239,7 +248,8 @@ impl AuthStorage {
         // Get the device to find user_code for cleanup
         if let Some(device) = self.get_device_code(device_code).await? {
             let user_code_key = format!("devicecode:user:{}", device.user_code);
-            let _: () = conn.del::<_, ()>(&user_code_key)
+            let _: () = conn
+                .del::<_, ()>(&user_code_key)
                 .await
                 .map_err(|e| AuthError::Internal(format!("Redis DEL error: {}", e)))?;
         }
@@ -254,12 +264,10 @@ impl AuthStorage {
     /// Check Redis health
     pub async fn is_healthy(&self) -> bool {
         match self.get_conn().await {
-            Ok(mut conn) => {
-                redis::cmd("PING")
-                    .query_async::<_, String>(&mut conn)
-                    .await
-                    .is_ok()
-            }
+            Ok(mut conn) => redis::cmd("PING")
+                .query_async::<_, String>(&mut conn)
+                .await
+                .is_ok(),
             Err(_) => false,
         }
     }
@@ -275,7 +283,8 @@ impl AuthStorage {
         let window_secs = 60;
 
         // Get current count
-        let count: Option<u32> = conn.get(&key)
+        let count: Option<u32> = conn
+            .get(&key)
             .await
             .map_err(|e| AuthError::Internal(format!("Redis GET error: {}", e)))?;
 
@@ -286,7 +295,8 @@ impl AuthStorage {
         }
 
         // Increment counter
-        let new_count: u32 = conn.incr::<_, _, u32>(&key, 1)
+        let new_count: u32 = conn
+            .incr::<_, _, u32>(&key, 1)
             .await
             .map_err(|e| AuthError::Internal(format!("Redis INCR error: {}", e)))?;
 
@@ -313,7 +323,11 @@ impl AuthStorage {
     // ========== Password Reset ==========
 
     /// Store password reset token with 1 hour TTL
-    pub async fn store_password_reset_token(&self, token: &str, reset_token: &crate::password_reset::PasswordResetToken) -> Result<()> {
+    pub async fn store_password_reset_token(
+        &self,
+        token: &str,
+        reset_token: &crate::password_reset::PasswordResetToken,
+    ) -> Result<()> {
         let mut conn = self.get_conn().await?;
         let key = format!("password_reset:{}", token);
         let value = serde_json::to_string(reset_token)
@@ -327,18 +341,24 @@ impl AuthStorage {
     }
 
     /// Get password reset token
-    pub async fn get_password_reset_token(&self, token: &str) -> Result<Option<crate::password_reset::PasswordResetToken>> {
+    pub async fn get_password_reset_token(
+        &self,
+        token: &str,
+    ) -> Result<Option<crate::password_reset::PasswordResetToken>> {
         let mut conn = self.get_conn().await?;
         let key = format!("password_reset:{}", token);
 
-        let value: Option<String> = conn.get(&key)
+        let value: Option<String> = conn
+            .get(&key)
             .await
             .map_err(|e| AuthError::Internal(format!("Redis GET error: {}", e)))?;
 
         match value {
             Some(v) => {
-                let reset_token: crate::password_reset::PasswordResetToken = serde_json::from_str(&v)
-                    .map_err(|e| AuthError::Internal(format!("Deserialization error: {}", e)))?;
+                let reset_token: crate::password_reset::PasswordResetToken =
+                    serde_json::from_str(&v).map_err(|e| {
+                        AuthError::Internal(format!("Deserialization error: {}", e))
+                    })?;
                 Ok(Some(reset_token))
             }
             None => Ok(None),
@@ -362,7 +382,8 @@ impl AuthStorage {
         let max_attempts = 3;
         let window_secs = 3600; // 1 hour
 
-        let count: Option<u32> = conn.get(&key)
+        let count: Option<u32> = conn
+            .get(&key)
             .await
             .map_err(|e| AuthError::Internal(format!("Redis GET error: {}", e)))?;
 
@@ -372,7 +393,8 @@ impl AuthStorage {
             return Ok(0);
         }
 
-        let new_count: u32 = conn.incr::<_, _, u32>(&key, 1)
+        let new_count: u32 = conn
+            .incr::<_, _, u32>(&key, 1)
             .await
             .map_err(|e| AuthError::Internal(format!("Redis INCR error: {}", e)))?;
 

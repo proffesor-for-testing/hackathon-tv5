@@ -94,7 +94,10 @@ impl TestClient {
             anyhow::bail!("Request failed with status {}: {}", status, error_text);
         }
 
-        response.json::<T>().await.context("Failed to parse JSON response")
+        response
+            .json::<T>()
+            .await
+            .context("Failed to parse JSON response")
     }
 
     pub async fn post_json<T: Serialize, R: serde::de::DeserializeOwned>(
@@ -110,10 +113,17 @@ impl TestClient {
             anyhow::bail!("Request failed with status {}: {}", status, error_text);
         }
 
-        response.json::<R>().await.context("Failed to parse JSON response")
+        response
+            .json::<R>()
+            .await
+            .context("Failed to parse JSON response")
     }
 
-    pub async fn expect_status(&self, response: Response, expected: StatusCode) -> Result<Response> {
+    pub async fn expect_status(
+        &self,
+        response: Response,
+        expected: StatusCode,
+    ) -> Result<Response> {
         let status = response.status();
         if status != expected {
             let error_text = response.text().await.unwrap_or_default();

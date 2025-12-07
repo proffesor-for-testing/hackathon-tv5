@@ -71,7 +71,9 @@ impl ApiKeyManager {
 
     pub fn extract_prefix(key: &str) -> Result<String> {
         if !key.starts_with(PREFIX) {
-            return Err(AuthError::InvalidToken("Invalid API key format".to_string()));
+            return Err(AuthError::InvalidToken(
+                "Invalid API key format".to_string(),
+            ));
         }
 
         if key.len() < PREFIX.len() + PREFIX_LENGTH {
@@ -110,9 +112,9 @@ impl ApiKeyManager {
         let key_hash = Self::hash_key(&key);
         let key_prefix = Self::extract_prefix(&key)?;
 
-        let expires_at = request.expires_in_days.map(|days| {
-            Utc::now() + Duration::days(days as i64)
-        });
+        let expires_at = request
+            .expires_in_days
+            .map(|days| Utc::now() + Duration::days(days as i64));
 
         let rate_limit = request.rate_limit_per_minute.unwrap_or(60);
 
@@ -176,7 +178,9 @@ impl ApiKeyManager {
         .await?;
 
         if result.rows_affected() == 0 {
-            return Err(AuthError::InvalidToken("API key not found or already revoked".to_string()));
+            return Err(AuthError::InvalidToken(
+                "API key not found or already revoked".to_string(),
+            ));
         }
 
         Ok(())
@@ -261,10 +265,7 @@ mod tests {
 
     #[test]
     fn test_validate_scopes_valid() {
-        let scopes = vec![
-            "read:content".to_string(),
-            "write:watchlist".to_string(),
-        ];
+        let scopes = vec!["read:content".to_string(), "write:watchlist".to_string()];
         assert!(ApiKeyManager::validate_scopes(&scopes).is_ok());
     }
 
@@ -276,8 +277,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_api_key() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -330,8 +332,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_verify_key() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -383,8 +386,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_user_keys() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -442,8 +446,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_revoke_key() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -496,8 +501,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_expired_key() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
 

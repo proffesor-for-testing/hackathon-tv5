@@ -1,11 +1,10 @@
 //! Disney+ platform normalizer using Streaming Availability API
 
 use super::{
-    PlatformNormalizer, RawContent, CanonicalContent, ContentType,
-    AvailabilityInfo, ImageSet, RateLimitConfig,
-    extract_string, extract_i64, extract_f64, extract_array,
+    extract_array, extract_f64, extract_i64, extract_string, AvailabilityInfo, CanonicalContent,
+    ContentType, ImageSet, PlatformNormalizer, RateLimitConfig, RawContent,
 };
-use crate::{Result, IngestionError, deep_link::DeepLinkResult};
+use crate::{deep_link::DeepLinkResult, IngestionError, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
@@ -85,7 +84,8 @@ impl PlatformNormalizer for DisneyPlusNormalizer {
             since.format("%Y-%m-%d")
         );
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("X-RapidAPI-Key", &self.api_key)
             .header("X-RapidAPI-Host", "streaming-availability.p.rapidapi.com")
@@ -94,18 +94,20 @@ impl PlatformNormalizer for DisneyPlusNormalizer {
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
         let data: serde_json::Value = response.json().await?;
-        let changes = data.get("changes")
+        let changes = data
+            .get("changes")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| IngestionError::NormalizationFailed(
-                "No changes array in response".to_string()
-            ))?;
+            .ok_or_else(|| {
+                IngestionError::NormalizationFailed("No changes array in response".to_string())
+            })?;
 
-        let raw_items = changes.iter()
+        let raw_items = changes
+            .iter()
             .filter_map(|item| {
                 let id = extract_string(item, "id")?;
                 Some(RawContent {
@@ -134,7 +136,8 @@ impl PlatformNormalizer for DisneyPlusNormalizer {
 
         // Extract and map genres
         let genres = if let Some(genre_array) = extract_array(data, "genres") {
-            genre_array.iter()
+            genre_array
+                .iter()
                 .filter_map(|g| g.as_str())
                 .flat_map(|g| self.map_disney_genre(g))
                 .collect()
@@ -151,13 +154,16 @@ impl PlatformNormalizer for DisneyPlusNormalizer {
         };
 
         // Extract availability
-        let availability = if let Some(streaming_info) = data.get("streamingInfo")
+        let availability = if let Some(streaming_info) = data
+            .get("streamingInfo")
             .and_then(|si| si.get("disney"))
             .and_then(|d| d.as_array())
             .and_then(|arr| arr.first())
         {
             AvailabilityInfo {
-                regions: vec![raw.data.get("country")
+                regions: vec![raw
+                    .data
+                    .get("country")
                     .and_then(|c| c.as_str())
                     .unwrap_or("us")
                     .to_string()],
@@ -165,10 +171,12 @@ impl PlatformNormalizer for DisneyPlusNormalizer {
                 purchase_price: None,
                 rental_price: None,
                 currency: None,
-                available_from: streaming_info.get("addedOn")
+                available_from: streaming_info
+                    .get("addedOn")
                     .and_then(|v| v.as_i64())
                     .and_then(|ts| DateTime::from_timestamp(ts, 0)),
-                available_until: streaming_info.get("leaving")
+                available_until: streaming_info
+                    .get("leaving")
                     .and_then(|v| v.as_i64())
                     .and_then(|ts| DateTime::from_timestamp(ts, 0)),
             }
@@ -231,7 +239,10 @@ mod tests {
 
         assert_eq!(normalizer.map_disney_genre("animation"), vec!["Animation"]);
         assert_eq!(normalizer.map_disney_genre("family"), vec!["Family"]);
-        assert_eq!(normalizer.map_disney_genre("superhero"), vec!["Action", "Fantasy"]);
+        assert_eq!(
+            normalizer.map_disney_genre("superhero"),
+            vec!["Action", "Fantasy"]
+        );
     }
 
     #[test]
@@ -239,8 +250,14 @@ mod tests {
         let normalizer = DisneyPlusNormalizer::new("test_key".to_string());
         let deep_link = normalizer.generate_deep_link("123abc");
 
-        assert_eq!(deep_link.mobile_url, Some("disneyplus://content/123abc".to_string()));
+        assert_eq!(
+            deep_link.mobile_url,
+            Some("disneyplus://content/123abc".to_string())
+        );
         assert_eq!(deep_link.web_url, "https://www.disneyplus.com/video/123abc");
-        assert_eq!(deep_link.tv_url, Some("disneyplus://content/123abc".to_string()));
+        assert_eq!(
+            deep_link.tv_url,
+            Some("disneyplus://content/123abc".to_string())
+        );
     }
 }

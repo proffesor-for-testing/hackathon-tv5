@@ -6,8 +6,8 @@ use actix_web::{
 };
 use media_gateway_auth::{
     admin::{
-        delete_user, get_user_detail, impersonate_user, list_users, update_user,
-        AdminMiddleware, AdminUpdateUserRequest, ListUsersQuery,
+        delete_user, get_user_detail, impersonate_user, list_users, update_user, AdminMiddleware,
+        AdminUpdateUserRequest, ListUsersQuery,
     },
     jwt::JwtManager,
     middleware::UserContext,
@@ -38,15 +38,16 @@ fn create_test_jwt_manager() -> Arc<JwtManager> {
 }
 
 async fn create_test_db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+    });
 
     PgPool::connect(&database_url).await.unwrap()
 }
 
 async fn create_test_session_manager() -> Arc<SessionManager> {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     let redis_client = redis::Client::open(redis_url).unwrap();
 
@@ -150,16 +151,14 @@ async fn test_admin_middleware_allows_admin_user() {
     let (admin_id, user_id, admin_token) = setup_test_data(&pool).await;
 
     let app = test::init_service(
-        App::new()
-            .app_data(Data::new(pool.clone()))
-            .service(
-                web::scope("/api/v1/admin")
-                    .wrap(AdminMiddleware::new(
-                        Rc::new((*jwt_manager).clone()),
-                        Rc::new((*session_manager).clone()),
-                    ))
-                    .service(list_users),
-            ),
+        App::new().app_data(Data::new(pool.clone())).service(
+            web::scope("/api/v1/admin")
+                .wrap(AdminMiddleware::new(
+                    Rc::new((*jwt_manager).clone()),
+                    Rc::new((*session_manager).clone()),
+                ))
+                .service(list_users),
+        ),
     )
     .await;
 
@@ -195,16 +194,14 @@ async fn test_admin_middleware_rejects_non_admin_user() {
         .unwrap();
 
     let app = test::init_service(
-        App::new()
-            .app_data(Data::new(pool.clone()))
-            .service(
-                web::scope("/api/v1/admin")
-                    .wrap(AdminMiddleware::new(
-                        Rc::new((*jwt_manager).clone()),
-                        Rc::new((*session_manager).clone()),
-                    ))
-                    .service(list_users),
-            ),
+        App::new().app_data(Data::new(pool.clone())).service(
+            web::scope("/api/v1/admin")
+                .wrap(AdminMiddleware::new(
+                    Rc::new((*jwt_manager).clone()),
+                    Rc::new((*session_manager).clone()),
+                ))
+                .service(list_users),
+        ),
     )
     .await;
 
@@ -229,16 +226,14 @@ async fn test_admin_middleware_rejects_missing_token() {
     let jwt_manager = create_test_jwt_manager();
 
     let app = test::init_service(
-        App::new()
-            .app_data(Data::new(pool.clone()))
-            .service(
-                web::scope("/api/v1/admin")
-                    .wrap(AdminMiddleware::new(
-                        Rc::new((*jwt_manager).clone()),
-                        Rc::new((*session_manager).clone()),
-                    ))
-                    .service(list_users),
-            ),
+        App::new().app_data(Data::new(pool.clone())).service(
+            web::scope("/api/v1/admin")
+                .wrap(AdminMiddleware::new(
+                    Rc::new((*jwt_manager).clone()),
+                    Rc::new((*session_manager).clone()),
+                ))
+                .service(list_users),
+        ),
     )
     .await;
 
@@ -421,7 +416,9 @@ async fn test_list_users_with_status_filter() {
 
     let body: serde_json::Value = test::read_body_json(resp).await;
     let users = body["users"].as_array().unwrap();
-    assert!(users.iter().all(|u| u["suspended"].as_bool().unwrap_or(false)));
+    assert!(users
+        .iter()
+        .all(|u| u["suspended"].as_bool().unwrap_or(false)));
 
     cleanup_test_data(&pool, admin_id, user_id).await;
 }
@@ -494,14 +491,17 @@ async fn test_get_user_detail_logs_audit_action() {
 
     // Verify audit log was created
     let audit_count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM audit_logs WHERE admin_user_id = $1 AND action = 'get_user_detail'"
+        "SELECT COUNT(*) FROM audit_logs WHERE admin_user_id = $1 AND action = 'get_user_detail'",
     )
     .bind(admin_id)
     .fetch_one(&pool)
     .await
     .unwrap();
 
-    assert!(audit_count.0 > 0, "Audit log should be created for get_user_detail action");
+    assert!(
+        audit_count.0 > 0,
+        "Audit log should be created for get_user_detail action"
+    );
 
     cleanup_test_data(&pool, admin_id, user_id).await;
 }
@@ -730,7 +730,10 @@ async fn test_delete_user_hard_delete() {
         .fetch_optional(&pool)
         .await
         .unwrap();
-    assert!(user_exists.is_none(), "User should be hard deleted from database");
+    assert!(
+        user_exists.is_none(),
+        "User should be hard deleted from database"
+    );
 
     cleanup_test_data(&pool, admin_id, user_id).await;
 }
@@ -797,14 +800,17 @@ async fn test_delete_user_logs_audit_action() {
 
     // Verify audit log was created
     let audit_count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM audit_logs WHERE admin_user_id = $1 AND action = 'delete_user'"
+        "SELECT COUNT(*) FROM audit_logs WHERE admin_user_id = $1 AND action = 'delete_user'",
     )
     .bind(admin_id)
     .fetch_one(&pool)
     .await
     .unwrap();
 
-    assert!(audit_count.0 > 0, "Audit log should be created for delete_user action");
+    assert!(
+        audit_count.0 > 0,
+        "Audit log should be created for delete_user action"
+    );
 
     cleanup_test_data(&pool, admin_id, user_id).await;
 }
@@ -959,14 +965,17 @@ async fn test_impersonate_user_logs_audit_action() {
 
     // Verify audit log was created
     let audit_count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM audit_logs WHERE admin_user_id = $1 AND action = 'impersonate_user'"
+        "SELECT COUNT(*) FROM audit_logs WHERE admin_user_id = $1 AND action = 'impersonate_user'",
     )
     .bind(admin_id)
     .fetch_one(&pool)
     .await
     .unwrap();
 
-    assert!(audit_count.0 > 0, "Audit log should be created for impersonate_user action");
+    assert!(
+        audit_count.0 > 0,
+        "Audit log should be created for impersonate_user action"
+    );
 
     cleanup_test_data(&pool, admin_id, user_id).await;
 }

@@ -7,13 +7,18 @@ pub mod intent;
 pub mod search;
 pub mod server;
 
-pub use analytics::{SearchAnalytics, AnalyticsDashboard, PopularQuery, ZeroResultQuery};
+pub use analytics::{AnalyticsDashboard, PopularQuery, SearchAnalytics, ZeroResultQuery};
 pub use cache::{CacheError, CacheStats, RedisCache};
-pub use catalog::{CatalogService, CatalogState, CreateContentRequest, UpdateContentRequest, AvailabilityUpdate, ContentResponse};
+pub use catalog::{
+    AvailabilityUpdate, CatalogService, CatalogState, ContentResponse, CreateContentRequest,
+    UpdateContentRequest,
+};
 pub use config::DiscoveryConfig;
 pub use embedding::{EmbeddingClient, EmbeddingModel, EmbeddingProvider, EmbeddingService};
 pub use intent::{IntentParser, ParsedIntent};
-pub use search::{HybridSearchService, RankingConfig, RankingConfigStore, SearchRequest, SearchResponse};
+pub use search::{
+    HybridSearchService, RankingConfig, RankingConfigStore, SearchRequest, SearchResponse,
+};
 
 use std::sync::Arc;
 
@@ -63,11 +68,14 @@ pub async fn init_service(
     ));
 
     // Initialize vector search with embedding client
-    let vector_search = Arc::new(search::vector::VectorSearch::new(
-        config.vector.qdrant_url.clone(),
-        config.vector.collection_name.clone(),
-        config.vector.dimension,
-    ).with_embedding_client((*embedding_client).clone()));
+    let vector_search = Arc::new(
+        search::vector::VectorSearch::new(
+            config.vector.qdrant_url.clone(),
+            config.vector.collection_name.clone(),
+            config.vector.dimension,
+        )
+        .with_embedding_client((*embedding_client).clone()),
+    );
 
     // Initialize keyword search
     let keyword_search = Arc::new(search::keyword::KeywordSearch::new(

@@ -59,8 +59,8 @@ where
             .unwrap_or_else(|| request_id.clone());
 
         // Check for AI agent headers
-        let is_ai_agent = req.headers().get("X-AI-Agent").is_some()
-            || req.headers().get("AI-Agent-ID").is_some();
+        let is_ai_agent =
+            req.headers().get("X-AI-Agent").is_some() || req.headers().get("AI-Agent-ID").is_some();
 
         // Store in request extensions
         req.extensions_mut().insert(RequestIdData {

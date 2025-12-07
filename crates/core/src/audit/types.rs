@@ -16,10 +16,7 @@ pub struct AuditEvent {
 }
 
 impl AuditEvent {
-    pub fn new(
-        action: AuditAction,
-        resource_type: String,
-    ) -> Self {
+    pub fn new(action: AuditAction, resource_type: String) -> Self {
         Self {
             id: Uuid::new_v4(),
             timestamp: Utc::now(),
@@ -236,8 +233,14 @@ mod tests {
 
     #[test]
     fn test_audit_action_from_str() {
-        assert_eq!(AuditAction::from_str("AUTH_LOGIN"), Some(AuditAction::AuthLogin));
-        assert_eq!(AuditAction::from_str("USER_CREATED"), Some(AuditAction::UserCreated));
+        assert_eq!(
+            AuditAction::from_str("AUTH_LOGIN"),
+            Some(AuditAction::AuthLogin)
+        );
+        assert_eq!(
+            AuditAction::from_str("USER_CREATED"),
+            Some(AuditAction::UserCreated)
+        );
         assert_eq!(AuditAction::from_str("INVALID"), None);
     }
 

@@ -8,9 +8,7 @@ use std::sync::Arc;
 
 /// Google OAuth authorization endpoint
 #[get("/auth/oauth/google/authorize")]
-pub async fn google_authorize(
-    storage: web::Data<Arc<AuthStorage>>,
-) -> Result<impl Responder> {
+pub async fn google_authorize(storage: web::Data<Arc<AuthStorage>>) -> Result<impl Responder> {
     // Load Google provider
     let provider = GoogleOAuthProvider::from_env()?;
 
@@ -45,7 +43,11 @@ pub async fn google_callback(
 ) -> Result<impl Responder> {
     // Check for OAuth errors
     if let Some(error) = &query.error {
-        tracing::error!("Google OAuth error: {} - {:?}", error, query.error_description);
+        tracing::error!(
+            "Google OAuth error: {} - {:?}",
+            error,
+            query.error_description
+        );
         return Ok(HttpResponse::BadRequest().json(serde_json::json!({
             "error": error,
             "error_description": query.error_description.as_deref().unwrap_or("Unknown error")
@@ -60,7 +62,11 @@ pub async fn google_callback(
 
     // Verify state parameter matches
     if pkce.state != query.state {
-        tracing::error!("State mismatch: expected={}, received={}", pkce.state, query.state);
+        tracing::error!(
+            "State mismatch: expected={}, received={}",
+            pkce.state,
+            query.state
+        );
         return Err(AuthError::Internal("State mismatch".to_string()));
     }
 
@@ -102,9 +108,7 @@ pub async fn google_callback(
 
 /// GitHub OAuth authorization endpoint
 #[get("/auth/oauth/github/authorize")]
-pub async fn github_authorize(
-    storage: web::Data<Arc<AuthStorage>>,
-) -> Result<impl Responder> {
+pub async fn github_authorize(storage: web::Data<Arc<AuthStorage>>) -> Result<impl Responder> {
     // Load GitHub provider
     let provider = GitHubOAuthProvider::from_env()?;
 
@@ -139,7 +143,11 @@ pub async fn github_callback(
 ) -> Result<impl Responder> {
     // Check for OAuth errors
     if let Some(error) = &query.error {
-        tracing::error!("GitHub OAuth error: {} - {:?}", error, query.error_description);
+        tracing::error!(
+            "GitHub OAuth error: {} - {:?}",
+            error,
+            query.error_description
+        );
         return Ok(HttpResponse::BadRequest().json(serde_json::json!({
             "error": error,
             "error_description": query.error_description.as_deref().unwrap_or("Unknown error")
@@ -154,7 +162,11 @@ pub async fn github_callback(
 
     // Verify state parameter matches
     if pkce.state != query.state {
-        tracing::error!("State mismatch: expected={}, received={}", pkce.state, query.state);
+        tracing::error!(
+            "State mismatch: expected={}, received={}",
+            pkce.state,
+            query.state
+        );
         return Err(AuthError::Internal("State mismatch".to_string()));
     }
 
@@ -176,7 +188,10 @@ pub async fn github_callback(
         .get_verified_email(&token_response.access_token)
         .await
         .unwrap_or_else(|_| {
-            user_profile.email.clone().unwrap_or_else(|| format!("{}@github.local", user_profile.login))
+            user_profile
+                .email
+                .clone()
+                .unwrap_or_else(|| format!("{}@github.local", user_profile.login))
         });
 
     // Clean up PKCE session
@@ -203,9 +218,7 @@ pub async fn github_callback(
 
 /// Apple OAuth authorization endpoint
 #[get("/auth/oauth/apple/authorize")]
-pub async fn apple_authorize(
-    storage: web::Data<Arc<AuthStorage>>,
-) -> Result<impl Responder> {
+pub async fn apple_authorize(storage: web::Data<Arc<AuthStorage>>) -> Result<impl Responder> {
     // Load Apple provider
     let provider = AppleOAuthProvider::from_env()?;
 
@@ -255,7 +268,11 @@ pub async fn apple_callback(
 
     // Verify state parameter matches
     if pkce.state != form.state {
-        tracing::error!("State mismatch: expected={}, received={}", pkce.state, form.state);
+        tracing::error!(
+            "State mismatch: expected={}, received={}",
+            pkce.state,
+            form.state
+        );
         return Err(AuthError::Internal("State mismatch".to_string()));
     }
 

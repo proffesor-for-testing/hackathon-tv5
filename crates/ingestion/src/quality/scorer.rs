@@ -112,7 +112,8 @@ impl QualityScorer {
         let base_score = self.score_content(content);
         let now = Utc::now();
         let days_since_update = (now - last_updated_at).num_days() as f64;
-        self.freshness_decay.calculate_decay(base_score, days_since_update)
+        self.freshness_decay
+            .calculate_decay(base_score, days_since_update)
     }
 }
 
@@ -155,7 +156,6 @@ impl QualityReport {
             missing_fields_summary: vec![],
         }
     }
-
 }
 
 #[cfg(test)]

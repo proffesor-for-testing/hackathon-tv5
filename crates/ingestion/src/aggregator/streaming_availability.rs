@@ -2,13 +2,13 @@
 //!
 //! Rate limit: 100 requests per minute
 
-use super::{AggregatorResponse, AggregatorContent};
-use crate::{Result, IngestionError};
+use super::{AggregatorContent, AggregatorResponse};
+use crate::{IngestionError, Result};
 use chrono::{DateTime, Utc};
+use moka::future::Cache;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use moka::future::Cache;
 use std::time::Duration;
 
 /// Streaming Availability API client
@@ -47,11 +47,7 @@ impl StreamingAvailabilityClient {
     ///
     /// # Returns
     /// Vector of matching content items
-    pub async fn search(
-        &self,
-        title: &str,
-        country: &str,
-    ) -> Result<Vec<AggregatorContent>> {
+    pub async fn search(&self, title: &str, country: &str) -> Result<Vec<AggregatorContent>> {
         let cache_key = format!("search:{}:{}", title, country);
 
         // Check cache first
@@ -66,7 +62,8 @@ impl StreamingAvailabilityClient {
             country
         );
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("X-RapidAPI-Key", &self.api_key)
             .header("X-RapidAPI-Host", "streaming-availability.p.rapidapi.com")
@@ -75,7 +72,7 @@ impl StreamingAvailabilityClient {
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
@@ -109,7 +106,8 @@ impl StreamingAvailabilityClient {
 
         let url = format!("{}/get?tmdb_id={}", self.base_url, content_id);
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("X-RapidAPI-Key", &self.api_key)
             .header("X-RapidAPI-Host", "streaming-availability.p.rapidapi.com")
@@ -118,7 +116,7 @@ impl StreamingAvailabilityClient {
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
@@ -158,7 +156,8 @@ impl StreamingAvailabilityClient {
             service
         );
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("X-RapidAPI-Key", &self.api_key)
             .header("X-RapidAPI-Host", "streaming-availability.p.rapidapi.com")
@@ -167,7 +166,7 @@ impl StreamingAvailabilityClient {
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
@@ -177,26 +176,30 @@ impl StreamingAvailabilityClient {
 
     /// Parse search response
     fn parse_search_response(&self, data: &Value) -> Result<Vec<AggregatorContent>> {
-        let results = data.get("result")
+        let results = data
+            .get("result")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| IngestionError::NormalizationFailed(
-                "No results array in response".to_string()
-            ))?;
+            .ok_or_else(|| {
+                IngestionError::NormalizationFailed("No results array in response".to_string())
+            })?;
 
-        Ok(results.iter()
+        Ok(results
+            .iter()
             .filter_map(|item| self.parse_content_item(item).ok())
             .collect::<Vec<_>>())
     }
 
     /// Parse changes response
     fn parse_changes_response(&self, data: &Value) -> Result<Vec<AggregatorContent>> {
-        let changes = data.get("changes")
+        let changes = data
+            .get("changes")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| IngestionError::NormalizationFailed(
-                "No changes array in response".to_string()
-            ))?;
+            .ok_or_else(|| {
+                IngestionError::NormalizationFailed("No changes array in response".to_string())
+            })?;
 
-        Ok(changes.iter()
+        Ok(changes
+            .iter()
             .filter_map(|item| self.parse_content_item(item).ok())
             .collect())
     }
@@ -208,12 +211,14 @@ impl StreamingAvailabilityClient {
 
     /// Parse a single content item
     fn parse_content_item(&self, item: &Value) -> Result<AggregatorContent> {
-        let id = item.get("id")
+        let id = item
+            .get("id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing id".to_string()))?
             .to_string();
 
-        let title = item.get("title")
+        let title = item
+            .get("title")
             .and_then(|v| v.as_str())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing title".to_string()))?
             .to_string();
@@ -221,15 +226,26 @@ impl StreamingAvailabilityClient {
         Ok(AggregatorContent {
             id,
             title,
-            overview: item.get("overview").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            overview: item
+                .get("overview")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             year: item.get("year").and_then(|v| v.as_i64()).map(|y| y as i32),
-            content_type: item.get("showType")
+            content_type: item
+                .get("showType")
                 .and_then(|v| v.as_str())
                 .unwrap_or("movie")
                 .to_string(),
-            imdb_id: item.get("imdbId").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            tmdb_id: item.get("tmdbId").and_then(|v| v.as_i64()).map(|i| i as i32),
-            genres: item.get("genres")
+            imdb_id: item
+                .get("imdbId")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            tmdb_id: item
+                .get("tmdbId")
+                .and_then(|v| v.as_i64())
+                .map(|i| i as i32),
+            genres: item
+                .get("genres")
                 .and_then(|v| v.as_array())
                 .map(|arr| {
                     arr.iter()
@@ -237,12 +253,19 @@ impl StreamingAvailabilityClient {
                         .collect()
                 })
                 .unwrap_or_default(),
-            poster_url: item.get("posterURLs")
+            poster_url: item
+                .get("posterURLs")
                 .and_then(|p| p.get("342"))
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
-            rating: item.get("imdbRating").and_then(|v| v.as_f64()).map(|r| r as f32),
-            runtime: item.get("runtime").and_then(|v| v.as_i64()).map(|r| r as i32),
+            rating: item
+                .get("imdbRating")
+                .and_then(|v| v.as_f64())
+                .map(|r| r as f32),
+            runtime: item
+                .get("runtime")
+                .and_then(|v| v.as_i64())
+                .map(|r| r as i32),
         })
     }
 }
@@ -254,6 +277,9 @@ mod tests {
     #[test]
     fn test_client_creation() {
         let client = StreamingAvailabilityClient::new("test_key".to_string());
-        assert_eq!(client.base_url, "https://streaming-availability.p.rapidapi.com");
+        assert_eq!(
+            client.base_url,
+            "https://streaming-availability.p.rapidapi.com"
+        );
     }
 }

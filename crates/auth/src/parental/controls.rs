@@ -1,6 +1,6 @@
 use chrono::NaiveTime;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use crate::error::AuthError;
@@ -210,15 +210,15 @@ pub async fn set_parental_controls(
     let controls_json = serde_json::to_value(&controls)
         .map_err(|e| AuthError::InternalError(format!("Failed to serialize controls: {}", e)))?;
 
-    sqlx::query!(
+    sqlx::query(
         r#"
         UPDATE users
         SET parental_controls = $1
         WHERE id = $2
         "#,
-        controls_json,
-        user_id
     )
+    .bind(controls_json)
+    .bind(user_id)
     .execute(pool)
     .await
     .map_err(|e| AuthError::DatabaseError(format!("Failed to update parental controls: {}", e)))?;
@@ -231,28 +231,38 @@ pub async fn get_parental_controls(
     pool: &PgPool,
     user_id: Uuid,
 ) -> Result<Option<ParentalControls>, AuthError> {
-    let row = sqlx::query!(
+    let row = sqlx::query(
         r#"
         SELECT parental_controls
         FROM users
         WHERE id = $1
         "#,
-        user_id
     )
+    .bind(user_id)
     .fetch_optional(pool)
     .await
     .map_err(|e| AuthError::DatabaseError(format!("Failed to fetch parental controls: {}", e)))?;
 
     match row {
-        Some(r) => match r.parental_controls {
-            Some(json) => {
-                let controls: ParentalControls = serde_json::from_value(json).map_err(|e| {
-                    AuthError::InternalError(format!("Failed to deserialize controls: {}", e))
+        Some(r) => {
+            let parental_controls_value: Option<serde_json::Value> =
+                r.try_get("parental_controls").map_err(|e| {
+                    AuthError::DatabaseError(format!(
+                        "Failed to get parental_controls column: {}",
+                        e
+                    ))
                 })?;
-                Ok(Some(controls))
+
+            match parental_controls_value {
+                Some(json) => {
+                    let controls: ParentalControls = serde_json::from_value(json).map_err(|e| {
+                        AuthError::InternalError(format!("Failed to deserialize controls: {}", e))
+                    })?;
+                    Ok(Some(controls))
+                }
+                None => Ok(None),
             }
-            None => Ok(None),
-        },
+        }
         None => Err(AuthError::UserNotFound),
     }
 }

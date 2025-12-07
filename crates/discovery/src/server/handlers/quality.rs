@@ -3,11 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{error, info};
 
-use media_gateway_ingestion::{
-    ContentRepository, LowQualityContentItem, PostgresContentRepository,
-    QualityScorer, QualityWeights, generate_quality_report,
-};
 use media_gateway_ingestion::normalizer::CanonicalContent;
+use media_gateway_ingestion::{
+    generate_quality_report, ContentRepository, LowQualityContentItem, PostgresContentRepository,
+    QualityScorer, QualityWeights,
+};
 
 /// Query parameters for quality report endpoint
 #[derive(Debug, Deserialize)]
@@ -115,7 +115,13 @@ pub async fn get_quality_report(
 fn identify_missing_fields(content: &CanonicalContent) -> Vec<String> {
     let mut missing = Vec::new();
 
-    if content.overview.is_none() || content.overview.as_ref().map(|s| s.is_empty()).unwrap_or(true) {
+    if content.overview.is_none()
+        || content
+            .overview
+            .as_ref()
+            .map(|s| s.is_empty())
+            .unwrap_or(true)
+    {
         missing.push("description".to_string());
     }
     if content.images.poster_medium.is_none() && content.images.poster_large.is_none() {
@@ -136,7 +142,9 @@ fn identify_missing_fields(content: &CanonicalContent) -> Vec<String> {
     if content.external_ids.get("imdb_id").is_none() {
         missing.push("imdb_id".to_string());
     }
-    if content.external_ids.get("tmdb_id").is_none() && content.external_ids.get("rottentomatoes_id").is_none() {
+    if content.external_ids.get("tmdb_id").is_none()
+        && content.external_ids.get("rottentomatoes_id").is_none()
+    {
         missing.push("external_ratings".to_string());
     }
     if content.release_year.is_none() {
@@ -152,9 +160,11 @@ fn identify_missing_fields(content: &CanonicalContent) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use media_gateway_ingestion::normalizer::{CanonicalContent, ContentType, ImageSet, AvailabilityInfo};
-    use std::collections::HashMap;
     use chrono::Utc;
+    use media_gateway_ingestion::normalizer::{
+        AvailabilityInfo, CanonicalContent, ContentType, ImageSet,
+    };
+    use std::collections::HashMap;
 
     fn create_minimal_content() -> CanonicalContent {
         CanonicalContent {
@@ -209,7 +219,9 @@ mod tests {
         content.images.poster_large = Some("http://example.com/poster-large.jpg".to_string());
         content.images.backdrop = Some("http://example.com/backdrop.jpg".to_string());
         content.user_rating = Some(8.5);
-        content.external_ids.insert("imdb_id".to_string(), "tt1234567".to_string());
+        content
+            .external_ids
+            .insert("imdb_id".to_string(), "tt1234567".to_string());
 
         let missing = identify_missing_fields(&content);
 

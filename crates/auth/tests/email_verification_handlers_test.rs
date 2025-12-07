@@ -1,19 +1,20 @@
+use actix_web::{test, web::Data, App};
 use media_gateway_auth::{
+    email::{ConsoleProvider, EmailConfig, EmailManager},
     handlers::{
-        register, verify_email, resend_verification,
-        RegisterRequest, VerifyEmailRequest, ResendVerificationRequest,
+        register, resend_verification, verify_email, RegisterRequest, ResendVerificationRequest,
+        VerifyEmailRequest,
     },
-    email::{EmailManager, ConsoleProvider, EmailConfig},
     user::{PostgresUserRepository, UserRepository},
     AuthError,
 };
-use actix_web::{test, web::Data, App};
 use sqlx::PgPool;
 use std::sync::Arc;
 
 async fn setup_test_dependencies() -> (Arc<PostgresUserRepository>, Arc<EmailManager>) {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+    });
 
     let pool = PgPool::connect(&database_url)
         .await
@@ -27,8 +28,7 @@ async fn setup_test_dependencies() -> (Arc<PostgresUserRepository>, Arc<EmailMan
 
     let user_repo = Arc::new(PostgresUserRepository::new(pool));
 
-    let redis = redis::Client::open("redis://localhost:6379")
-        .expect("Failed to connect to Redis");
+    let redis = redis::Client::open("redis://localhost:6379").expect("Failed to connect to Redis");
 
     let email_config = EmailConfig::default();
     let provider = Arc::new(ConsoleProvider::new(
@@ -104,9 +104,7 @@ async fn test_verify_email_with_valid_token() {
     )
     .await;
 
-    let verify_req = VerifyEmailRequest {
-        token: token.token,
-    };
+    let verify_req = VerifyEmailRequest { token: token.token };
 
     let resp = test::call_service(
         &app,
@@ -209,7 +207,10 @@ async fn test_resend_verification_for_already_verified_email() {
         .unwrap();
 
     // Mark email as verified
-    user_repo.update_email_verified(user.id, true).await.unwrap();
+    user_repo
+        .update_email_verified(user.id, true)
+        .await
+        .unwrap();
 
     let app = test::init_service(
         App::new()

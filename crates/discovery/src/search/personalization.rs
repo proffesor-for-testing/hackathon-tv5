@@ -108,8 +108,8 @@ impl PersonalizationService {
         for result in &mut results {
             if let Some(&score) = personalization_scores.get(&result.content.id) {
                 let original_score = result.relevance_score;
-                result.relevance_score = original_score * (1.0 - boost_weight)
-                    + score * boost_weight;
+                result.relevance_score =
+                    original_score * (1.0 - boost_weight) + score * boost_weight;
 
                 debug!(
                     content_id = %result.content.id,
@@ -232,10 +232,7 @@ impl PersonalizationService {
             .context("Failed to send request to SONA")?;
 
         if !response.status().is_success() {
-            anyhow::bail!(
-                "SONA returned error status: {}",
-                response.status()
-            );
+            anyhow::bail!("SONA returned error status: {}", response.status());
         }
 
         let score_response: PersonalizationScoreResponse = response
@@ -309,10 +306,22 @@ mod tests {
         let service = PersonalizationService::new(config, cache);
 
         assert_eq!(service.get_boost_weight_for_variant(Some("control")), 0.0);
-        assert_eq!(service.get_boost_weight_for_variant(Some("low_boost")), 0.15);
-        assert_eq!(service.get_boost_weight_for_variant(Some("medium_boost")), 0.25);
-        assert_eq!(service.get_boost_weight_for_variant(Some("high_boost")), 0.40);
-        assert_eq!(service.get_boost_weight_for_variant(Some("aggressive_boost")), 0.60);
+        assert_eq!(
+            service.get_boost_weight_for_variant(Some("low_boost")),
+            0.15
+        );
+        assert_eq!(
+            service.get_boost_weight_for_variant(Some("medium_boost")),
+            0.25
+        );
+        assert_eq!(
+            service.get_boost_weight_for_variant(Some("high_boost")),
+            0.40
+        );
+        assert_eq!(
+            service.get_boost_weight_for_variant(Some("aggressive_boost")),
+            0.60
+        );
         assert_eq!(service.get_boost_weight_for_variant(None), 0.25); // default
     }
 
@@ -327,8 +336,8 @@ mod tests {
 
         // Simulate personalization boost: boost Movie A significantly
         let boost_weight = 0.3;
-        results[0].relevance_score = results[0].relevance_score * (1.0 - boost_weight)
-            + 0.95 * boost_weight; // High personalization score for Movie A
+        results[0].relevance_score =
+            results[0].relevance_score * (1.0 - boost_weight) + 0.95 * boost_weight; // High personalization score for Movie A
 
         // Rerank
         results.sort_by(|a, b| {

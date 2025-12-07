@@ -1,11 +1,14 @@
 use chrono::{Duration, Utc};
-use media_gateway_core::audit::{AuditAction, AuditEvent, AuditFilter, PostgresAuditLogger, AuditLogger};
+use media_gateway_core::audit::{
+    AuditAction, AuditEvent, AuditFilter, AuditLogger, PostgresAuditLogger,
+};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 async fn setup_test_db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+    });
 
     let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -45,21 +48,27 @@ async fn test_query_with_date_range_filter() {
     let user_id = Uuid::new_v4();
 
     // Create events at different times
-    let event1 = AuditEvent::new(AuditAction::AuthLogin, "user".to_string())
-        .with_user_id(user_id);
-    let event2 = AuditEvent::new(AuditAction::UserCreated, "user".to_string())
-        .with_user_id(user_id);
-    let event3 = AuditEvent::new(AuditAction::ContentCreated, "content".to_string())
-        .with_user_id(user_id);
+    let event1 = AuditEvent::new(AuditAction::AuthLogin, "user".to_string()).with_user_id(user_id);
+    let event2 =
+        AuditEvent::new(AuditAction::UserCreated, "user".to_string()).with_user_id(user_id);
+    let event3 =
+        AuditEvent::new(AuditAction::ContentCreated, "content".to_string()).with_user_id(user_id);
 
-    logger.log_batch(vec![event1, event2, event3]).await.unwrap();
+    logger
+        .log_batch(vec![event1, event2, event3])
+        .await
+        .unwrap();
 
     // Query with date range
-    let filter = AuditFilter::new()
-        .with_date_range(now - Duration::minutes(5), now + Duration::minutes(5));
+    let filter =
+        AuditFilter::new().with_date_range(now - Duration::minutes(5), now + Duration::minutes(5));
     let results = logger.query(filter).await.unwrap();
 
-    assert_eq!(results.len(), 3, "Should return all events within date range");
+    assert_eq!(
+        results.len(),
+        3,
+        "Should return all events within date range"
+    );
 }
 
 #[tokio::test]
@@ -100,9 +109,8 @@ async fn test_query_with_end_date_only() {
     let now = Utc::now();
     let user_id = Uuid::new_v4();
 
-    let events = vec![
-        AuditEvent::new(AuditAction::AuthLogin, "user".to_string()).with_user_id(user_id),
-    ];
+    let events =
+        vec![AuditEvent::new(AuditAction::AuthLogin, "user".to_string()).with_user_id(user_id)];
 
     logger.log_batch(events).await.unwrap();
 
@@ -158,7 +166,7 @@ async fn test_query_with_limit_and_offset() {
         events.push(
             AuditEvent::new(AuditAction::AuthLogin, "user".to_string())
                 .with_user_id(user_id)
-                .with_resource_id(format!("login-{}", i))
+                .with_resource_id(format!("login-{}", i)),
         );
     }
 
@@ -172,7 +180,11 @@ async fn test_query_with_limit_and_offset() {
     // Query with limit and offset
     let filter = AuditFilter::new().with_limit(3).with_offset(2);
     let results = logger.query(filter).await.unwrap();
-    assert_eq!(results.len(), 3, "Should return 3 events starting from offset 2");
+    assert_eq!(
+        results.len(),
+        3,
+        "Should return 3 events starting from offset 2"
+    );
 
     // Query second page
     let filter = AuditFilter::new().with_limit(5).with_offset(5);
@@ -208,7 +220,11 @@ async fn test_query_with_multiple_filters() {
 
     let results = logger.query(filter).await.unwrap();
 
-    assert_eq!(results.len(), 2, "Should return 2 AuthLogin events for user_id_1");
+    assert_eq!(
+        results.len(),
+        2,
+        "Should return 2 AuthLogin events for user_id_1"
+    );
     assert!(results.iter().all(|e| e.action == AuditAction::AuthLogin));
     assert!(results.iter().all(|e| e.user_id == Some(user_id_1)));
 }
@@ -233,7 +249,11 @@ async fn test_query_with_resource_type_filter() {
     let filter = AuditFilter::new().with_resource_type("content".to_string());
     let results = logger.query(filter).await.unwrap();
 
-    assert_eq!(results.len(), 2, "Should return only content resource type events");
+    assert_eq!(
+        results.len(),
+        2,
+        "Should return only content resource type events"
+    );
     assert!(results.iter().all(|e| e.resource_type == "content"));
 }
 
@@ -253,7 +273,11 @@ async fn test_query_empty_results() {
     let filter = AuditFilter::new().with_user_id(non_existent_user);
     let results = logger.query(filter).await.unwrap();
 
-    assert_eq!(results.len(), 0, "Should return empty results for non-matching filter");
+    assert_eq!(
+        results.len(),
+        0,
+        "Should return empty results for non-matching filter"
+    );
 }
 
 #[tokio::test]
@@ -304,10 +328,8 @@ async fn test_query_with_all_filters() {
         AuditEvent::new(AuditAction::AuthLogin, "user".to_string())
             .with_user_id(user_id)
             .with_resource_id("res-2".to_string()),
-        AuditEvent::new(AuditAction::UserCreated, "user".to_string())
-            .with_user_id(user_id),
-        AuditEvent::new(AuditAction::ContentCreated, "content".to_string())
-            .with_user_id(user_id),
+        AuditEvent::new(AuditAction::UserCreated, "user".to_string()).with_user_id(user_id),
+        AuditEvent::new(AuditAction::ContentCreated, "content".to_string()).with_user_id(user_id),
     ];
 
     logger.log_batch(events).await.unwrap();
@@ -325,7 +347,11 @@ async fn test_query_with_all_filters() {
 
     let results = logger.query(filter).await.unwrap();
 
-    assert_eq!(results.len(), 2, "Should return 2 AuthLogin events for user resource type");
+    assert_eq!(
+        results.len(),
+        2,
+        "Should return 2 AuthLogin events for user resource type"
+    );
     assert!(results.iter().all(|e| e.action == AuditAction::AuthLogin));
     assert!(results.iter().all(|e| e.user_id == Some(user_id)));
     assert!(results.iter().all(|e| e.resource_type == "user"));

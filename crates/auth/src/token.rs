@@ -47,9 +47,12 @@ impl TokenManager {
 
     /// Base62 encoding (A-Za-z0-9)
     fn base62_encode(data: &[u8]) -> String {
-        const BASE62_CHARS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        const BASE62_CHARS: &[u8] =
+            b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
-        let mut num = data.iter().fold(0u128, |acc, &byte| (acc << 8) | byte as u128);
+        let mut num = data
+            .iter()
+            .fold(0u128, |acc, &byte| (acc << 8) | byte as u128);
         let mut result = Vec::new();
 
         while num > 0 {
@@ -108,7 +111,9 @@ mod tests {
         assert_ne!(token1, token2);
 
         // Should be base64url encoded
-        assert!(token1.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
+        assert!(token1
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
     }
 
     #[test]

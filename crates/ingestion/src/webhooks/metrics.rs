@@ -1,8 +1,8 @@
 //! Webhook metrics tracking
 
-use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
-use serde::{Serialize, Deserialize};
+use std::sync::Arc;
 
 /// Webhook metrics tracker
 #[derive(Debug, Clone)]

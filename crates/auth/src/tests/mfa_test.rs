@@ -32,9 +32,7 @@ async fn test_mfa_enrollment_flow(pool: PgPool) -> sqlx::Result<()> {
     let valid_code = totp_manager.generate_current_code(&secret).unwrap();
 
     // Verify enrollment with valid code
-    let result = mfa_manager
-        .verify_enrollment(&user_id, &valid_code)
-        .await;
+    let result = mfa_manager.verify_enrollment(&user_id, &valid_code).await;
     assert!(result.is_ok());
 
     // Now user should be enrolled
@@ -118,17 +116,13 @@ async fn test_mfa_challenge_with_backup_code(pool: PgPool) -> sqlx::Result<()> {
 
     // Test: Verify challenge with backup code
     let backup_code = backup_codes[0].clone();
-    let result = mfa_manager
-        .verify_challenge(&user_id, &backup_code)
-        .await;
+    let result = mfa_manager.verify_challenge(&user_id, &backup_code).await;
 
     assert!(result.is_ok());
     assert!(result.unwrap());
 
     // Test: Backup code should be single-use
-    let result = mfa_manager
-        .verify_challenge(&user_id, &backup_code)
-        .await;
+    let result = mfa_manager.verify_challenge(&user_id, &backup_code).await;
 
     assert!(matches!(result, Err(AuthError::InvalidMfaCode)));
 

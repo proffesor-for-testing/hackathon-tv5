@@ -36,17 +36,9 @@ struct SerializableLoRAAdapter {
 impl SerializableLoRAAdapter {
     /// Convert UserLoRAAdapter to serializable format
     fn from_adapter(adapter: &UserLoRAAdapter) -> Self {
-        let base_layer_data: Vec<f32> = adapter
-            .base_layer_weights
-            .iter()
-            .copied()
-            .collect();
+        let base_layer_data: Vec<f32> = adapter.base_layer_weights.iter().copied().collect();
 
-        let user_layer_data: Vec<f32> = adapter
-            .user_layer_weights
-            .iter()
-            .copied()
-            .collect();
+        let user_layer_data: Vec<f32> = adapter.user_layer_weights.iter().copied().collect();
 
         Self {
             user_id: adapter.user_id,
@@ -70,17 +62,13 @@ impl SerializableLoRAAdapter {
     fn to_adapter(&self, last_trained_time: DateTime<Utc>) -> Result<UserLoRAAdapter> {
         use ndarray::Array2;
 
-        let base_layer_weights = Array2::from_shape_vec(
-            self.base_layer_shape,
-            self.base_layer_data.clone(),
-        )
-        .context("Failed to reconstruct base layer weights")?;
+        let base_layer_weights =
+            Array2::from_shape_vec(self.base_layer_shape, self.base_layer_data.clone())
+                .context("Failed to reconstruct base layer weights")?;
 
-        let user_layer_weights = Array2::from_shape_vec(
-            self.user_layer_shape,
-            self.user_layer_data.clone(),
-        )
-        .context("Failed to reconstruct user layer weights")?;
+        let user_layer_weights =
+            Array2::from_shape_vec(self.user_layer_shape, self.user_layer_data.clone())
+                .context("Failed to reconstruct user layer weights")?;
 
         Ok(UserLoRAAdapter {
             user_id: self.user_id,
@@ -134,19 +122,15 @@ impl LoRAStorage {
     /// - Serialization fails
     /// - Database connection fails
     /// - SQL execution fails
-    pub async fn save_adapter(
-        &self,
-        adapter: &UserLoRAAdapter,
-        adapter_name: &str,
-    ) -> Result<i32> {
+    pub async fn save_adapter(&self, adapter: &UserLoRAAdapter, adapter_name: &str) -> Result<i32> {
         let start = Instant::now();
 
         // Convert to serializable format
         let serializable = SerializableLoRAAdapter::from_adapter(adapter);
 
         // Serialize using bincode (efficient binary format)
-        let weights_bytes = bincode::serialize(&serializable)
-            .context("Failed to serialize LoRA adapter")?;
+        let weights_bytes =
+            bincode::serialize(&serializable).context("Failed to serialize LoRA adapter")?;
 
         let size_bytes = weights_bytes.len() as i64;
 
@@ -215,11 +199,7 @@ impl LoRAStorage {
     /// - Adapter not found
     /// - Deserialization fails
     /// - Database connection fails
-    pub async fn load_adapter(
-        &self,
-        user_id: Uuid,
-        adapter_name: &str,
-    ) -> Result<UserLoRAAdapter> {
+    pub async fn load_adapter(&self, user_id: Uuid, adapter_name: &str) -> Result<UserLoRAAdapter> {
         let start = Instant::now();
 
         let row = sqlx::query(
@@ -248,8 +228,8 @@ impl LoRAStorage {
         let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
 
         // Deserialize using bincode
-        let serializable: SerializableLoRAAdapter = bincode::deserialize(&weights_bytes)
-            .context("Failed to deserialize LoRA adapter")?;
+        let serializable: SerializableLoRAAdapter =
+            bincode::deserialize(&weights_bytes).context("Failed to deserialize LoRA adapter")?;
 
         let adapter = serializable
             .to_adapter(updated_at)
@@ -265,10 +245,7 @@ impl LoRAStorage {
 
         // Verify <2ms target
         if elapsed.as_millis() > 2 {
-            tracing::warn!(
-                "LoRA adapter load exceeded 2ms target: {:?}",
-                elapsed
-            );
+            tracing::warn!("LoRA adapter load exceeded 2ms target: {:?}", elapsed);
         }
 
         Ok(adapter)
@@ -310,8 +287,8 @@ impl LoRAStorage {
         let weights_bytes: Vec<u8> = row.try_get("weights")?;
         let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
 
-        let serializable: SerializableLoRAAdapter = bincode::deserialize(&weights_bytes)
-            .context("Failed to deserialize LoRA adapter")?;
+        let serializable: SerializableLoRAAdapter =
+            bincode::deserialize(&weights_bytes).context("Failed to deserialize LoRA adapter")?;
 
         serializable.to_adapter(updated_at)
     }
@@ -324,11 +301,7 @@ impl LoRAStorage {
     ///
     /// # Returns
     /// Number of adapter versions deleted
-    pub async fn delete_adapter(
-        &self,
-        user_id: Uuid,
-        adapter_name: &str,
-    ) -> Result<u64> {
+    pub async fn delete_adapter(&self, user_id: Uuid, adapter_name: &str) -> Result<u64> {
         let result = sqlx::query(
             r#"
             DELETE FROM lora_adapters
@@ -382,10 +355,7 @@ impl LoRAStorage {
     ///
     /// # Returns
     /// Vector of adapter metadata sorted by updated_at (newest first)
-    pub async fn list_adapters(
-        &self,
-        user_id: Uuid,
-    ) -> Result<Vec<LoRAAdapterMetadata>> {
+    pub async fn list_adapters(&self, user_id: Uuid) -> Result<Vec<LoRAAdapterMetadata>> {
         let rows = sqlx::query(
             r#"
             SELECT
@@ -512,12 +482,11 @@ mod tests {
         let serializable = SerializableLoRAAdapter::from_adapter(&adapter);
 
         // Serialize
-        let bytes = bincode::serialize(&serializable)
-            .expect("Failed to serialize");
+        let bytes = bincode::serialize(&serializable).expect("Failed to serialize");
 
         // Deserialize
-        let deserialized: SerializableLoRAAdapter = bincode::deserialize(&bytes)
-            .expect("Failed to deserialize");
+        let deserialized: SerializableLoRAAdapter =
+            bincode::deserialize(&bytes).expect("Failed to deserialize");
 
         // Verify data integrity
         assert_eq!(deserialized.user_id, serializable.user_id);
@@ -566,10 +535,9 @@ mod integration_tests {
     use sqlx::postgres::PgPoolOptions;
 
     async fn create_test_pool() -> Result<PgPool> {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| {
-                "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
-            });
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+        });
 
         let pool = PgPoolOptions::new()
             .max_connections(5)

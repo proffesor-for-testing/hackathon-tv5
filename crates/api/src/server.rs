@@ -100,7 +100,7 @@ impl Server {
                 .service(
                     fs::Files::new("/dashboard/health", "apps/health-dashboard")
                         .index_file("index.html")
-                        .use_last_modified(true)
+                        .use_last_modified(true),
                 )
                 // API routes
                 .configure(routes::configure)

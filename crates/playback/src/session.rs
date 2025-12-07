@@ -1,14 +1,14 @@
 //! Playback session management
 
-use redis::{AsyncCommands, Client, aio::MultiplexedConnection};
-use serde::{Deserialize, Serialize};
-use std::time::Duration;
-use std::sync::Arc;
-use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use redis::{aio::MultiplexedConnection, AsyncCommands, Client};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use std::time::Duration;
+use uuid::Uuid;
 
 use crate::events::{
-    PlaybackEventProducer, SessionCreatedEvent, PositionUpdatedEvent, SessionEndedEvent
+    PlaybackEventProducer, PositionUpdatedEvent, SessionCreatedEvent, SessionEndedEvent,
 };
 use crate::watch_history::WatchHistoryManager;
 
@@ -117,8 +117,8 @@ impl SessionManager {
     }
 
     pub fn from_env() -> Result<Self, redis::RedisError> {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
         let sync_service_url = std::env::var("SYNC_SERVICE_URL")
             .unwrap_or_else(|_| "http://localhost:8083".to_string());
 
@@ -170,8 +170,13 @@ impl SessionManager {
     }
 
     /// Create new playback session with resume position support
-    pub async fn create(&self, request: CreateSessionRequest) -> Result<CreateSessionResponse, SessionError> {
-        let mut conn = self.get_conn().await
+    pub async fn create(
+        &self,
+        request: CreateSessionRequest,
+    ) -> Result<CreateSessionResponse, SessionError> {
+        let mut conn = self
+            .get_conn()
+            .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
 
         // Query watch history for resume position
@@ -247,11 +252,14 @@ impl SessionManager {
 
     /// Get session by ID
     pub async fn get(&self, session_id: Uuid) -> Result<Option<PlaybackSession>, SessionError> {
-        let mut conn = self.get_conn().await
+        let mut conn = self
+            .get_conn()
+            .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
 
         let key = format!("session:{}", session_id);
-        let value: Option<String> = conn.get(&key)
+        let value: Option<String> = conn
+            .get(&key)
             .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
 
@@ -271,8 +279,7 @@ impl SessionManager {
         session_id: Uuid,
         request: UpdatePositionRequest,
     ) -> Result<PlaybackSession, SessionError> {
-        let mut session = self.get(session_id).await?
-            .ok_or(SessionError::NotFound)?;
+        let mut session = self.get(session_id).await?.ok_or(SessionError::NotFound)?;
 
         session.position_seconds = request.position_seconds;
         session.updated_at = Utc::now();
@@ -286,7 +293,9 @@ impl SessionManager {
             session.playback_state = PlaybackState::Ended;
         }
 
-        let mut conn = self.get_conn().await
+        let mut conn = self
+            .get_conn()
+            .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
 
         let key = format!("session:{}", session.id);
@@ -294,11 +303,16 @@ impl SessionManager {
             .map_err(|e| SessionError::Serialization(e.to_string()))?;
 
         // Get remaining TTL and preserve it
-        let ttl: i64 = conn.ttl(&key)
+        let ttl: i64 = conn
+            .ttl(&key)
             .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
 
-        let ttl = if ttl > 0 { ttl as u64 } else { SESSION_TTL_SECS };
+        let ttl = if ttl > 0 {
+            ttl as u64
+        } else {
+            SESSION_TTL_SECS
+        };
 
         conn.set_ex(&key, value, ttl)
             .await
@@ -313,7 +327,10 @@ impl SessionManager {
             let wh = watch_history.clone();
 
             tokio::spawn(async move {
-                if let Err(e) = wh.update_watch_history(user_id, content_id, position, duration).await {
+                if let Err(e) = wh
+                    .update_watch_history(user_id, content_id, position, duration)
+                    .await
+                {
                     tracing::error!("Failed to update watch history: {}", e);
                 }
             });
@@ -358,12 +375,7 @@ impl SessionManager {
         // Fire-and-forget HTTP call
         let client = self.http_client.clone();
         tokio::spawn(async move {
-            match client
-                .post(&url)
-                .json(&progress_update)
-                .send()
-                .await
-            {
+            match client.post(&url).json(&progress_update).send().await {
                 Ok(resp) if resp.status().is_success() => {
                     tracing::debug!("Sync service notified successfully");
                 }
@@ -381,7 +393,9 @@ impl SessionManager {
     pub async fn delete(&self, session_id: Uuid) -> Result<(), SessionError> {
         let session = self.get(session_id).await?;
 
-        let mut conn = self.get_conn().await
+        let mut conn = self
+            .get_conn()
+            .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
 
         let key = format!("session:{}", session_id);
@@ -405,7 +419,10 @@ impl SessionManager {
                 let wh = watch_history.clone();
 
                 tokio::spawn(async move {
-                    if let Err(e) = wh.update_watch_history(user_id, content_id, position, duration).await {
+                    if let Err(e) = wh
+                        .update_watch_history(user_id, content_id, position, duration)
+                        .await
+                    {
                         tracing::error!("Failed to update final watch history: {}", e);
                     }
                 });
@@ -442,12 +459,18 @@ impl SessionManager {
     }
 
     /// Get all sessions for a user
-    pub async fn get_user_sessions(&self, user_id: Uuid) -> Result<Vec<PlaybackSession>, SessionError> {
-        let mut conn = self.get_conn().await
+    pub async fn get_user_sessions(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<PlaybackSession>, SessionError> {
+        let mut conn = self
+            .get_conn()
+            .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
 
         let user_key = format!("user:{}:sessions", user_id);
-        let session_ids: Vec<String> = conn.smembers(&user_key)
+        let session_ids: Vec<String> = conn
+            .smembers(&user_key)
             .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
 
@@ -466,12 +489,10 @@ impl SessionManager {
     /// Check health
     pub async fn is_healthy(&self) -> bool {
         match self.get_conn().await {
-            Ok(mut conn) => {
-                redis::cmd("PING")
-                    .query_async::<_, String>(&mut conn)
-                    .await
-                    .is_ok()
-            }
+            Ok(mut conn) => redis::cmd("PING")
+                .query_async::<_, String>(&mut conn)
+                .await
+                .is_ok(),
             Err(_) => false,
         }
     }
@@ -493,16 +514,12 @@ pub enum SessionError {
 impl actix_web::ResponseError for SessionError {
     fn error_response(&self) -> actix_web::HttpResponse {
         match self {
-            SessionError::NotFound => {
-                actix_web::HttpResponse::NotFound().json(serde_json::json!({
-                    "error": "Session not found"
-                }))
-            }
-            _ => {
-                actix_web::HttpResponse::InternalServerError().json(serde_json::json!({
-                    "error": self.to_string()
-                }))
-            }
+            SessionError::NotFound => actix_web::HttpResponse::NotFound().json(serde_json::json!({
+                "error": "Session not found"
+            })),
+            _ => actix_web::HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": self.to_string()
+            })),
         }
     }
 }

@@ -4,9 +4,8 @@
 //! SLA: 99.9% availability
 //! Latency target: <100ms p95
 
-mod routes;
-
-use actix_web::{web, App, HttpServer, HttpResponse};
+use actix_web::{web, App, HttpResponse, HttpServer};
+use media_gateway_api::routes;
 use media_gateway_core::{metrics_handler, MetricsMiddleware};
 use tracing::info;
 

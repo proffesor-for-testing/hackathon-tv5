@@ -6,20 +6,21 @@ use crate::{
     error::{AuthError, Result},
     jwt::JwtManager,
     mfa::MfaManager,
-    middleware::{RateLimitConfig, RateLimitMiddleware, extract_user_context},
+    middleware::{extract_user_context, RateLimitConfig, RateLimitMiddleware},
     oauth::{
         device::{DeviceAuthorizationResponse, DeviceCode},
         handlers::{apple_authorize, apple_callback, google_authorize, google_callback},
         pkce::{AuthorizationCode, PkceChallenge},
         OAuthConfig, OAuthManager,
     },
-    parental::{
-        update_parental_controls, verify_parental_pin, ParentalControlsState,
+    parental::{update_parental_controls, verify_parental_pin, ParentalControlsState},
+    password_reset::{
+        ForgotPasswordRequest, ForgotPasswordResponse, PasswordResetToken, PasswordValidator,
+        ResetPasswordRequest, ResetPasswordResponse,
     },
-    password_reset::{ForgotPasswordRequest, ForgotPasswordResponse, PasswordResetToken, ResetPasswordRequest, ResetPasswordResponse, PasswordValidator},
     profile::{
-        delete_current_user, get_current_user, update_current_user, upload_avatar,
-        handlers::ProfileState, ProfileStorage,
+        delete_current_user, get_current_user, handlers::ProfileState, update_current_user,
+        upload_avatar, ProfileStorage,
     },
     rate_limit_admin_handlers::{
         delete_rate_limit, get_rate_limit, list_rate_limits, update_rate_limit,
@@ -105,7 +106,11 @@ async fn authorize(
         .validate_redirect_uri(&query.client_id, &query.redirect_uri)?;
 
     // Parse and validate scopes
-    let scopes: Vec<String> = query.scope.split_whitespace().map(|s| s.to_string()).collect();
+    let scopes: Vec<String> = query
+        .scope
+        .split_whitespace()
+        .map(|s| s.to_string())
+        .collect();
 
     // Store PKCE session
     let pkce = PkceChallenge {
@@ -169,12 +174,19 @@ async fn exchange_authorization_code(
     state: &AppState,
 ) -> Result<HttpResponse> {
     let code = form.code.as_ref().ok_or(AuthError::InvalidAuthCode)?;
-    let verifier = form.code_verifier.as_ref().ok_or(AuthError::InvalidPkceVerifier)?;
-    let redirect_uri = form.redirect_uri.as_ref().ok_or(AuthError::InvalidRedirectUri)?;
+    let verifier = form
+        .code_verifier
+        .as_ref()
+        .ok_or(AuthError::InvalidPkceVerifier)?;
+    let redirect_uri = form
+        .redirect_uri
+        .as_ref()
+        .ok_or(AuthError::InvalidRedirectUri)?;
     let client_id = form.client_id.as_ref().ok_or(AuthError::InvalidClient)?;
 
     // Retrieve authorization code
-    let mut auth_code = state.storage
+    let mut auth_code = state
+        .storage
         .get_auth_code(code)
         .await?
         .ok_or(AuthError::InvalidAuthCode)?;
@@ -212,7 +224,9 @@ async fn exchange_authorization_code(
     )?;
 
     // Create new token family for this authorization
-    let family_id = state.token_family_manager.create_family(auth_code.user_id.clone()).await?;
+    let user_uuid = uuid::Uuid::parse_str(&auth_code.user_id)
+        .map_err(|e| AuthError::Internal(format!("Invalid user_id format: {}", e)))?;
+    let family_id = state.token_family_manager.create_family(user_uuid).await?;
 
     let refresh_token = state.jwt_manager.create_refresh_token_with_family(
         auth_code.user_id.clone(),
@@ -224,7 +238,10 @@ async fn exchange_authorization_code(
 
     // Create session and add token to family
     let refresh_claims = state.jwt_manager.verify_refresh_token(&refresh_token)?;
-    state.token_family_manager.add_token_to_family(family_id, refresh_claims.jti.clone()).await?;
+    state
+        .token_family_manager
+        .add_token_to_family(family_id, &refresh_claims.jti)
+        .await?;
     state
         .session_manager
         .create_session(auth_code.user_id.clone(), refresh_claims.jti, None)
@@ -240,7 +257,10 @@ async fn exchange_authorization_code(
 }
 
 async fn refresh_access_token(form: &TokenRequest, state: &AppState) -> Result<HttpResponse> {
-    let refresh_token = form.refresh_token.as_ref().ok_or(AuthError::InvalidToken("Missing refresh token".to_string()))?;
+    let refresh_token = form
+        .refresh_token
+        .as_ref()
+        .ok_or(AuthError::InvalidToken("Missing refresh token".to_string()))?;
 
     // Verify refresh token
     let claims = state.jwt_manager.verify_refresh_token(refresh_token)?;
@@ -252,11 +272,14 @@ async fn refresh_access_token(form: &TokenRequest, state: &AppState) -> Result<H
 
     // Extract token family ID
     let family_id = claims.token_family_id.ok_or(AuthError::InvalidToken(
-        "Token missing family ID (legacy token)".to_string()
+        "Token missing family ID (legacy token)".to_string(),
     ))?;
 
     // SECURITY CHECK: Verify token is in its family
-    let is_in_family = state.token_family_manager.is_token_in_family(family_id, &claims.jti).await?;
+    let is_in_family = state
+        .token_family_manager
+        .is_token_in_family(family_id, &claims.jti)
+        .await?;
 
     if !is_in_family {
         // SECURITY EVENT: Token reuse detected - revoke entire family
@@ -271,7 +294,7 @@ async fn refresh_access_token(form: &TokenRequest, state: &AppState) -> Result<H
         state.token_family_manager.revoke_family(family_id).await?;
 
         return Err(AuthError::InvalidToken(
-            "Token reuse detected. All tokens in this family have been revoked.".to_string()
+            "Token reuse detected. All tokens in this family have been revoked.".to_string(),
         ));
     }
 
@@ -292,14 +315,24 @@ async fn refresh_access_token(form: &TokenRequest, state: &AppState) -> Result<H
     )?;
 
     // Remove old JTI from family and revoke it
-    state.token_family_manager.remove_token_from_family(family_id, &claims.jti).await?;
-    state.session_manager.revoke_token(&claims.jti, 3600).await?;
+    state
+        .token_family_manager
+        .remove_token_from_family(family_id, &claims.jti)
+        .await?;
+    state
+        .session_manager
+        .revoke_token(&claims.jti, 3600)
+        .await?;
 
     // Add new JTI to family
     let new_refresh_claims = state.jwt_manager.verify_refresh_token(&new_refresh_token)?;
-    state.token_family_manager.add_token_to_family(family_id, new_refresh_claims.jti.clone()).await?;
+    state
+        .token_family_manager
+        .add_token_to_family(family_id, &new_refresh_claims.jti)
+        .await?;
 
     // Create new session
+    let new_jti = new_refresh_claims.jti.clone();
     state
         .session_manager
         .create_session(claims.sub.clone(), new_refresh_claims.jti, None)
@@ -309,7 +342,7 @@ async fn refresh_access_token(form: &TokenRequest, state: &AppState) -> Result<H
         user_id = %claims.sub,
         family_id = %family_id,
         old_jti = %claims.jti,
-        new_jti = %new_refresh_claims.jti,
+        new_jti = %new_jti,
         "Successfully rotated refresh token"
     );
 
@@ -323,10 +356,14 @@ async fn refresh_access_token(form: &TokenRequest, state: &AppState) -> Result<H
 }
 
 async fn exchange_device_code(form: &TokenRequest, state: &AppState) -> Result<HttpResponse> {
-    let device_code = form.device_code.as_ref().ok_or(AuthError::DeviceCodeNotFound)?;
+    let device_code = form
+        .device_code
+        .as_ref()
+        .ok_or(AuthError::DeviceCodeNotFound)?;
 
     // Retrieve device code
-    let device = state.storage
+    let device = state
+        .storage
         .get_device_code(device_code)
         .await?
         .ok_or(AuthError::DeviceCodeNotFound)?;
@@ -334,7 +371,10 @@ async fn exchange_device_code(form: &TokenRequest, state: &AppState) -> Result<H
     // Check status - will error if pending
     device.check_status()?;
 
-    let user_id = device.user_id.clone().ok_or(AuthError::Internal("User ID not found".to_string()))?;
+    let user_id = device
+        .user_id
+        .clone()
+        .ok_or(AuthError::Internal("User ID not found".to_string()))?;
 
     // Generate tokens with token family
     let access_token = state.jwt_manager.create_access_token(
@@ -345,7 +385,9 @@ async fn exchange_device_code(form: &TokenRequest, state: &AppState) -> Result<H
     )?;
 
     // Create new token family for this device authorization
-    let family_id = state.token_family_manager.create_family(user_id.clone()).await?;
+    let user_uuid = uuid::Uuid::parse_str(&user_id)
+        .map_err(|e| AuthError::Internal(format!("Invalid user_id format: {}", e)))?;
+    let family_id = state.token_family_manager.create_family(user_uuid).await?;
 
     let refresh_token = state.jwt_manager.create_refresh_token_with_family(
         user_id.clone(),
@@ -357,7 +399,10 @@ async fn exchange_device_code(form: &TokenRequest, state: &AppState) -> Result<H
 
     // Create session and add token to family
     let refresh_claims = state.jwt_manager.verify_refresh_token(&refresh_token)?;
-    state.token_family_manager.add_token_to_family(family_id, refresh_claims.jti.clone()).await?;
+    state
+        .token_family_manager
+        .add_token_to_family(family_id, &refresh_claims.jti)
+        .await?;
     state
         .session_manager
         .create_session(user_id.clone(), refresh_claims.jti, None)
@@ -397,7 +442,10 @@ async fn revoke_token(
         .or_else(|_| state.jwt_manager.verify_refresh_token(&form.token))?;
 
     // Revoke token
-    state.session_manager.revoke_token(&claims.jti, 3600).await?;
+    state
+        .session_manager
+        .revoke_token(&claims.jti, 3600)
+        .await?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "message": "Token revoked successfully"
@@ -434,7 +482,10 @@ async fn device_authorization(
     let response = DeviceAuthorizationResponse::from(&device);
 
     // Store device code
-    state.storage.store_device_code(&device.device_code, &device).await?;
+    state
+        .storage
+        .store_device_code(&device.device_code, &device)
+        .await?;
 
     Ok(HttpResponse::Ok().json(response))
 }
@@ -447,7 +498,11 @@ struct DeviceApprovalRequest {
 #[post("/auth/device/approve")]
 async fn approve_device(
     req: web::Json<DeviceApprovalRequest>,
-    auth_header: web::Header<actix_web_httpauth::headers::authorization::Authorization<actix_web_httpauth::headers::authorization::Bearer>>,
+    auth_header: web::Header<
+        actix_web_httpauth::headers::authorization::Authorization<
+            actix_web_httpauth::headers::authorization::Bearer,
+        >,
+    >,
     state: Data<AppState>,
 ) -> Result<impl Responder> {
     // Extract and verify JWT token
@@ -462,14 +517,18 @@ async fn approve_device(
     let user_id = claims.sub;
 
     // Look up device code by user_code
-    let mut device = state.storage
+    let mut device = state
+        .storage
         .get_device_code_by_user_code(&req.user_code)
         .await?
         .ok_or(AuthError::InvalidUserCode)?;
 
     // Verify device is in Pending state
     if device.is_expired() {
-        state.storage.delete_device_code(&device.device_code).await?;
+        state
+            .storage
+            .delete_device_code(&device.device_code)
+            .await?;
         return Err(AuthError::DeviceCodeExpired);
     }
 
@@ -481,7 +540,10 @@ async fn approve_device(
     device.approve(user_id);
 
     // Update Redis with new state
-    state.storage.update_device_code(&device.device_code, &device).await?;
+    state
+        .storage
+        .update_device_code(&device.device_code, &device)
+        .await?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "message": "Device authorization approved",
@@ -498,7 +560,8 @@ async fn device_poll(
         .get("device_code")
         .ok_or(AuthError::DeviceCodeNotFound)?;
 
-    let device = state.storage
+    let device = state
+        .storage
         .get_device_code(device_code)
         .await?
         .ok_or(AuthError::DeviceCodeNotFound)?;
@@ -507,7 +570,10 @@ async fn device_poll(
     device.check_status()?;
 
     // If we reach here, device is approved - generate tokens with token family
-    let user_id = device.user_id.clone().ok_or(AuthError::Internal("User ID not found".to_string()))?;
+    let user_id = device
+        .user_id
+        .clone()
+        .ok_or(AuthError::Internal("User ID not found".to_string()))?;
 
     // Generate tokens with token family
     let access_token = state.jwt_manager.create_access_token(
@@ -518,7 +584,9 @@ async fn device_poll(
     )?;
 
     // Create new token family for this device authorization
-    let family_id = state.token_family_manager.create_family(user_id.clone()).await?;
+    let user_uuid = uuid::Uuid::parse_str(&user_id)
+        .map_err(|e| AuthError::Internal(format!("Invalid user_id format: {}", e)))?;
+    let family_id = state.token_family_manager.create_family(user_uuid).await?;
 
     let refresh_token = state.jwt_manager.create_refresh_token_with_family(
         user_id.clone(),
@@ -530,7 +598,10 @@ async fn device_poll(
 
     // Create session and add token to family
     let refresh_claims = state.jwt_manager.verify_refresh_token(&refresh_token)?;
-    state.token_family_manager.add_token_to_family(family_id, refresh_claims.jti.clone()).await?;
+    state
+        .token_family_manager
+        .add_token_to_family(family_id, &refresh_claims.jti)
+        .await?;
     state
         .session_manager
         .create_session(user_id.clone(), refresh_claims.jti, None)
@@ -558,11 +629,16 @@ async fn create_api_key(
     body: web::Json<CreateApiKeyRequest>,
     state: Data<AppState>,
 ) -> Result<impl Responder> {
-    let api_key_manager = state.api_key_manager.as_ref().ok_or(AuthError::Internal("API key manager not configured".to_string()))?;
+    let api_key_manager = state.api_key_manager.as_ref().ok_or(AuthError::Internal(
+        "API key manager not configured".to_string(),
+    ))?;
     let user_context = extract_user_context(&req)?;
 
     let api_key = api_key_manager
-        .create_api_key(Uuid::parse_str(&user_context.user_id).unwrap(), body.into_inner())
+        .create_api_key(
+            Uuid::parse_str(&user_context.user_id).unwrap(),
+            body.into_inner(),
+        )
         .await?;
 
     Ok(HttpResponse::Created().json(api_key))
@@ -573,7 +649,9 @@ async fn list_api_keys(
     req: actix_web::HttpRequest,
     state: Data<AppState>,
 ) -> Result<impl Responder> {
-    let api_key_manager = state.api_key_manager.as_ref().ok_or(AuthError::Internal("API key manager not configured".to_string()))?;
+    let api_key_manager = state.api_key_manager.as_ref().ok_or(AuthError::Internal(
+        "API key manager not configured".to_string(),
+    ))?;
     let user_context = extract_user_context(&req)?;
 
     let keys = api_key_manager
@@ -589,7 +667,9 @@ async fn revoke_api_key(
     path: web::Path<Uuid>,
     state: Data<AppState>,
 ) -> Result<impl Responder> {
-    let api_key_manager = state.api_key_manager.as_ref().ok_or(AuthError::Internal("API key manager not configured".to_string()))?;
+    let api_key_manager = state.api_key_manager.as_ref().ok_or(AuthError::Internal(
+        "API key manager not configured".to_string(),
+    ))?;
     let user_context = extract_user_context(&req)?;
     let key_id = path.into_inner();
 
@@ -619,10 +699,17 @@ struct MfaEnrollResponse {
 
 #[post("/api/v1/auth/mfa/enroll")]
 async fn mfa_enroll(
-    auth_header: web::Header<actix_web_httpauth::headers::authorization::Authorization<actix_web_httpauth::headers::authorization::Bearer>>,
+    auth_header: web::Header<
+        actix_web_httpauth::headers::authorization::Authorization<
+            actix_web_httpauth::headers::authorization::Bearer,
+        >,
+    >,
     state: Data<AppState>,
 ) -> Result<impl Responder> {
-    let mfa_manager = state.mfa_manager.as_ref().ok_or(AuthError::Internal("MFA not configured".to_string()))?;
+    let mfa_manager = state
+        .mfa_manager
+        .as_ref()
+        .ok_or(AuthError::Internal("MFA not configured".to_string()))?;
 
     // Extract and verify JWT token
     let token = auth_header.as_ref().token();
@@ -652,10 +739,17 @@ struct MfaVerifyRequest {
 #[post("/api/v1/auth/mfa/verify")]
 async fn mfa_verify(
     req: web::Json<MfaVerifyRequest>,
-    auth_header: web::Header<actix_web_httpauth::headers::authorization::Authorization<actix_web_httpauth::headers::authorization::Bearer>>,
+    auth_header: web::Header<
+        actix_web_httpauth::headers::authorization::Authorization<
+            actix_web_httpauth::headers::authorization::Bearer,
+        >,
+    >,
     state: Data<AppState>,
 ) -> Result<impl Responder> {
-    let mfa_manager = state.mfa_manager.as_ref().ok_or(AuthError::Internal("MFA not configured".to_string()))?;
+    let mfa_manager = state
+        .mfa_manager
+        .as_ref()
+        .ok_or(AuthError::Internal("MFA not configured".to_string()))?;
 
     // Extract and verify JWT token
     let token = auth_header.as_ref().token();
@@ -693,10 +787,17 @@ struct MfaChallengeRequest {
 #[post("/api/v1/auth/mfa/challenge")]
 async fn mfa_challenge(
     req: web::Json<MfaChallengeRequest>,
-    auth_header: web::Header<actix_web_httpauth::headers::authorization::Authorization<actix_web_httpauth::headers::authorization::Bearer>>,
+    auth_header: web::Header<
+        actix_web_httpauth::headers::authorization::Authorization<
+            actix_web_httpauth::headers::authorization::Bearer,
+        >,
+    >,
     state: Data<AppState>,
 ) -> Result<impl Responder> {
-    let mfa_manager = state.mfa_manager.as_ref().ok_or(AuthError::Internal("MFA not configured".to_string()))?;
+    let mfa_manager = state
+        .mfa_manager
+        .as_ref()
+        .ok_or(AuthError::Internal("MFA not configured".to_string()))?;
 
     // Extract and verify JWT token
     let token = auth_header.as_ref().token();
@@ -746,11 +847,15 @@ async fn forgot_password(
     let user_repo = PostgresUserRepository::new(db_pool.get_ref().clone());
 
     // Check rate limit
-    let remaining = state.storage.check_password_reset_rate_limit(&req.email).await?;
+    let remaining = state
+        .storage
+        .check_password_reset_rate_limit(&req.email)
+        .await?;
     if remaining == 0 {
         // Return success even when rate limited to prevent enumeration
         return Ok(HttpResponse::Ok().json(ForgotPasswordResponse {
-            message: "If an account exists with this email, a password reset link has been sent.".to_string(),
+            message: "If an account exists with this email, a password reset link has been sent."
+                .to_string(),
         }));
     }
 
@@ -763,11 +868,17 @@ async fn forgot_password(
         let reset_token = PasswordResetToken::new(user.id.to_string(), user.email.clone());
 
         // Store token in Redis
-        state.storage.store_password_reset_token(&reset_token.token, &reset_token).await?;
+        state
+            .storage
+            .store_password_reset_token(&reset_token.token, &reset_token)
+            .await?;
 
         // Send password reset email
         if let Some(email_manager) = &state.email_manager {
-            if let Err(e) = email_manager.send_password_reset_email(user.email.clone(), reset_token.token.clone()).await {
+            if let Err(e) = email_manager
+                .send_password_reset_email(user.email.clone(), reset_token.token.clone())
+                .await
+            {
                 tracing::error!("Failed to send password reset email: {}", e);
                 // Continue anyway - don't expose email sending failures to prevent enumeration
             }
@@ -780,7 +891,8 @@ async fn forgot_password(
     }
 
     Ok(HttpResponse::Ok().json(ForgotPasswordResponse {
-        message: "If an account exists with this email, a password reset link has been sent.".to_string(),
+        message: "If an account exists with this email, a password reset link has been sent."
+            .to_string(),
     }))
 }
 
@@ -796,12 +908,20 @@ async fn reset_password(
     PasswordValidator::validate(&req.new_password)?;
 
     // Get reset token from Redis
-    let reset_token = state.storage.get_password_reset_token(&req.token).await?
-        .ok_or(AuthError::InvalidToken("Invalid or expired reset token".to_string()))?;
+    let reset_token = state
+        .storage
+        .get_password_reset_token(&req.token)
+        .await?
+        .ok_or(AuthError::InvalidToken(
+            "Invalid or expired reset token".to_string(),
+        ))?;
 
     // Check if token is expired
     if reset_token.is_expired() {
-        state.storage.delete_password_reset_token(&req.token).await?;
+        state
+            .storage
+            .delete_password_reset_token(&req.token)
+            .await?;
         return Err(AuthError::InvalidToken("Reset token expired".to_string()));
     }
 
@@ -812,19 +932,33 @@ async fn reset_password(
         .map_err(|e| AuthError::Internal(format!("Invalid user ID: {}", e)))?;
 
     // Hash new password
-    let new_password_hash = PasswordHasher::hash_password(&req.new_password)?;
+    let password_hasher = PasswordHasher::default();
+    let new_password_hash = password_hasher.hash_password(&req.new_password)?;
 
     // Update password in database
-    user_repo.update_password(user_id, &new_password_hash).await?;
+    user_repo
+        .update_password(user_id, &new_password_hash)
+        .await?;
 
     // Delete reset token (single-use)
-    state.storage.delete_password_reset_token(&req.token).await?;
+    state
+        .storage
+        .delete_password_reset_token(&req.token)
+        .await?;
 
     // Invalidate all existing sessions for this user (except current if requested)
-    let sessions_invalidated = state.session_manager.invalidate_all_user_sessions(&user_id, None).await.unwrap_or(0);
+    let sessions_invalidated = state
+        .session_manager
+        .invalidate_all_user_sessions(&user_id, None)
+        .await
+        .unwrap_or(0);
 
     // Revoke all refresh tokens for this user
-    let tokens_revoked = state.token_family_manager.revoke_all_user_tokens(&user_id).await.unwrap_or(0);
+    let tokens_revoked = state
+        .token_family_manager
+        .revoke_all_user_tokens(&user_id)
+        .await
+        .unwrap_or(0);
 
     // TODO: Emit sessions-invalidated event to Kafka
     tracing::info!(
@@ -837,7 +971,10 @@ async fn reset_password(
 
     // Send password changed notification email
     if let Some(email_manager) = &state.email_manager {
-        if let Err(e) = email_manager.send_password_changed_notification(reset_token.email.clone()).await {
+        if let Err(e) = email_manager
+            .send_password_changed_notification(reset_token.email.clone())
+            .await
+        {
             tracing::error!("Failed to send password changed notification: {}", e);
             // Continue anyway - password was already changed successfully
         }
@@ -846,12 +983,12 @@ async fn reset_password(
     }
 
     Ok(HttpResponse::Ok().json(ResetPasswordResponse {
-        message: "Password has been reset successfully. All sessions have been invalidated.".to_string(),
+        message: "Password has been reset successfully. All sessions have been invalidated."
+            .to_string(),
         sessions_invalidated,
         tokens_revoked,
     }))
 }
-
 
 // ============================================================================
 // Server Initialization
@@ -920,7 +1057,10 @@ pub async fn start_server(
 
     HttpServer::new(move || {
         App::new()
-            .wrap(RateLimitMiddleware::new(redis_client.clone(), rate_limit_config.clone()))
+            .wrap(RateLimitMiddleware::new(
+                redis_client.clone(),
+                rate_limit_config.clone(),
+            ))
             .app_data(app_state.clone())
             .app_data(db_pool_data.clone())
             .app_data(user_handler_state.clone())

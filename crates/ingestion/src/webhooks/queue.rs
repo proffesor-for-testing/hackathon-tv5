@@ -1,10 +1,15 @@
 //! Webhook queue implementation using Redis Streams
 
+use crate::webhooks::{
+    ProcessedWebhook, ProcessingStatus, WebhookError, WebhookPayload, WebhookResult,
+};
 use async_trait::async_trait;
-use redis::{Client, AsyncCommands, streams::{StreamReadOptions, StreamReadReply}};
-use serde::{Serialize, Deserialize};
 use chrono::Utc;
-use crate::webhooks::{WebhookError, WebhookResult, WebhookPayload, ProcessedWebhook, ProcessingStatus};
+use redis::{
+    streams::{StreamReadOptions, StreamReadReply},
+    AsyncCommands, Client,
+};
+use serde::{Deserialize, Serialize};
 
 /// Webhook queue trait
 #[async_trait]
@@ -13,7 +18,8 @@ pub trait WebhookQueue: Send + Sync {
     async fn enqueue(&self, webhook: WebhookPayload) -> WebhookResult<String>;
 
     /// Dequeue next webhook for processing
-    async fn dequeue(&self, consumer_name: &str) -> WebhookResult<Option<(String, WebhookPayload)>>;
+    async fn dequeue(&self, consumer_name: &str)
+        -> WebhookResult<Option<(String, WebhookPayload)>>;
 
     /// Acknowledge successful processing
     async fn ack(&self, message_id: &str) -> WebhookResult<()>;
@@ -65,7 +71,10 @@ impl RedisWebhookQueue {
             .map_err(|e| WebhookError::RedisError(format!("Failed to connect: {}", e)))?;
 
         let platforms = std::env::var("WEBHOOK_PLATFORMS")
-            .unwrap_or_else(|_| "netflix,hulu,disney_plus,prime_video,hbo_max,apple_tv_plus,paramount_plus,peacock".to_string())
+            .unwrap_or_else(|_| {
+                "netflix,hulu,disney_plus,prime_video,hbo_max,apple_tv_plus,paramount_plus,peacock"
+                    .to_string()
+            })
             .split(',')
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
@@ -90,15 +99,16 @@ impl RedisWebhookQueue {
     /// Initialize consumer group for a platform
     async fn ensure_consumer_group(&self, platform: &str) -> WebhookResult<()> {
         let stream_key = format!("{}:{}", self.stream_prefix, platform);
-        let mut conn = self.client.get_async_connection().await
+        let mut conn = self
+            .client
+            .get_async_connection()
+            .await
             .map_err(|e| WebhookError::RedisError(format!("Connection failed: {}", e)))?;
 
         // Create stream if it doesn't exist
-        let _: Result<(), redis::RedisError> = conn.xgroup_create_mkstream(
-            &stream_key,
-            &self.consumer_group,
-            "0"
-        ).await;
+        let _: Result<(), redis::RedisError> = conn
+            .xgroup_create_mkstream(&stream_key, &self.consumer_group, "0")
+            .await;
 
         Ok(())
     }
@@ -116,29 +126,36 @@ impl RedisWebhookQueue {
 impl WebhookQueue for RedisWebhookQueue {
     async fn enqueue(&self, webhook: WebhookPayload) -> WebhookResult<String> {
         let stream_key = self.stream_key(&webhook.platform);
-        let mut conn = self.client.get_async_connection().await
+        let mut conn = self
+            .client
+            .get_async_connection()
+            .await
             .map_err(|e| WebhookError::RedisError(format!("Connection failed: {}", e)))?;
 
         // Ensure consumer group exists
         self.ensure_consumer_group(&webhook.platform).await?;
 
         // Serialize webhook payload
-        let payload_json = serde_json::to_string(&webhook)
-            .map_err(|e| WebhookError::SerializationError(e))?;
+        let payload_json =
+            serde_json::to_string(&webhook).map_err(|e| WebhookError::SerializationError(e))?;
 
         // Add to stream
-        let message_id: String = conn.xadd(
-            &stream_key,
-            "*",
-            &[("payload", payload_json)]
-        ).await
+        let message_id: String = conn
+            .xadd(&stream_key, "*", &[("payload", payload_json)])
+            .await
             .map_err(|e| WebhookError::QueueError(format!("Failed to enqueue: {}", e)))?;
 
         Ok(message_id)
     }
 
-    async fn dequeue(&self, _consumer_name: &str) -> WebhookResult<Option<(String, WebhookPayload)>> {
-        let mut conn = self.client.get_async_connection().await
+    async fn dequeue(
+        &self,
+        _consumer_name: &str,
+    ) -> WebhookResult<Option<(String, WebhookPayload)>> {
+        let mut conn = self
+            .client
+            .get_async_connection()
+            .await
             .map_err(|e| WebhookError::RedisError(format!("Connection failed: {}", e)))?;
 
         for platform in &self.platforms {
@@ -148,16 +165,12 @@ impl WebhookQueue for RedisWebhookQueue {
             self.ensure_consumer_group(platform).await?;
 
             // Read from stream using consumer group
-            let opts = StreamReadOptions::default()
-                .count(1)
-                .block(100); // 100ms block
+            let opts = StreamReadOptions::default().count(1).block(100); // 100ms block
 
-            let result: StreamReadReply = conn.xread_options(
-                &[&stream_key],
-                &[">"],
-                &opts
-            ).await
-                .map_err(|e| WebhookError::QueueError(format!("Failed to dequeue: {}", e)))?;
+            let result: StreamReadReply =
+                conn.xread_options(&[&stream_key], &[">"], &opts)
+                    .await
+                    .map_err(|e| WebhookError::QueueError(format!("Failed to dequeue: {}", e)))?;
 
             if !result.keys.is_empty() && !result.keys[0].ids.is_empty() {
                 let stream_id = &result.keys[0].ids[0];
@@ -170,7 +183,8 @@ impl WebhookQueue for RedisWebhookQueue {
                         let webhook: WebhookPayload = serde_json::from_str(&payload_str)
                             .map_err(|e| WebhookError::SerializationError(e))?;
 
-                        self.processing_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        self.processing_count
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
                         return Ok(Some((message_id, webhook)));
                     }
@@ -182,47 +196,54 @@ impl WebhookQueue for RedisWebhookQueue {
     }
 
     async fn ack(&self, message_id: &str) -> WebhookResult<()> {
-        let mut conn = self.client.get_async_connection().await
+        let mut conn = self
+            .client
+            .get_async_connection()
+            .await
             .map_err(|e| WebhookError::RedisError(format!("Connection failed: {}", e)))?;
 
         for platform in &self.platforms {
             let stream_key = self.stream_key(platform);
 
-            let _: Result<i32, redis::RedisError> = conn.xack(
-                &stream_key,
-                &self.consumer_group,
-                &[message_id]
-            ).await;
+            let _: Result<i32, redis::RedisError> = conn
+                .xack(&stream_key, &self.consumer_group, &[message_id])
+                .await;
         }
 
-        self.processing_count.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
-        self.total_processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.processing_count
+            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        self.total_processed
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         Ok(())
     }
 
     async fn dead_letter(&self, webhook: ProcessedWebhook) -> WebhookResult<()> {
         let dlq_key = self.dlq_key(&webhook.webhook.platform);
-        let mut conn = self.client.get_async_connection().await
+        let mut conn = self
+            .client
+            .get_async_connection()
+            .await
             .map_err(|e| WebhookError::RedisError(format!("Connection failed: {}", e)))?;
 
         // Serialize processed webhook
-        let payload_json = serde_json::to_string(&webhook)
-            .map_err(|e| WebhookError::SerializationError(e))?;
+        let payload_json =
+            serde_json::to_string(&webhook).map_err(|e| WebhookError::SerializationError(e))?;
 
         // Add to dead letter queue stream
-        let _: String = conn.xadd(
-            &dlq_key,
-            "*",
-            &[("payload", payload_json)]
-        ).await
+        let _: String = conn
+            .xadd(&dlq_key, "*", &[("payload", payload_json)])
+            .await
             .map_err(|e| WebhookError::QueueError(format!("Failed to dead letter: {}", e)))?;
 
         Ok(())
     }
 
     async fn stats(&self) -> WebhookResult<QueueStats> {
-        let mut conn = self.client.get_async_connection().await
+        let mut conn = self
+            .client
+            .get_async_connection()
+            .await
             .map_err(|e| WebhookError::RedisError(format!("Connection failed: {}", e)))?;
 
         let mut total_pending = 0u64;
@@ -233,21 +254,23 @@ impl WebhookQueue for RedisWebhookQueue {
             let dlq_key = self.dlq_key(platform);
 
             // Get stream length
-            let pending: u64 = conn.xlen(&stream_key).await
-                .unwrap_or(0);
+            let pending: u64 = conn.xlen(&stream_key).await.unwrap_or(0);
             total_pending += pending;
 
             // Get DLQ length
-            let dlq_count: u64 = conn.xlen(&dlq_key).await
-                .unwrap_or(0);
+            let dlq_count: u64 = conn.xlen(&dlq_key).await.unwrap_or(0);
             total_dlq += dlq_count;
         }
 
         Ok(QueueStats {
             pending_count: total_pending,
-            processing_count: self.processing_count.load(std::sync::atomic::Ordering::Relaxed),
+            processing_count: self
+                .processing_count
+                .load(std::sync::atomic::Ordering::Relaxed),
             dead_letter_count: total_dlq,
-            total_processed: self.total_processed.load(std::sync::atomic::Ordering::Relaxed),
+            total_processed: self
+                .total_processed
+                .load(std::sync::atomic::Ordering::Relaxed),
         })
     }
 }
@@ -259,8 +282,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_queue_enqueue_dequeue() {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
         let queue = match RedisWebhookQueue::new(&redis_url, None, None, None) {
             Ok(q) => q,
@@ -296,13 +319,17 @@ mod tests {
         // Clean up
         let mut conn = queue.client.get_async_connection().await.unwrap();
         let stream_key = queue.stream_key("netflix");
-        let _: () = redis::cmd("DEL").arg(&stream_key).query_async(&mut conn).await.unwrap();
+        let _: () = redis::cmd("DEL")
+            .arg(&stream_key)
+            .query_async(&mut conn)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
     async fn test_dead_letter_queue() {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
         let queue = match RedisWebhookQueue::new(&redis_url, None, None, None) {
             Ok(q) => q,
@@ -338,6 +365,10 @@ mod tests {
         // Clean up
         let mut conn = queue.client.get_async_connection().await.unwrap();
         let dlq_key = queue.dlq_key("netflix");
-        let _: () = redis::cmd("DEL").arg(&dlq_key).query_async(&mut conn).await.unwrap();
+        let _: () = redis::cmd("DEL")
+            .arg(&dlq_key)
+            .query_async(&mut conn)
+            .await
+            .unwrap();
     }
 }

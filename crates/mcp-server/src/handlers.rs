@@ -15,10 +15,10 @@ use tracing::{debug, error, info, instrument, warn};
 use crate::{
     protocol::{
         error_codes, InitializeParams, InitializeResult, JsonRpcError, JsonRpcRequest,
-        JsonRpcResponse, PromptListResult, PromptParams, Prompt, PromptArgument, RequestId,
-        ResourceListResult, ResourceParams, ServerCapabilities, ServerInfo, ToolCallResult,
-        ToolListResult, ToolParams, ToolsCapability, ResourcesCapability, PromptsCapability,
-        JSONRPC_VERSION, MCP_VERSION,
+        JsonRpcResponse, Prompt, PromptArgument, PromptListResult, PromptParams, PromptsCapability,
+        RequestId, ResourceListResult, ResourceParams, ResourcesCapability, ServerCapabilities,
+        ServerInfo, ToolCallResult, ToolListResult, ToolParams, ToolsCapability, JSONRPC_VERSION,
+        MCP_VERSION,
     },
     resources::ResourceManager,
     tools::ToolExecutor,
@@ -43,10 +43,7 @@ pub async fn handle_jsonrpc(
         "prompts/get" => handle_prompts_get(request.id, request.params).await,
         _ => {
             warn!(method = %request.method, "Unknown method");
-            JsonRpcResponse::error(
-                request.id,
-                JsonRpcError::method_not_found(request.method),
-            )
+            JsonRpcResponse::error(request.id, JsonRpcError::method_not_found(request.method))
         }
     };
 
@@ -54,10 +51,7 @@ pub async fn handle_jsonrpc(
 }
 
 /// Handle initialize request
-async fn handle_initialize(
-    id: RequestId,
-    params: Option<serde_json::Value>,
-) -> JsonRpcResponse {
+async fn handle_initialize(id: RequestId, params: Option<serde_json::Value>) -> JsonRpcResponse {
     info!("Initializing MCP server");
 
     let _params: InitializeParams = match params {
@@ -72,10 +66,7 @@ async fn handle_initialize(
             }
         },
         None => {
-            return JsonRpcResponse::error(
-                id,
-                JsonRpcError::invalid_params("Missing parameters"),
-            );
+            return JsonRpcResponse::error(id, JsonRpcError::invalid_params("Missing parameters"));
         }
     };
 
@@ -138,10 +129,7 @@ async fn handle_tools_call(
             }
         },
         None => {
-            return JsonRpcResponse::error(
-                id,
-                JsonRpcError::invalid_params("Missing parameters"),
-            );
+            return JsonRpcResponse::error(id, JsonRpcError::invalid_params("Missing parameters"));
         }
     };
 
@@ -149,15 +137,15 @@ async fn handle_tools_call(
 
     let executor: Box<dyn ToolExecutor> = match tool_params.name.as_str() {
         "semantic_search" => Box::new(crate::tools::SemanticSearchTool::new(state.db_pool.clone())),
-        "get_recommendations" => {
-            Box::new(crate::tools::GetRecommendationsTool::new(state.db_pool.clone()))
-        }
-        "check_availability" => {
-            Box::new(crate::tools::CheckAvailabilityTool::new(state.db_pool.clone()))
-        }
-        "get_content_details" => {
-            Box::new(crate::tools::GetContentDetailsTool::new(state.db_pool.clone()))
-        }
+        "get_recommendations" => Box::new(crate::tools::GetRecommendationsTool::new(
+            state.db_pool.clone(),
+        )),
+        "check_availability" => Box::new(crate::tools::CheckAvailabilityTool::new(
+            state.db_pool.clone(),
+        )),
+        "get_content_details" => Box::new(crate::tools::GetContentDetailsTool::new(
+            state.db_pool.clone(),
+        )),
         "sync_watchlist" => Box::new(crate::tools::SyncWatchlistTool::new(state.db_pool.clone())),
         "list_devices" => Box::new(crate::tools::ListDevicesTool::new(state.db_pool.clone())),
         _ => {
@@ -207,16 +195,17 @@ async fn handle_resources_read(
             }
         },
         None => {
-            return JsonRpcResponse::error(
-                id,
-                JsonRpcError::invalid_params("Missing parameters"),
-            );
+            return JsonRpcResponse::error(id, JsonRpcError::invalid_params("Missing parameters"));
         }
     };
 
     info!(uri = %resource_params.uri, "Reading resource");
 
-    match state.resource_manager.read_resource(&resource_params.uri).await {
+    match state
+        .resource_manager
+        .read_resource(&resource_params.uri)
+        .await
+    {
         Ok(content) => JsonRpcResponse::success(id, json!(content)),
         Err(e) => {
             error!(error = %e, uri = %resource_params.uri, "Resource read failed");
@@ -272,10 +261,7 @@ async fn handle_prompts_list(id: RequestId) -> JsonRpcResponse {
 }
 
 /// Handle prompts/get request
-async fn handle_prompts_get(
-    id: RequestId,
-    params: Option<serde_json::Value>,
-) -> JsonRpcResponse {
+async fn handle_prompts_get(id: RequestId, params: Option<serde_json::Value>) -> JsonRpcResponse {
     let prompt_params: PromptParams = match params {
         Some(p) => match serde_json::from_value(p) {
             Ok(params) => params,
@@ -288,10 +274,7 @@ async fn handle_prompts_get(
             }
         },
         None => {
-            return JsonRpcResponse::error(
-                id,
-                JsonRpcError::invalid_params("Missing parameters"),
-            );
+            return JsonRpcResponse::error(id, JsonRpcError::invalid_params("Missing parameters"));
         }
     };
 

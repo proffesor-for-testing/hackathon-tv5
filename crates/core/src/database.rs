@@ -1,6 +1,6 @@
 //! Shared PostgreSQL connection pool for Media Gateway services
 
-use sqlx::{postgres::PgPoolOptions, PgPool, Error as SqlxError};
+use sqlx::{postgres::PgPoolOptions, Error as SqlxError, PgPool};
 use std::time::Duration;
 use tracing::info;
 
@@ -36,7 +36,10 @@ pub struct DatabasePool {
 impl DatabasePool {
     /// Create new database pool
     pub async fn new(config: &DatabaseConfig) -> Result<Self, SqlxError> {
-        info!("Connecting to database with max {} connections", config.max_connections);
+        info!(
+            "Connecting to database with max {} connections",
+            config.max_connections
+        );
 
         let pool = PgPoolOptions::new()
             .max_connections(config.max_connections)
@@ -62,10 +65,7 @@ impl DatabasePool {
 
     /// Check if pool is healthy
     pub async fn is_healthy(&self) -> bool {
-        sqlx::query("SELECT 1")
-            .fetch_one(&self.pool)
-            .await
-            .is_ok()
+        sqlx::query("SELECT 1").fetch_one(&self.pool).await.is_ok()
     }
 
     /// Get pool statistics

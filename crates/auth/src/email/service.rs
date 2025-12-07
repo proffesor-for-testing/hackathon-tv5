@@ -93,10 +93,11 @@ impl EmailManager {
         let key = format!("email_verification:{}", token.token);
         let ttl = self.config.verification_ttl_hours * 3600;
 
-        let token_data = serde_json::to_string(&token)
-            .map_err(|e| EmailError::Template(e.to_string()))?;
+        let token_data =
+            serde_json::to_string(&token).map_err(|e| EmailError::Template(e.to_string()))?;
 
-        conn.set_ex::<_, _, ()>(&key, token_data, ttl as u64).await?;
+        conn.set_ex::<_, _, ()>(&key, token_data, ttl as u64)
+            .await?;
 
         Ok(token)
     }
@@ -109,8 +110,8 @@ impl EmailManager {
 
         match token_data {
             Some(data) => {
-                let verification_token: VerificationToken = serde_json::from_str(&data)
-                    .map_err(|e| EmailError::Template(e.to_string()))?;
+                let verification_token: VerificationToken =
+                    serde_json::from_str(&data).map_err(|e| EmailError::Template(e.to_string()))?;
 
                 // Delete token after verification
                 conn.del::<_, ()>(&key).await?;
@@ -145,10 +146,14 @@ impl EmailManager {
         self.check_resend_rate_limit(&email).await?;
 
         // Create token
-        let token = self.create_verification_token(user_id, email.clone()).await?;
+        let token = self
+            .create_verification_token(user_id, email.clone())
+            .await?;
 
         // Send email
-        self.provider.send_verification(&email, &token.token).await?;
+        self.provider
+            .send_verification(&email, &token.token)
+            .await?;
 
         Ok(token)
     }
@@ -161,20 +166,13 @@ impl EmailManager {
         self.send_verification_email(user_id, email).await
     }
 
-    pub async fn send_password_reset_email(
-        &self,
-        email: String,
-        token: String,
-    ) -> Result<()> {
+    pub async fn send_password_reset_email(&self, email: String, token: String) -> Result<()> {
         // Send email via provider
         self.provider.send_password_reset(&email, &token).await?;
         Ok(())
     }
 
-    pub async fn send_password_changed_notification(
-        &self,
-        email: String,
-    ) -> Result<()> {
+    pub async fn send_password_changed_notification(&self, email: String) -> Result<()> {
         // Send email via provider
         self.provider.send_password_changed(&email).await?;
         Ok(())
@@ -201,17 +199,26 @@ mod tests {
     #[async_trait]
     impl EmailService for MockEmailProvider {
         async fn send_verification(&self, email: &str, token: &str) -> Result<()> {
-            self.sent_emails.lock().unwrap().push((email.to_string(), token.to_string()));
+            self.sent_emails
+                .lock()
+                .unwrap()
+                .push((email.to_string(), token.to_string()));
             Ok(())
         }
 
         async fn send_password_reset(&self, email: &str, token: &str) -> Result<()> {
-            self.sent_emails.lock().unwrap().push((email.to_string(), token.to_string()));
+            self.sent_emails
+                .lock()
+                .unwrap()
+                .push((email.to_string(), token.to_string()));
             Ok(())
         }
 
         async fn send_password_changed(&self, email: &str) -> Result<()> {
-            self.sent_emails.lock().unwrap().push((email.to_string(), "changed".to_string()));
+            self.sent_emails
+                .lock()
+                .unwrap()
+                .push((email.to_string(), "changed".to_string()));
             Ok(())
         }
     }
@@ -242,10 +249,10 @@ mod tests {
 
         let manager = EmailManager::new(provider, redis, config);
 
-        let token = manager.create_verification_token(
-            "user123".to_string(),
-            "test@example.com".to_string(),
-        ).await.unwrap();
+        let token = manager
+            .create_verification_token("user123".to_string(), "test@example.com".to_string())
+            .await
+            .unwrap();
 
         let verified = manager.verify_token(&token.token).await.unwrap();
 
@@ -275,10 +282,10 @@ mod tests {
 
         let manager = EmailManager::new(provider, redis, config);
 
-        let token = manager.create_verification_token(
-            "user123".to_string(),
-            "test@example.com".to_string(),
-        ).await.unwrap();
+        let token = manager
+            .create_verification_token("user123".to_string(), "test@example.com".to_string())
+            .await
+            .unwrap();
 
         // First verification succeeds
         manager.verify_token(&token.token).await.unwrap();
@@ -297,16 +304,15 @@ mod tests {
         let manager = EmailManager::new(provider, redis, config);
 
         // First send succeeds
-        manager.send_verification_email(
-            "user123".to_string(),
-            "test@example.com".to_string(),
-        ).await.unwrap();
+        manager
+            .send_verification_email("user123".to_string(), "test@example.com".to_string())
+            .await
+            .unwrap();
 
         // Second send within rate limit fails
-        let result = manager.send_verification_email(
-            "user123".to_string(),
-            "test@example.com".to_string(),
-        ).await;
+        let result = manager
+            .send_verification_email("user123".to_string(), "test@example.com".to_string())
+            .await;
 
         assert!(matches!(result, Err(EmailError::RateLimitExceeded)));
     }

@@ -4,6 +4,4 @@ pub mod types;
 
 pub use handlers::{configure_routes, CatalogState};
 pub use service::CatalogService;
-pub use types::{
-    AvailabilityUpdate, ContentResponse, CreateContentRequest, UpdateContentRequest,
-};
+pub use types::{AvailabilityUpdate, ContentResponse, CreateContentRequest, UpdateContentRequest};

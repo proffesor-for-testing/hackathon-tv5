@@ -1,11 +1,10 @@
 //! Generic platform normalizer fallback using Streaming Availability API
 
 use super::{
-    PlatformNormalizer, RawContent, CanonicalContent, ContentType,
-    AvailabilityInfo, ImageSet, RateLimitConfig,
-    extract_string, extract_i64, extract_f64, extract_array,
+    extract_array, extract_f64, extract_i64, extract_string, AvailabilityInfo, CanonicalContent,
+    ContentType, ImageSet, PlatformNormalizer, RateLimitConfig, RawContent,
 };
-use crate::{Result, IngestionError, deep_link::DeepLinkResult};
+use crate::{deep_link::DeepLinkResult, IngestionError, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
@@ -104,7 +103,8 @@ impl PlatformNormalizer for GenericNormalizer {
             self.service_id
         );
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("X-RapidAPI-Key", &self.api_key)
             .header("X-RapidAPI-Host", "streaming-availability.p.rapidapi.com")
@@ -113,18 +113,20 @@ impl PlatformNormalizer for GenericNormalizer {
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
         let data: serde_json::Value = response.json().await?;
-        let changes = data.get("changes")
+        let changes = data
+            .get("changes")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| IngestionError::NormalizationFailed(
-                "No changes array in response".to_string()
-            ))?;
+            .ok_or_else(|| {
+                IngestionError::NormalizationFailed("No changes array in response".to_string())
+            })?;
 
-        let raw_items = changes.iter()
+        let raw_items = changes
+            .iter()
             .filter_map(|item| {
                 let id = extract_string(item, "id")?;
                 Some(RawContent {
@@ -153,7 +155,8 @@ impl PlatformNormalizer for GenericNormalizer {
 
         // Extract and map genres
         let genres = if let Some(genre_array) = extract_array(data, "genres") {
-            genre_array.iter()
+            genre_array
+                .iter()
                 .filter_map(|g| g.as_str())
                 .flat_map(|g| self.map_generic_genre(g))
                 .collect()
@@ -170,7 +173,8 @@ impl PlatformNormalizer for GenericNormalizer {
         };
 
         // Extract availability
-        let availability = if let Some(streaming_info) = data.get("streamingInfo")
+        let availability = if let Some(streaming_info) = data
+            .get("streamingInfo")
             .and_then(|si| si.get(&self.service_id))
             .and_then(|s| s.as_array())
             .and_then(|arr| arr.first())
@@ -179,7 +183,9 @@ impl PlatformNormalizer for GenericNormalizer {
             let is_subscription = stream_type.as_deref() == Some("subscription");
 
             AvailabilityInfo {
-                regions: vec![raw.data.get("country")
+                regions: vec![raw
+                    .data
+                    .get("country")
                     .and_then(|c| c.as_str())
                     .unwrap_or("us")
                     .to_string()],
@@ -191,10 +197,12 @@ impl PlatformNormalizer for GenericNormalizer {
                 },
                 rental_price: extract_f64(streaming_info, "rent").map(|r| r as f32),
                 currency: extract_string(streaming_info, "currency"),
-                available_from: streaming_info.get("addedOn")
+                available_from: streaming_info
+                    .get("addedOn")
                     .and_then(|v| v.as_i64())
                     .and_then(|ts| DateTime::from_timestamp(ts, 0)),
-                available_until: streaming_info.get("leaving")
+                available_until: streaming_info
+                    .get("leaving")
                     .and_then(|v| v.as_i64())
                     .and_then(|ts| DateTime::from_timestamp(ts, 0)),
             }
@@ -261,7 +269,13 @@ mod tests {
         );
 
         assert_eq!(normalizer.map_generic_genre("action"), vec!["Action"]);
-        assert_eq!(normalizer.map_generic_genre("sci-fi"), vec!["Science Fiction"]);
-        assert_eq!(normalizer.map_generic_genre("documentary"), vec!["Documentary"]);
+        assert_eq!(
+            normalizer.map_generic_genre("sci-fi"),
+            vec!["Science Fiction"]
+        );
+        assert_eq!(
+            normalizer.map_generic_genre("documentary"),
+            vec!["Documentary"]
+        );
     }
 }

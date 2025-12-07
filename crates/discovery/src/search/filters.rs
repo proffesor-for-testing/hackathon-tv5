@@ -76,8 +76,10 @@ impl SearchFilters {
 
         // Genre filter
         if !self.genres.is_empty() {
-            conditions.push(format!("genres && ARRAY[{}]::text[]",
-                self.genres.iter()
+            conditions.push(format!(
+                "genres && ARRAY[{}]::text[]",
+                self.genres
+                    .iter()
                     .map(|g| format!("'{}'", g))
                     .collect::<Vec<_>>()
                     .join(", ")
@@ -86,8 +88,10 @@ impl SearchFilters {
 
         // Platform filter
         if !self.platforms.is_empty() {
-            conditions.push(format!("platforms && ARRAY[{}]::text[]",
-                self.platforms.iter()
+            conditions.push(format!(
+                "platforms && ARRAY[{}]::text[]",
+                self.platforms
+                    .iter()
                     .map(|p| format!("'{}'", p))
                     .collect::<Vec<_>>()
                     .join(", ")
@@ -113,16 +117,15 @@ impl SearchFilters {
         // Content rating filter (parental controls)
         if let Some(rating_limit) = self.content_rating_limit {
             let rating_value = rating_limit as i32;
-            conditions.push(format!(
-                "content_rating_value <= {}",
-                rating_value
-            ));
+            conditions.push(format!("content_rating_value <= {}", rating_value));
         }
 
         // Blocked genres filter (parental controls)
         if !self.blocked_genres.is_empty() {
-            conditions.push(format!("NOT (genres && ARRAY[{}]::text[])",
-                self.blocked_genres.iter()
+            conditions.push(format!(
+                "NOT (genres && ARRAY[{}]::text[])",
+                self.blocked_genres
+                    .iter()
                     .map(|g| format!("'{}'", g))
                     .collect::<Vec<_>>()
                     .join(", ")

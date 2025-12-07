@@ -1,21 +1,21 @@
 //! Main ingestion pipeline with scheduling and orchestration
 
 use crate::{
-    normalizer::{PlatformNormalizer, RawContent, CanonicalContent},
+    embedding::EmbeddingGenerator,
     entity_resolution::EntityResolver,
     genre_mapping::GenreMapper,
-    embedding::EmbeddingGenerator,
-    qdrant::{QdrantClient, to_content_point},
+    normalizer::{CanonicalContent, PlatformNormalizer, RawContent},
+    qdrant::{to_content_point, QdrantClient},
     rate_limit::RateLimitManager,
     repository::{ContentRepository, PostgresContentRepository},
-    Result, IngestionError,
+    IngestionError, Result,
 };
-use chrono::{DateTime, Utc, Duration as ChronoDuration};
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use sqlx::PgPool;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::interval;
-use tracing::{info, warn, error, debug};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// Ingestion schedule configuration
@@ -95,14 +95,20 @@ impl IngestionPipeline {
     ///
     /// # Arguments
     /// * `event_producer` - Optional event producer for publishing events
-    pub fn with_event_producer(mut self, event_producer: Option<Arc<dyn crate::events::EventProducer>>) -> Self {
+    pub fn with_event_producer(
+        mut self,
+        event_producer: Option<Arc<dyn crate::events::EventProducer>>,
+    ) -> Self {
         self.event_producer = event_producer;
         self
     }
 
     /// Start the ingestion pipeline with all scheduled tasks
     pub async fn start(&self) -> Result<()> {
-        info!("Starting ingestion pipeline with {} platforms", self.normalizers.len());
+        info!(
+            "Starting ingestion pipeline with {} platforms",
+            self.normalizers.len()
+        );
 
         // Spawn concurrent tasks for different schedules
         let catalog_handle = self.spawn_catalog_refresh_task();
@@ -158,9 +164,15 @@ impl IngestionPipeline {
                             &rate_limiter,
                             repository.as_ref(),
                             region,
-                        ).await {
-                            error!("Catalog refresh failed for {} in {}: {}",
-                                normalizer.platform_id(), region, e);
+                        )
+                        .await
+                        {
+                            error!(
+                                "Catalog refresh failed for {} in {}: {}",
+                                normalizer.platform_id(),
+                                region,
+                                e
+                            );
                         }
                     }
                 }
@@ -193,9 +205,15 @@ impl IngestionPipeline {
                             repository.as_ref(),
                             event_producer.as_ref(),
                             region,
-                        ).await {
-                            error!("Availability sync failed for {} in {}: {}",
-                                normalizer.platform_id(), region, e);
+                        )
+                        .await
+                        {
+                            error!(
+                                "Availability sync failed for {} in {}: {}",
+                                normalizer.platform_id(),
+                                region,
+                                e
+                            );
                         }
                     }
                 }
@@ -226,9 +244,15 @@ impl IngestionPipeline {
                             &rate_limiter,
                             repository.as_ref(),
                             region,
-                        ).await {
-                            warn!("Expiring content check failed for {} in {}: {}",
-                                normalizer.platform_id(), region, e);
+                        )
+                        .await
+                        {
+                            warn!(
+                                "Expiring content check failed for {} in {}: {}",
+                                normalizer.platform_id(),
+                                region,
+                                e
+                            );
                         }
                     }
                 }
@@ -255,7 +279,9 @@ impl IngestionPipeline {
                     qdrant_client.as_ref().map(|c| c.as_ref()),
                     repository.as_ref(),
                     event_producer.as_ref(),
-                ).await {
+                )
+                .await
+                {
                     error!("Metadata enrichment failed: {}", e);
                 }
 
@@ -286,7 +312,12 @@ impl IngestionPipeline {
 
         // Fetch catalog delta
         let raw_items = normalizer.fetch_catalog_delta(since, region).await?;
-        info!("Fetched {} items from {} for {}", raw_items.len(), platform_id, region);
+        info!(
+            "Fetched {} items from {} for {}",
+            raw_items.len(),
+            platform_id,
+            region
+        );
 
         // Process items in batches for performance (target: 500 items/s)
         const BATCH_SIZE: usize = 100;
@@ -299,7 +330,8 @@ impl IngestionPipeline {
                 embedding_generator,
                 qdrant_client,
                 repository,
-            ).await?;
+            )
+            .await?;
         }
 
         Ok(())
@@ -319,11 +351,14 @@ impl IngestionPipeline {
 
         for raw in batch {
             // Normalize to canonical format
-            let mut canonical = normalizer.normalize(raw.clone())
+            let mut canonical = normalizer
+                .normalize(raw.clone())
                 .map_err(|e| IngestionError::NormalizationFailed(e.to_string()))?;
 
             // Resolve entity (EIDR, external IDs, fuzzy matching)
-            let entity_match = entity_resolver.resolve(&canonical).await
+            let entity_match = entity_resolver
+                .resolve(&canonical)
+                .await
                 .map_err(|e| IngestionError::EntityResolutionFailed(e.to_string()))?;
 
             if let Some(matched_entity_id) = entity_match.entity_id {
@@ -331,23 +366,25 @@ impl IngestionPipeline {
             }
 
             // Map genres to canonical taxonomy
-            canonical.genres = genre_mapper.map_genres(
-                &canonical.genres,
-                normalizer.platform_id(),
-            );
+            canonical.genres = genre_mapper.map_genres(&canonical.genres, normalizer.platform_id());
 
             // Generate embeddings
             canonical.embedding = Some(
-                embedding_generator.generate(&canonical).await
-                    .map_err(|e| IngestionError::NormalizationFailed(e.to_string()))?
+                embedding_generator
+                    .generate(&canonical)
+                    .await
+                    .map_err(|e| IngestionError::NormalizationFailed(e.to_string()))?,
             );
 
             // Persist to database
-            let content_id = repository.upsert(&canonical).await
-                .map_err(|e| IngestionError::NormalizationFailed(format!("Database error: {}", e)))?;
+            let content_id = repository.upsert(&canonical).await.map_err(|e| {
+                IngestionError::NormalizationFailed(format!("Database error: {}", e))
+            })?;
 
-            debug!("Processed and persisted content: {} (id: {}, entity: {:?})",
-                canonical.title, content_id, canonical.entity_id);
+            debug!(
+                "Processed and persisted content: {} (id: {}, entity: {:?})",
+                canonical.title, content_id, canonical.entity_id
+            );
 
             // Prepare for Qdrant batch upsert if client is available
             if qdrant_client.is_some() {
@@ -385,6 +422,8 @@ impl IngestionPipeline {
         let since = Utc::now() - ChronoDuration::hours(1);
         let raw_items = normalizer.fetch_catalog_delta(since, region).await?;
 
+        let items_count = raw_items.len();
+
         // Process each raw item to extract and update availability
         for raw in raw_items {
             // Normalize to extract availability information
@@ -397,10 +436,10 @@ impl IngestionPipeline {
             };
 
             // Look up content by platform_content_id and platform_id
-            let content_id = match repository.find_by_platform_id(
-                &canonical.platform_content_id,
-                &canonical.platform_id,
-            ).await {
+            let content_id = match repository
+                .find_by_platform_id(&canonical.platform_content_id, &canonical.platform_id)
+                .await
+            {
                 Ok(Some(id)) => id,
                 Ok(None) => {
                     debug!(
@@ -421,14 +460,20 @@ impl IngestionPipeline {
             let is_available = !availability.regions.is_empty();
 
             // Update availability in database
-            if let Err(e) = repository.update_availability(
-                content_id,
-                &canonical.platform_id,
-                region,
-                is_available,
-                availability.available_until,
-            ).await {
-                warn!("Failed to update availability for content {}: {}", content_id, e);
+            if let Err(e) = repository
+                .update_availability(
+                    content_id,
+                    &canonical.platform_id,
+                    region,
+                    is_available,
+                    availability.available_until,
+                )
+                .await
+            {
+                warn!(
+                    "Failed to update availability for content {}: {}",
+                    content_id, e
+                );
                 continue;
             }
 
@@ -448,13 +493,19 @@ impl IngestionPipeline {
                     event = event.with_expiration(expires_at);
                 }
 
-                if let Err(e) = producer.publish_event(ContentEvent::AvailabilityChanged(event)).await {
+                if let Err(e) = producer
+                    .publish_event(ContentEvent::AvailabilityChanged(event))
+                    .await
+                {
                     warn!("Failed to publish availability changed event: {}", e);
                 }
             }
         }
 
-        debug!("Updated availability for {} items from {}", raw_items.len(), platform_id);
+        debug!(
+            "Updated availability for {} items from {}",
+            items_count, platform_id
+        );
 
         Ok(())
     }
@@ -471,13 +522,17 @@ impl IngestionPipeline {
         rate_limiter.check_and_wait(platform_id).await?;
 
         // Query database for content expiring in next 7 days
-        let expiring = repository.find_expiring_within(ChronoDuration::days(7)).await
+        let expiring = repository
+            .find_expiring_within(ChronoDuration::days(7))
+            .await
             .map_err(|e| IngestionError::NormalizationFailed(e.to_string()))?;
 
         for item in expiring {
             if item.platform == platform_id && item.region == region {
-                info!("Content '{}' on {} expires at {}",
-                    item.title, item.platform, item.expires_at);
+                info!(
+                    "Content '{}' on {} expires at {}",
+                    item.title, item.platform, item.expires_at
+                );
             }
         }
 
@@ -493,7 +548,9 @@ impl IngestionPipeline {
     ) -> Result<()> {
         // Query for content with stale embeddings (older than 7 days)
         let stale_threshold = Utc::now() - ChronoDuration::days(7);
-        let stale_content = repository.find_stale_embeddings(stale_threshold).await
+        let stale_content = repository
+            .find_stale_embeddings(stale_threshold)
+            .await
             .map_err(|e| IngestionError::DatabaseError(e.to_string()))?;
 
         if stale_content.is_empty() {
@@ -501,7 +558,10 @@ impl IngestionPipeline {
             return Ok(());
         }
 
-        info!("Found {} content items with stale embeddings", stale_content.len());
+        info!(
+            "Found {} content items with stale embeddings",
+            stale_content.len()
+        );
 
         // Process in batches of 100 items
         const BATCH_SIZE: usize = 100;
@@ -524,8 +584,14 @@ impl IngestionPipeline {
                 match embedding_generator.generate(&item.content).await {
                     Ok(embedding) => {
                         // Update embedding in database
-                        if let Err(e) = repository.update_embedding(item.content_id, &embedding).await {
-                            warn!("Failed to update embedding for content {}: {}", item.content_id, e);
+                        if let Err(e) = repository
+                            .update_embedding(item.content_id, &embedding)
+                            .await
+                        {
+                            warn!(
+                                "Failed to update embedding for content {}: {}",
+                                item.content_id, e
+                            );
                             continue;
                         }
 
@@ -536,23 +602,30 @@ impl IngestionPipeline {
 
                             match to_content_point(&content_with_embedding, item.content_id) {
                                 Ok(point) => qdrant_points.push(point),
-                                Err(e) => warn!("Failed to create Qdrant point for {}: {}", item.content_id, e),
+                                Err(e) => warn!(
+                                    "Failed to create Qdrant point for {}: {}",
+                                    item.content_id, e
+                                ),
                             }
                         }
 
                         // Compute quality score
                         let quality_score = Self::compute_quality_score(&item.content);
-                        if let Err(e) = repository.update_quality_score(item.content_id, quality_score).await {
-                            warn!("Failed to update quality score for content {}: {}", item.content_id, e);
+                        if let Err(e) = repository
+                            .update_quality_score(item.content_id, quality_score)
+                            .await
+                        {
+                            warn!(
+                                "Failed to update quality score for content {}: {}",
+                                item.content_id, e
+                            );
                         } else {
                             total_quality_computed += 1;
                         }
 
                         // Create metadata enrichment event
-                        let enriched_fields = vec![
-                            "embedding".to_string(),
-                            "quality_score".to_string(),
-                        ];
+                        let enriched_fields =
+                            vec!["embedding".to_string(), "quality_score".to_string()];
 
                         events.push(crate::events::ContentEvent::MetadataEnriched(
                             crate::events::MetadataEnrichedEvent::new(
@@ -560,14 +633,20 @@ impl IngestionPipeline {
                                 "embedding_generator".to_string(),
                                 enriched_fields,
                                 quality_score,
-                            )
+                            ),
                         ));
 
                         total_enriched += 1;
-                        debug!("Enriched metadata for content: {} ({})", item.content.title, item.content_id);
+                        debug!(
+                            "Enriched metadata for content: {} ({})",
+                            item.content.title, item.content_id
+                        );
                     }
                     Err(e) => {
-                        warn!("Failed to generate embedding for content {}: {}", item.content_id, e);
+                        warn!(
+                            "Failed to generate embedding for content {}: {}",
+                            item.content_id, e
+                        );
                         continue;
                     }
                 }
@@ -602,8 +681,7 @@ impl IngestionPipeline {
 
         info!(
             "Metadata enrichment completed: {} embeddings regenerated, {} quality scores computed",
-            total_enriched,
-            total_quality_computed
+            total_enriched, total_quality_computed
         );
 
         Ok(())
@@ -629,7 +707,12 @@ impl IngestionPipeline {
         }
 
         // Overview
-        if content.overview.as_ref().map(|s| !s.is_empty()).unwrap_or(false) {
+        if content
+            .overview
+            .as_ref()
+            .map(|s| !s.is_empty())
+            .unwrap_or(false)
+        {
             score += 0.2;
         }
 

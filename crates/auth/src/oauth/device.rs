@@ -39,8 +39,7 @@ impl DeviceCode {
         let created_at = chrono::Utc::now();
 
         let verification_uri = format!("{}/device", base_url);
-        let verification_uri_complete =
-            format!("{}/device?user_code={}", base_url, user_code);
+        let verification_uri_complete = format!("{}/device?user_code={}", base_url, user_code);
 
         Self {
             device_code,
@@ -178,11 +177,7 @@ mod tests {
 
     #[test]
     fn test_user_code_format() {
-        let device = DeviceCode::new(
-            "client123".to_string(),
-            vec![],
-            "https://auth.example.com",
-        );
+        let device = DeviceCode::new("client123".to_string(), vec![], "https://auth.example.com");
 
         // User code should not contain confusing characters
         assert!(!device.user_code.contains('0'));

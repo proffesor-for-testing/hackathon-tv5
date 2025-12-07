@@ -67,7 +67,10 @@ pub async fn up(database_url: &str, dry_run: bool) -> Result<()> {
         apply_migration(&pool, migration).await?;
     }
 
-    println!("\n{}", "All migrations applied successfully!".green().bold());
+    println!(
+        "\n{}",
+        "All migrations applied successfully!".green().bold()
+    );
 
     Ok(())
 }
@@ -174,8 +177,7 @@ pub fn create(name: &str) -> Result<()> {
     let migrations_dir = Path::new(MIGRATIONS_DIR);
 
     if !migrations_dir.exists() {
-        fs::create_dir_all(migrations_dir)
-            .context("Failed to create migrations directory")?;
+        fs::create_dir_all(migrations_dir).context("Failed to create migrations directory")?;
     }
 
     let existing = load_migrations()?;
@@ -251,9 +253,7 @@ fn load_migrations() -> Result<Vec<Migration>> {
     let version_regex = Regex::new(r"^(\d+)_(.+)\.sql$").unwrap();
     let mut migrations = Vec::new();
 
-    for entry in fs::read_dir(migrations_dir)
-        .context("Failed to read migrations directory")?
-    {
+    for entry in fs::read_dir(migrations_dir).context("Failed to read migrations directory")? {
         let entry = entry?;
         let path = entry.path();
 
@@ -270,8 +270,7 @@ fn load_migrations() -> Result<Vec<Migration>> {
             let version = captures.get(1).unwrap().as_str().to_string();
             let name = captures.get(2).unwrap().as_str().to_string();
 
-            let sql =
-                fs::read_to_string(&path).context("Failed to read migration file")?;
+            let sql = fs::read_to_string(&path).context("Failed to read migration file")?;
 
             migrations.push(Migration {
                 version,
@@ -315,10 +314,7 @@ async fn get_applied_migrations(pool: &PgPool) -> Result<Vec<AppliedMigration>> 
 async fn apply_migration(pool: &PgPool, migration: &Migration) -> Result<()> {
     print!("Applying {} ... ", migration.name.white());
 
-    let mut tx = pool
-        .begin()
-        .await
-        .context("Failed to begin transaction")?;
+    let mut tx = pool.begin().await.context("Failed to begin transaction")?;
 
     sqlx::query(&migration.sql)
         .execute(&mut *tx)
@@ -344,10 +340,7 @@ async fn apply_migration(pool: &PgPool, migration: &Migration) -> Result<()> {
 async fn rollback_migration(pool: &PgPool, version: &str) -> Result<()> {
     print!("Rolling back {} ... ", version.white());
 
-    let mut tx = pool
-        .begin()
-        .await
-        .context("Failed to begin transaction")?;
+    let mut tx = pool.begin().await.context("Failed to begin transaction")?;
 
     sqlx::query(&format!(
         "DELETE FROM {} WHERE version = $1",

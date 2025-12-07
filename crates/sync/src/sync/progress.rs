@@ -1,13 +1,12 @@
 /// Watch progress synchronization using LWW-Register CRDT
 ///
 /// Tracks playback position with last-writer-wins conflict resolution
-
 use crate::crdt::{HLCTimestamp, HybridLogicalClock, PlaybackPosition, PlaybackState};
 use crate::sync::publisher::{PublisherError, SyncPublisher};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 use tracing::{debug, error, info};
 
 /// Progress sync manager
@@ -229,12 +228,8 @@ mod tests {
     fn test_progress_update() {
         let sync = ProgressSync::new("user-1".to_string(), "device-a".to_string());
 
-        let update = sync.update_progress(
-            "content-1".to_string(),
-            100,
-            1000,
-            PlaybackState::Playing,
-        );
+        let update =
+            sync.update_progress("content-1".to_string(), 100, 1000, PlaybackState::Playing);
 
         assert_eq!(update.position_seconds, 100);
         assert_eq!(update.completion_percent(), 0.1);
@@ -248,12 +243,8 @@ mod tests {
         let sync1 = ProgressSync::new("user-1".to_string(), "device-a".to_string());
         let sync2 = ProgressSync::new("user-1".to_string(), "device-b".to_string());
 
-        let update = sync1.update_progress(
-            "content-1".to_string(),
-            100,
-            1000,
-            PlaybackState::Playing,
-        );
+        let update =
+            sync1.update_progress("content-1".to_string(), 100, 1000, PlaybackState::Playing);
 
         sync2.apply_remote_update(update);
 
@@ -266,22 +257,14 @@ mod tests {
         let sync = ProgressSync::new("user-1".to_string(), "device-a".to_string());
 
         // First update at 100s
-        let update1 = sync.update_progress(
-            "content-1".to_string(),
-            100,
-            1000,
-            PlaybackState::Playing,
-        );
+        let update1 =
+            sync.update_progress("content-1".to_string(), 100, 1000, PlaybackState::Playing);
 
         std::thread::sleep(std::time::Duration::from_millis(10));
 
         // Second update at 200s (newer timestamp)
-        let update2 = sync.update_progress(
-            "content-1".to_string(),
-            200,
-            1000,
-            PlaybackState::Paused,
-        );
+        let update2 =
+            sync.update_progress("content-1".to_string(), 200, 1000, PlaybackState::Paused);
 
         // Apply updates in reverse order (simulating out-of-order delivery)
         let sync2 = ProgressSync::new("user-1".to_string(), "device-b".to_string());

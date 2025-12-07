@@ -52,12 +52,10 @@ async fn main() -> anyhow::Result<()> {
         acquire_timeout: std::time::Duration::from_secs(30),
         idle_timeout: std::time::Duration::from_secs(600),
     };
-    let db_pool = DatabasePool::new(&db_config)
-        .await
-        .map_err(|e| {
-            error!(error = %e, "Failed to connect to database");
-            anyhow::anyhow!("Database connection failed: {}", e)
-        })?;
+    let db_pool = DatabasePool::new(&db_config).await.map_err(|e| {
+        error!(error = %e, "Failed to connect to database");
+        anyhow::anyhow!("Database connection failed: {}", e)
+    })?;
     info!("Database connection established");
 
     // Create server state
@@ -68,12 +66,10 @@ async fn main() -> anyhow::Result<()> {
         info!("Starting MCP server with STDIO transport");
         info!("Server ready for Claude Desktop integration");
 
-        transport::run_stdio_server(state)
-            .await
-            .map_err(|e| {
-                error!(error = %e, "STDIO transport error");
-                anyhow::anyhow!("STDIO server failed: {}", e)
-            })?;
+        transport::run_stdio_server(state).await.map_err(|e| {
+            error!(error = %e, "STDIO transport error");
+            anyhow::anyhow!("STDIO server failed: {}", e)
+        })?;
     } else {
         info!("Starting MCP server with HTTP transport");
 
@@ -88,23 +84,19 @@ async fn main() -> anyhow::Result<()> {
         let addr = config.address();
         info!(address = %addr, "Starting HTTP server");
 
-        let listener = tokio::net::TcpListener::bind(&addr)
-            .await
-            .map_err(|e| {
-                error!(error = %e, address = %addr, "Failed to bind to address");
-                anyhow::anyhow!("Failed to bind: {}", e)
-            })?;
+        let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|e| {
+            error!(error = %e, address = %addr, "Failed to bind to address");
+            anyhow::anyhow!("Failed to bind: {}", e)
+        })?;
 
         info!("MCP server listening on {}", addr);
         info!("Health check endpoint: http://{}/health", addr);
         info!("JSON-RPC endpoint: http://{}/", addr);
 
-        axum::serve(listener, app)
-            .await
-            .map_err(|e| {
-                error!(error = %e, "Server error");
-                anyhow::anyhow!("Server failed: {}", e)
-            })?;
+        axum::serve(listener, app).await.map_err(|e| {
+            error!(error = %e, "Server error");
+            anyhow::anyhow!("Server failed: {}", e)
+        })?;
     }
 
     Ok(())

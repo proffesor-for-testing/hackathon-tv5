@@ -148,7 +148,10 @@ async fn test_update_user_profile_partial_update() {
         updated_profile.avatar_url,
         Some("https://example.com/avatar1.jpg".to_string())
     );
-    assert_eq!(updated_profile.preferences, serde_json::json!({"theme": "dark"}));
+    assert_eq!(
+        updated_profile.preferences,
+        serde_json::json!({"theme": "dark"})
+    );
 
     cleanup_user(&pool, user_id).await;
 }
@@ -174,13 +177,10 @@ async fn test_soft_delete_user_marks_deleted_at() {
     assert!(profile.is_none());
 
     // Verify deleted_at is set in database
-    let row = sqlx::query!(
-        "SELECT deleted_at FROM users WHERE id = $1",
-        user_id
-    )
-    .fetch_one(&pool)
-    .await
-    .expect("Failed to fetch user");
+    let row = sqlx::query!("SELECT deleted_at FROM users WHERE id = $1", user_id)
+        .fetch_one(&pool)
+        .await
+        .expect("Failed to fetch user");
 
     assert!(row.deleted_at.is_some());
 

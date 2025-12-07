@@ -1,7 +1,6 @@
 /// Media Gateway Sync Service - Main Entry Point
 ///
 /// Starts the sync server on port 8083
-
 use media_gateway_sync::{init_tracing, start_server};
 
 #[actix_web::main]

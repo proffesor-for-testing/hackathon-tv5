@@ -34,7 +34,9 @@ pub mod middleware;
 pub mod tracing;
 
 pub use self::tracing::{
-    TracingConfig, TelemetryError, init_tracing, shutdown_tracing,
-    create_span, db_query_span, redis_op_span, external_api_span,
+    create_span, db_query_span, external_api_span, init_tracing, redis_op_span, shutdown_tracing,
+    TelemetryError, TracingConfig,
 };
-pub use middleware::{TracingMiddleware, extract_trace_context, inject_trace_context, TraceContext};
+pub use middleware::{
+    extract_trace_context, inject_trace_context, TraceContext, TracingMiddleware,
+};

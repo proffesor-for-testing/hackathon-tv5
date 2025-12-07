@@ -48,11 +48,17 @@ async fn test_genre_similarity() {
     let recommendations = recommender.recommend(user_id, 10).await.unwrap();
 
     // Should return recommendations based on genre similarity
-    assert!(!recommendations.is_empty(), "Should return graph-based recommendations");
+    assert!(
+        !recommendations.is_empty(),
+        "Should return graph-based recommendations"
+    );
 
     // Verify scores are in valid range [0, 1]
     for (_, score) in &recommendations {
-        assert!(*score >= 0.0 && *score <= 1.0, "Score should be in [0, 1] range");
+        assert!(
+            *score >= 0.0 && *score <= 1.0,
+            "Score should be in [0, 1] range"
+        );
     }
 
     cleanup_test_data(&pool, user_id, content_id).await;
@@ -80,7 +86,10 @@ async fn test_collaborative_filtering() {
     // User1 should get recommendations based on User2's additional content
     let recommendations = recommender.recommend(user1_id, 10).await.unwrap();
 
-    assert!(!recommendations.is_empty(), "Should return collaborative recommendations");
+    assert!(
+        !recommendations.is_empty(),
+        "Should return collaborative recommendations"
+    );
 
     cleanup_test_data(&pool, user1_id, shared_content).await;
     cleanup_test_data(&pool, user2_id, shared_content).await;
@@ -105,7 +114,10 @@ async fn test_cast_similarity() {
     let recommendations = recommender.recommend(user_id, 10).await.unwrap();
 
     // Should find content with shared cast members
-    assert!(!recommendations.is_empty(), "Should find cast-based recommendations");
+    assert!(
+        !recommendations.is_empty(),
+        "Should find cast-based recommendations"
+    );
 
     cleanup_test_data(&pool, user_id, content_id).await;
 }
@@ -244,13 +256,10 @@ async fn insert_shared_watch_history(pool: &sqlx::PgPool, user1_id: Uuid, user2_
 }
 
 async fn cleanup_test_data(pool: &sqlx::PgPool, user_id: Uuid, content_id: Uuid) {
-    sqlx::query!(
-        "DELETE FROM watch_progress WHERE user_id = $1",
-        user_id
-    )
-    .execute(pool)
-    .await
-    .ok();
+    sqlx::query!("DELETE FROM watch_progress WHERE user_id = $1", user_id)
+        .execute(pool)
+        .await
+        .ok();
 }
 
 async fn setup_large_test_dataset(_pool: &sqlx::PgPool, _size: usize) {

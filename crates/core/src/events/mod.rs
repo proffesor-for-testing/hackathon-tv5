@@ -7,6 +7,6 @@
 pub mod user_activity;
 
 pub use user_activity::{
-    ActivityEventType, KafkaActivityProducer, UserActivityEvent, UserActivityProducer,
-    ActivityEventError, ActivityEventResult,
+    ActivityEventError, ActivityEventResult, ActivityEventType, KafkaActivityProducer,
+    UserActivityEvent, UserActivityProducer,
 };

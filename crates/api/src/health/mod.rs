@@ -59,10 +59,12 @@ impl HealthChecker {
         checks.insert("playback".to_string(), self.check_service("playback").await);
 
         let critical_services = ["discovery", "auth"];
-        let status = if critical_services
-            .iter()
-            .any(|s| checks.get(*s).map(|h| h.status == "healthy").unwrap_or(false))
-        {
+        let status = if critical_services.iter().any(|s| {
+            checks
+                .get(*s)
+                .map(|h| h.status == "healthy")
+                .unwrap_or(false)
+        }) {
             "healthy"
         } else {
             "unhealthy"
@@ -112,7 +114,11 @@ impl HealthChecker {
     }
 
     async fn check_service(&self, service: &str) -> ServiceHealthCheck {
-        let health = self.proxy.get_service_health(service).await.unwrap_or(false);
+        let health = self
+            .proxy
+            .get_service_health(service)
+            .await
+            .unwrap_or(false);
         let circuit_state = self.circuit_breaker.get_state(service).await;
 
         ServiceHealthCheck {

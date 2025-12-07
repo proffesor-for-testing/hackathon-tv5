@@ -291,7 +291,9 @@ async fn test_logout_invalidates_token() -> Result<()> {
     assert_eq!(me_response.status(), 200);
 
     // Logout
-    let logout_response = authed_client.post("/api/v1/auth/logout", &json!({})).await?;
+    let logout_response = authed_client
+        .post("/api/v1/auth/logout", &json!({}))
+        .await?;
     assert_eq!(logout_response.status(), 200);
 
     // Verify token no longer works

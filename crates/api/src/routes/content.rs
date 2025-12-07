@@ -6,7 +6,9 @@ use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use std::sync::Arc;
 use tracing::debug;
 
-fn convert_headers(actix_headers: &actix_web::http::header::HeaderMap) -> reqwest::header::HeaderMap {
+fn convert_headers(
+    actix_headers: &actix_web::http::header::HeaderMap,
+) -> reqwest::header::HeaderMap {
     let mut reqwest_headers = reqwest::header::HeaderMap::new();
     for (key, value) in actix_headers.iter() {
         if let Ok(name) = reqwest::header::HeaderName::from_bytes(key.as_str().as_bytes()) {
@@ -55,8 +57,14 @@ async fn get_content(
 
     // Check rate limit
     let user_ctx = get_user_context(&req);
-    let user_id = user_ctx.as_ref().map(|u| u.user_id.as_str()).unwrap_or("anonymous");
-    let tier = user_ctx.as_ref().map(|u| u.tier.as_str()).unwrap_or("anonymous");
+    let user_id = user_ctx
+        .as_ref()
+        .map(|u| u.user_id.as_str())
+        .unwrap_or("anonymous");
+    let tier = user_ctx
+        .as_ref()
+        .map(|u| u.tier.as_str())
+        .unwrap_or("anonymous");
 
     match rate_limiter.check_rate_limit(user_id, tier).await {
         Ok(rate_info) => {
@@ -67,7 +75,10 @@ async fn get_content(
                 method: req.method().clone(),
                 headers: convert_headers(req.headers()),
                 body: None,
-                query: req.query_string().is_empty().then(|| req.query_string().to_string()),
+                query: req
+                    .query_string()
+                    .is_empty()
+                    .then(|| req.query_string().to_string()),
             };
 
             match proxy.forward(proxy_req).await {
@@ -76,7 +87,8 @@ async fn get_content(
 
                     // Add rate limit headers
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     // Forward response headers
@@ -103,8 +115,14 @@ async fn get_availability(
 
     // Check rate limit
     let user_ctx = get_user_context(&req);
-    let user_id = user_ctx.as_ref().map(|u| u.user_id.as_str()).unwrap_or("anonymous");
-    let tier = user_ctx.as_ref().map(|u| u.tier.as_str()).unwrap_or("anonymous");
+    let user_id = user_ctx
+        .as_ref()
+        .map(|u| u.user_id.as_str())
+        .unwrap_or("anonymous");
+    let tier = user_ctx
+        .as_ref()
+        .map(|u| u.tier.as_str())
+        .unwrap_or("anonymous");
 
     match rate_limiter.check_rate_limit(user_id, tier).await {
         Ok(rate_info) => {
@@ -114,14 +132,18 @@ async fn get_availability(
                 method: req.method().clone(),
                 headers: convert_headers(req.headers()),
                 body: None,
-                query: req.query_string().is_empty().then(|| req.query_string().to_string()),
+                query: req
+                    .query_string()
+                    .is_empty()
+                    .then(|| req.query_string().to_string()),
             };
 
             match proxy.forward(proxy_req).await {
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {
@@ -144,8 +166,14 @@ async fn get_trending(
 ) -> impl Responder {
     // Check rate limit
     let user_ctx = get_user_context(&req);
-    let user_id = user_ctx.as_ref().map(|u| u.user_id.as_str()).unwrap_or("anonymous");
-    let tier = user_ctx.as_ref().map(|u| u.tier.as_str()).unwrap_or("anonymous");
+    let user_id = user_ctx
+        .as_ref()
+        .map(|u| u.user_id.as_str())
+        .unwrap_or("anonymous");
+    let tier = user_ctx
+        .as_ref()
+        .map(|u| u.tier.as_str())
+        .unwrap_or("anonymous");
 
     match rate_limiter.check_rate_limit(user_id, tier).await {
         Ok(rate_info) => {
@@ -155,14 +183,18 @@ async fn get_trending(
                 method: req.method().clone(),
                 headers: convert_headers(req.headers()),
                 body: None,
-                query: req.query_string().is_empty().then(|| req.query_string().to_string()),
+                query: req
+                    .query_string()
+                    .is_empty()
+                    .then(|| req.query_string().to_string()),
             };
 
             match proxy.forward(proxy_req).await {
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {
@@ -185,8 +217,14 @@ async fn get_popular_movies(
 ) -> impl Responder {
     // Check rate limit
     let user_ctx = get_user_context(&req);
-    let user_id = user_ctx.as_ref().map(|u| u.user_id.as_str()).unwrap_or("anonymous");
-    let tier = user_ctx.as_ref().map(|u| u.tier.as_str()).unwrap_or("anonymous");
+    let user_id = user_ctx
+        .as_ref()
+        .map(|u| u.user_id.as_str())
+        .unwrap_or("anonymous");
+    let tier = user_ctx
+        .as_ref()
+        .map(|u| u.tier.as_str())
+        .unwrap_or("anonymous");
 
     match rate_limiter.check_rate_limit(user_id, tier).await {
         Ok(rate_info) => {
@@ -196,14 +234,18 @@ async fn get_popular_movies(
                 method: req.method().clone(),
                 headers: convert_headers(req.headers()),
                 body: None,
-                query: req.query_string().is_empty().then(|| req.query_string().to_string()),
+                query: req
+                    .query_string()
+                    .is_empty()
+                    .then(|| req.query_string().to_string()),
             };
 
             match proxy.forward(proxy_req).await {
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {
@@ -226,8 +268,14 @@ async fn get_popular_tv(
 ) -> impl Responder {
     // Check rate limit
     let user_ctx = get_user_context(&req);
-    let user_id = user_ctx.as_ref().map(|u| u.user_id.as_str()).unwrap_or("anonymous");
-    let tier = user_ctx.as_ref().map(|u| u.tier.as_str()).unwrap_or("anonymous");
+    let user_id = user_ctx
+        .as_ref()
+        .map(|u| u.user_id.as_str())
+        .unwrap_or("anonymous");
+    let tier = user_ctx
+        .as_ref()
+        .map(|u| u.tier.as_str())
+        .unwrap_or("anonymous");
 
     match rate_limiter.check_rate_limit(user_id, tier).await {
         Ok(rate_info) => {
@@ -237,14 +285,18 @@ async fn get_popular_tv(
                 method: req.method().clone(),
                 headers: convert_headers(req.headers()),
                 body: None,
-                query: req.query_string().is_empty().then(|| req.query_string().to_string()),
+                query: req
+                    .query_string()
+                    .is_empty()
+                    .then(|| req.query_string().to_string()),
             };
 
             match proxy.forward(proxy_req).await {
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {

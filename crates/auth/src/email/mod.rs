@@ -1,9 +1,9 @@
+pub mod providers;
 pub mod service;
 pub mod templates;
-pub mod providers;
 
-pub use service::{EmailService, EmailError, VerificationToken, EmailManager};
-pub use providers::{SendGridProvider, ConsoleProvider};
+pub use providers::{ConsoleProvider, SendGridProvider};
+pub use service::{EmailError, EmailManager, EmailService, VerificationToken};
 
 use serde::{Deserialize, Serialize};
 
@@ -19,8 +19,14 @@ pub struct EmailConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum EmailProviderConfig {
-    SendGrid { api_key: String },
-    AwsSes { region: String, access_key_id: String, secret_access_key: String },
+    SendGrid {
+        api_key: String,
+    },
+    AwsSes {
+        region: String,
+        access_key_id: String,
+        secret_access_key: String,
+    },
     Console,
 }
 

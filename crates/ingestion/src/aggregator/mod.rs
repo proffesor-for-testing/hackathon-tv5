@@ -1,18 +1,18 @@
 //! Aggregator API clients for content metadata
 
-use crate::{Result, IngestionError};
+use crate::{IngestionError, Result};
 use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub mod streaming_availability;
-pub mod watchmode;
 pub mod tmdb;
+pub mod watchmode;
 
 pub use streaming_availability::StreamingAvailabilityClient;
-pub use watchmode::WatchmodeClient;
 pub use tmdb::TMDbClient;
+pub use watchmode::WatchmodeClient;
 
 /// Common response structure for aggregator APIs
 #[derive(Debug, Clone, Serialize, Deserialize)]

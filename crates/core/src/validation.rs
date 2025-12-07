@@ -25,9 +25,8 @@ pub static COUNTRY_CODE_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^[A-Z]{2}$").expect("Failed to compile country code regex"));
 
 /// URL validation regex (basic)
-pub static URL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^https?://[^\s/$.?#].[^\s]*$").expect("Failed to compile URL regex")
-});
+pub static URL_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^https?://[^\s/$.?#].[^\s]*$").expect("Failed to compile URL regex"));
 
 /// Validate IMDb ID format
 ///
@@ -267,10 +266,7 @@ pub fn validate_string_length(
 }
 
 /// Validate a vector is not empty
-pub fn validate_not_empty<T>(
-    vec: &[T],
-    field: &str,
-) -> Result<(), MediaGatewayError> {
+pub fn validate_not_empty<T>(vec: &[T], field: &str) -> Result<(), MediaGatewayError> {
     if vec.is_empty() {
         Err(MediaGatewayError::validation_field(
             format!("Field '{}' must not be empty", field),
@@ -290,7 +286,7 @@ mod tests {
         assert!(validate_imdb_id("tt0111161").is_ok());
         assert!(validate_imdb_id("tt1234567").is_ok());
         assert!(validate_imdb_id("tt12345678").is_ok());
-        
+
         assert!(validate_imdb_id("invalid").is_err());
         assert!(validate_imdb_id("tt123").is_err());
         assert!(validate_imdb_id("123456789").is_err());
@@ -300,7 +296,7 @@ mod tests {
     fn test_email_validation() {
         assert!(validate_email("user@example.com").is_ok());
         assert!(validate_email("test.user+tag@domain.co.uk").is_ok());
-        
+
         assert!(validate_email("invalid").is_err());
         assert!(validate_email("@example.com").is_err());
         assert!(validate_email("user@").is_err());
@@ -311,7 +307,7 @@ mod tests {
         assert!(validate_language_code("en").is_ok());
         assert!(validate_language_code("fr").is_ok());
         assert!(validate_language_code("es").is_ok());
-        
+
         assert!(validate_language_code("ENG").is_err());
         assert!(validate_language_code("e").is_err());
         assert!(validate_language_code("eng").is_err());
@@ -322,7 +318,7 @@ mod tests {
         assert!(validate_country_code("US").is_ok());
         assert!(validate_country_code("CA").is_ok());
         assert!(validate_country_code("GB").is_ok());
-        
+
         assert!(validate_country_code("usa").is_err());
         assert!(validate_country_code("U").is_err());
         assert!(validate_country_code("USA").is_err());
@@ -333,7 +329,7 @@ mod tests {
         assert!(validate_url("https://example.com").is_ok());
         assert!(validate_url("http://example.com/path").is_ok());
         assert!(validate_url("https://example.com/path?query=value").is_ok());
-        
+
         assert!(validate_url("not-a-url").is_err());
         assert!(validate_url("ftp://example.com").is_err());
     }
@@ -343,7 +339,7 @@ mod tests {
         assert!(validate_release_year(2024).is_ok());
         assert!(validate_release_year(1900).is_ok());
         assert!(validate_release_year(2050).is_ok());
-        
+
         assert!(validate_release_year(1800).is_err());
         assert!(validate_release_year(2200).is_err());
     }
@@ -352,7 +348,7 @@ mod tests {
     fn test_runtime_validation() {
         assert!(validate_runtime(120).is_ok());
         assert!(validate_runtime(1).is_ok());
-        
+
         assert!(validate_runtime(0).is_err());
         assert!(validate_runtime(-10).is_err());
     }
@@ -362,7 +358,7 @@ mod tests {
         assert!(validate_rating(7.5).is_ok());
         assert!(validate_rating(0.0).is_ok());
         assert!(validate_rating(10.0).is_ok());
-        
+
         assert!(validate_rating(-1.0).is_err());
         assert!(validate_rating(11.0).is_err());
     }
@@ -372,7 +368,7 @@ mod tests {
         assert!(validate_quality_score(0.85).is_ok());
         assert!(validate_quality_score(0.0).is_ok());
         assert!(validate_quality_score(1.0).is_ok());
-        
+
         assert!(validate_quality_score(-0.1).is_err());
         assert!(validate_quality_score(1.1).is_err());
     }
@@ -381,7 +377,7 @@ mod tests {
     fn test_string_length_validation() {
         assert!(validate_string_length("hello", "test", Some(1), Some(10)).is_ok());
         assert!(validate_string_length("hello", "test", Some(5), Some(5)).is_ok());
-        
+
         assert!(validate_string_length("hi", "test", Some(5), None).is_err());
         assert!(validate_string_length("too long string", "test", None, Some(5)).is_err());
     }
@@ -390,7 +386,7 @@ mod tests {
     fn test_not_empty_validation() {
         assert!(validate_not_empty(&[1, 2, 3], "test").is_ok());
         assert!(validate_not_empty(&["a"], "test").is_ok());
-        
+
         let empty: Vec<i32> = vec![];
         assert!(validate_not_empty(&empty, "test").is_err());
     }

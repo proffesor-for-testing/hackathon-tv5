@@ -93,8 +93,9 @@ impl AppleOAuthProvider {
             .map_err(|_| AuthError::Config("APPLE_KEY_ID not set".to_string()))?;
         let private_key = std::env::var("APPLE_PRIVATE_KEY")
             .map_err(|_| AuthError::Config("APPLE_PRIVATE_KEY not set".to_string()))?;
-        let redirect_uri = std::env::var("APPLE_REDIRECT_URI")
-            .unwrap_or_else(|_| "https://api.mediagateway.io/auth/oauth/apple/callback".to_string());
+        let redirect_uri = std::env::var("APPLE_REDIRECT_URI").unwrap_or_else(|_| {
+            "https://api.mediagateway.io/auth/oauth/apple/callback".to_string()
+        });
 
         let scopes = vec![
             "openid".to_string(),
@@ -102,7 +103,14 @@ impl AppleOAuthProvider {
             "name".to_string(),
         ];
 
-        Ok(Self::new(client_id, team_id, key_id, private_key, redirect_uri, scopes))
+        Ok(Self::new(
+            client_id,
+            team_id,
+            key_id,
+            private_key,
+            redirect_uri,
+            scopes,
+        ))
     }
 
     /// Generate client secret JWT signed with ES256
@@ -177,9 +185,15 @@ impl AppleOAuthProvider {
             .map_err(|e| AuthError::Internal(format!("Token exchange request failed: {}", e)))?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             tracing::error!("Apple token exchange failed: {}", error_text);
-            return Err(AuthError::Internal(format!("Token exchange failed: {}", error_text)));
+            return Err(AuthError::Internal(format!(
+                "Token exchange failed: {}",
+                error_text
+            )));
         }
 
         let token_response: AppleTokenResponse = response
@@ -210,12 +224,9 @@ impl AppleOAuthProvider {
         validation.set_audience(&[&self.client_id]);
         validation.set_issuer(&["https://appleid.apple.com"]);
 
-        let token_data = decode::<AppleIdTokenClaims>(
-            id_token,
-            &DecodingKey::from_secret(&[]),
-            &validation,
-        )
-        .map_err(|e| AuthError::Internal(format!("Failed to decode ID token: {}", e)))?;
+        let token_data =
+            decode::<AppleIdTokenClaims>(id_token, &DecodingKey::from_secret(&[]), &validation)
+                .map_err(|e| AuthError::Internal(format!("Failed to decode ID token: {}", e)))?;
 
         let claims = token_data.claims;
 
@@ -234,9 +245,9 @@ impl AppleOAuthProvider {
             return Err(AuthError::Internal("ID token expired".to_string()));
         }
 
-        let email = claims.email.ok_or_else(|| {
-            AuthError::Internal("Email not provided in ID token".to_string())
-        })?;
+        let email = claims
+            .email
+            .ok_or_else(|| AuthError::Internal("Email not provided in ID token".to_string()))?;
 
         Ok(AppleUserInfo {
             id: claims.sub,
@@ -270,7 +281,11 @@ K0VWCvVEf5K9FPUcANqXWHAJZnXZDRWG0g==
             "KEY123".to_string(),
             private_key.to_string(),
             "https://example.com/callback".to_string(),
-            vec!["openid".to_string(), "email".to_string(), "name".to_string()],
+            vec![
+                "openid".to_string(),
+                "email".to_string(),
+                "name".to_string(),
+            ],
         )
     }
 
@@ -343,8 +358,8 @@ K0VWCvVEf5K9FPUcANqXWHAJZnXZDRWG0g==
 
         // Scopes should be space-separated and URL-encoded
         assert!(
-            auth_url.contains("scope=openid+email+name") ||
-            auth_url.contains("scope=openid%20email%20name")
+            auth_url.contains("scope=openid+email+name")
+                || auth_url.contains("scope=openid%20email%20name")
         );
     }
 
@@ -468,7 +483,8 @@ K0VWCvVEf5K9FPUcANqXWHAJZnXZDRWG0g==
             &jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256),
             &claims,
             &jsonwebtoken::EncodingKey::from_secret(&[]),
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = provider.extract_user_info(&token);
         assert!(result.is_err());
@@ -496,7 +512,8 @@ K0VWCvVEf5K9FPUcANqXWHAJZnXZDRWG0g==
             &jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256),
             &claims,
             &jsonwebtoken::EncodingKey::from_secret(&[]),
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = provider.extract_user_info(&token);
         assert!(result.is_err());

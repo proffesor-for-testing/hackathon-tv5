@@ -33,7 +33,12 @@ enum Commands {
 
     #[command(about = "Rollback the last migration")]
     Down {
-        #[arg(short, long, default_value = "1", help = "Number of migrations to rollback")]
+        #[arg(
+            short,
+            long,
+            default_value = "1",
+            help = "Number of migrations to rollback"
+        )]
         steps: usize,
     },
 
@@ -69,7 +74,9 @@ async fn run() -> Result<()> {
     let database_url = cli
         .database_url
         .or_else(|| env::var("DATABASE_URL").ok())
-        .context("DATABASE_URL must be set either as environment variable or --database-url flag")?;
+        .context(
+            "DATABASE_URL must be set either as environment variable or --database-url flag",
+        )?;
 
     match cli.command {
         Commands::Up => {

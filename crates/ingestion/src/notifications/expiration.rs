@@ -11,8 +11,8 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use crate::events::{EventProducer, KafkaEventProducer, EventError};
-use crate::repository::{ContentRepository, PostgresContentRepository, ExpiringContent};
+use crate::events::{EventError, EventProducer, KafkaEventProducer};
+use crate::repository::{ContentRepository, ExpiringContent, PostgresContentRepository};
 
 /// Configuration for expiration notification windows
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,10 +134,7 @@ pub struct ContentExpiringEvent {
 
 impl ContentExpiringEvent {
     /// Create a new content expiring event
-    pub fn new(
-        content: &ExpiringContent,
-        window: NotificationWindow,
-    ) -> Self {
+    pub fn new(content: &ExpiringContent, window: NotificationWindow) -> Self {
         let now = Utc::now();
         let days_until = (content.expires_at - now).num_days();
 
@@ -166,10 +163,7 @@ pub struct ExpirationNotificationJob {
 
 impl ExpirationNotificationJob {
     /// Create a new expiration notification job
-    pub fn new(
-        pool: PgPool,
-        config: ExpirationNotificationConfig,
-    ) -> Result<Self, EventError> {
+    pub fn new(pool: PgPool, config: ExpirationNotificationConfig) -> Result<Self, EventError> {
         let repository = Arc::new(PostgresContentRepository::new(pool.clone()));
 
         let producer = if config.enable_kafka {
@@ -217,7 +211,7 @@ impl ExpirationNotificationJob {
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 UNIQUE(content_id, platform, region, notification_window, expires_at)
             )
-            "#
+            "#,
         )
         .execute(&self.pool)
         .await?;
@@ -226,7 +220,7 @@ impl ExpirationNotificationJob {
             r#"
             CREATE INDEX IF NOT EXISTS idx_expiration_notifications_content
             ON expiration_notifications(content_id, notification_window)
-            "#
+            "#,
         )
         .execute(&self.pool)
         .await?;
@@ -235,7 +229,7 @@ impl ExpirationNotificationJob {
             r#"
             CREATE INDEX IF NOT EXISTS idx_expiration_notifications_notified
             ON expiration_notifications(notified_at DESC)
-            "#
+            "#,
         )
         .execute(&self.pool)
         .await?;
@@ -274,7 +268,8 @@ impl ExpirationNotificationJob {
         );
 
         // Find content expiring within this window
-        let expiring_content = self.repository
+        let expiring_content = self
+            .repository
             .find_expiring_within(duration)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to find expiring content: {}", e))?;
@@ -289,9 +284,7 @@ impl ExpirationNotificationJob {
 
         for content in expiring_content {
             // Check if already notified for this window
-            let already_notified = self
-                .is_already_notified(&content, window)
-                .await?;
+            let already_notified = self.is_already_notified(&content, window).await?;
 
             if already_notified {
                 debug!(
@@ -350,7 +343,7 @@ impl ExpirationNotificationJob {
                   AND notification_window = $4
                   AND expires_at = $5
             )
-            "#
+            "#,
         )
         .bind(content.content_id)
         .bind(&content.platform)
@@ -377,7 +370,7 @@ impl ExpirationNotificationJob {
             VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (content_id, platform, region, notification_window, expires_at)
             DO NOTHING
-            "#
+            "#,
         )
         .bind(content.content_id)
         .bind(&content.platform)
@@ -427,8 +420,9 @@ impl ExpirationNotificationJob {
         &self,
         content_id: Uuid,
     ) -> Result<Vec<NotificationStatus>, anyhow::Error> {
-        let results = sqlx::query_as::<_, (Uuid, String, String, String, DateTime<Utc>, DateTime<Utc>)>(
-            r#"
+        let results =
+            sqlx::query_as::<_, (Uuid, String, String, String, DateTime<Utc>, DateTime<Utc>)>(
+                r#"
             SELECT
                 content_id,
                 platform,
@@ -439,36 +433,38 @@ impl ExpirationNotificationJob {
             FROM expiration_notifications
             WHERE content_id = $1
             ORDER BY notified_at DESC
-            "#
-        )
-        .bind(content_id)
-        .fetch_all(&self.pool)
-        .await?;
+            "#,
+            )
+            .bind(content_id)
+            .fetch_all(&self.pool)
+            .await?;
 
         let history = results
             .into_iter()
-            .map(|(content_id, platform, region, window_str, expires_at, notified_at)| {
-                let window = if window_str == "7d" {
-                    NotificationWindow::SevenDays
-                } else if window_str == "3d" {
-                    NotificationWindow::ThreeDays
-                } else if window_str == "1d" {
-                    NotificationWindow::OneDay
-                } else {
-                    // Parse custom format like "14d"
-                    let days = window_str.trim_end_matches('d').parse().unwrap_or(1);
-                    NotificationWindow::Custom(days)
-                };
+            .map(
+                |(content_id, platform, region, window_str, expires_at, notified_at)| {
+                    let window = if window_str == "7d" {
+                        NotificationWindow::SevenDays
+                    } else if window_str == "3d" {
+                        NotificationWindow::ThreeDays
+                    } else if window_str == "1d" {
+                        NotificationWindow::OneDay
+                    } else {
+                        // Parse custom format like "14d"
+                        let days = window_str.trim_end_matches('d').parse().unwrap_or(1);
+                        NotificationWindow::Custom(days)
+                    };
 
-                NotificationStatus {
-                    content_id,
-                    window,
-                    notified_at,
-                    platform,
-                    region,
-                    expires_at,
-                }
-            })
+                    NotificationStatus {
+                        content_id,
+                        window,
+                        notified_at,
+                        platform,
+                        region,
+                        expires_at,
+                    }
+                },
+            )
             .collect();
 
         Ok(history)
@@ -478,12 +474,10 @@ impl ExpirationNotificationJob {
     pub async fn cleanup_old_notifications(&self) -> Result<u64, anyhow::Error> {
         let cutoff = Utc::now() - Duration::days(90);
 
-        let result = sqlx::query(
-            "DELETE FROM expiration_notifications WHERE notified_at < $1"
-        )
-        .bind(cutoff)
-        .execute(&self.pool)
-        .await?;
+        let result = sqlx::query("DELETE FROM expiration_notifications WHERE notified_at < $1")
+            .bind(cutoff)
+            .execute(&self.pool)
+            .await?;
 
         info!(
             deleted_count = result.rows_affected(),
@@ -517,10 +511,19 @@ mod tests {
 
     #[test]
     fn test_notification_window_from_days() {
-        assert_eq!(NotificationWindow::from_days(7), NotificationWindow::SevenDays);
-        assert_eq!(NotificationWindow::from_days(3), NotificationWindow::ThreeDays);
+        assert_eq!(
+            NotificationWindow::from_days(7),
+            NotificationWindow::SevenDays
+        );
+        assert_eq!(
+            NotificationWindow::from_days(3),
+            NotificationWindow::ThreeDays
+        );
         assert_eq!(NotificationWindow::from_days(1), NotificationWindow::OneDay);
-        assert_eq!(NotificationWindow::from_days(14), NotificationWindow::Custom(14));
+        assert_eq!(
+            NotificationWindow::from_days(14),
+            NotificationWindow::Custom(14)
+        );
     }
 
     #[test]

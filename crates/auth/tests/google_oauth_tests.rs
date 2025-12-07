@@ -11,7 +11,11 @@ mod google_oauth_provider_tests {
             "test_client_id".to_string(),
             "test_client_secret".to_string(),
             "https://example.com/callback".to_string(),
-            vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
+            vec![
+                "openid".to_string(),
+                "email".to_string(),
+                "profile".to_string(),
+            ],
         );
 
         assert_eq!(provider.client_id, "test_client_id");
@@ -74,9 +78,9 @@ mod google_oauth_provider_tests {
         // Scopes should be URL-encoded and space-separated
         assert!(auth_url.contains("scope="));
         assert!(
-            auth_url.contains("openid") &&
-            auth_url.contains("email") &&
-            auth_url.contains("profile")
+            auth_url.contains("openid")
+                && auth_url.contains("email")
+                && auth_url.contains("profile")
         );
     }
 
@@ -93,7 +97,9 @@ mod google_oauth_provider_tests {
         let auth_url = provider.generate_authorization_url(&pkce);
 
         // Query parameters in redirect_uri should be URL encoded
-        assert!(auth_url.contains("redirect_uri=https%3A%2F%2Fexample.com%2Fcallback%3Fapp%3Dtest%26version%3D1.0"));
+        assert!(auth_url.contains(
+            "redirect_uri=https%3A%2F%2Fexample.com%2Fcallback%3Fapp%3Dtest%26version%3D1.0"
+        ));
     }
 
     #[test]
@@ -157,9 +163,9 @@ mod google_oauth_provider_tests {
 #[cfg(test)]
 mod google_oauth_integration_tests {
     use super::*;
-    use wiremock::{MockServer, Mock, ResponseTemplate};
-    use wiremock::matchers::{method, path, body_string_contains};
     use serde_json::json;
+    use wiremock::matchers::{body_string_contains, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[actix_rt::test]
     async fn test_token_exchange_with_mock_google() {

@@ -1,13 +1,12 @@
 //! Netflix webhook handler
 
+use crate::webhooks::{
+    verify_hmac_signature, ProcessedWebhook, ProcessingStatus, WebhookDeduplicator, WebhookError,
+    WebhookEventType, WebhookHandler, WebhookPayload, WebhookResult,
+};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use crate::webhooks::{
-    WebhookHandler, WebhookPayload, ProcessedWebhook, ProcessingStatus,
-    WebhookError, WebhookResult, WebhookEventType,
-    verify_hmac_signature, WebhookDeduplicator,
-};
 
 /// Netflix webhook handler
 pub struct NetflixWebhookHandler;
@@ -30,7 +29,12 @@ impl WebhookHandler for NetflixWebhookHandler {
         "netflix"
     }
 
-    fn verify_signature(&self, payload: &[u8], signature: &str, secret: &str) -> WebhookResult<bool> {
+    fn verify_signature(
+        &self,
+        payload: &[u8],
+        signature: &str,
+        secret: &str,
+    ) -> WebhookResult<bool> {
         verify_hmac_signature(payload, signature, secret)
     }
 
@@ -40,9 +44,10 @@ impl WebhookHandler for NetflixWebhookHandler {
 
         // Validate platform
         if payload.platform != "netflix" {
-            return Err(WebhookError::InvalidPayload(
-                format!("Invalid platform: expected 'netflix', got '{}'", payload.platform)
-            ));
+            return Err(WebhookError::InvalidPayload(format!(
+                "Invalid platform: expected 'netflix', got '{}'",
+                payload.platform
+            )));
         }
 
         // Validate event type
@@ -54,7 +59,9 @@ impl WebhookHandler for NetflixWebhookHandler {
 
         // Validate payload structure
         if !payload.payload.is_object() {
-            return Err(WebhookError::InvalidPayload("Payload must be an object".to_string()));
+            return Err(WebhookError::InvalidPayload(
+                "Payload must be an object".to_string(),
+            ));
         }
 
         Ok(payload)
@@ -62,7 +69,8 @@ impl WebhookHandler for NetflixWebhookHandler {
 
     async fn process_event(&self, webhook: WebhookPayload) -> WebhookResult<ProcessedWebhook> {
         // Extract Netflix-specific data
-        let content_id = webhook.payload
+        let content_id = webhook
+            .payload
             .get("content_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| WebhookError::InvalidPayload("Missing content_id".to_string()))?;
@@ -146,7 +154,10 @@ mod tests {
         let result = handler.parse_payload(&body);
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), WebhookError::InvalidPayload(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            WebhookError::InvalidPayload(_)
+        ));
     }
 
     #[test]
@@ -157,7 +168,10 @@ mod tests {
         let result = handler.parse_payload(body);
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), WebhookError::InvalidPayload(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            WebhookError::InvalidPayload(_)
+        ));
     }
 
     #[tokio::test]
@@ -198,6 +212,9 @@ mod tests {
         let result = handler.process_event(webhook).await;
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), WebhookError::InvalidPayload(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            WebhookError::InvalidPayload(_)
+        ));
     }
 }

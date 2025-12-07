@@ -220,7 +220,10 @@ async fn test_event_type_string_representation() {
     assert_eq!(ActivityEventType::ContentRating.as_str(), "content_rating");
     assert_eq!(ActivityEventType::PlaybackStart.as_str(), "playback_start");
     assert_eq!(ActivityEventType::PlaybackPause.as_str(), "playback_pause");
-    assert_eq!(ActivityEventType::PlaybackResume.as_str(), "playback_resume");
+    assert_eq!(
+        ActivityEventType::PlaybackResume.as_str(),
+        "playback_resume"
+    );
     assert_eq!(
         ActivityEventType::PlaybackComplete.as_str(),
         "playback_complete"

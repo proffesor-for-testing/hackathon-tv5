@@ -1,7 +1,7 @@
 use crate::error::{AuthError, Result};
 use crate::profile::types::{AuditLogEntry, UpdateProfileRequest, UserProfile};
 use chrono::{DateTime, Duration, Utc};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -15,7 +15,7 @@ impl ProfileStorage {
     }
 
     pub async fn get_user_profile(&self, user_id: Uuid) -> Result<Option<UserProfile>> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             SELECT
                 u.id,
@@ -28,27 +28,27 @@ impl ProfileStorage {
                 COALESCE(
                     ARRAY_AGG(op.provider) FILTER (WHERE op.provider IS NOT NULL),
                     ARRAY[]::VARCHAR[]
-                ) as "oauth_providers!"
+                ) as oauth_providers
             FROM users u
             LEFT JOIN oauth_providers op ON u.id = op.user_id
             WHERE u.id = $1 AND u.deleted_at IS NULL
             GROUP BY u.id, u.email, u.display_name, u.avatar_url, u.preferences, u.email_verified, u.created_at
-            "#,
-            user_id
+            "#
         )
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| AuthError::Internal(format!("Database error: {}", e)))?;
 
         Ok(result.map(|row| UserProfile {
-            id: row.id,
-            email: row.email,
-            display_name: row.display_name,
-            avatar_url: row.avatar_url,
-            preferences: row.preferences,
-            email_verified: row.email_verified,
-            created_at: row.created_at.and_utc(),
-            oauth_providers: row.oauth_providers,
+            id: row.get("id"),
+            email: row.get("email"),
+            display_name: row.get("display_name"),
+            avatar_url: row.get("avatar_url"),
+            preferences: row.get("preferences"),
+            email_verified: row.get("email_verified"),
+            created_at: row.get::<chrono::NaiveDateTime, _>("created_at").and_utc(),
+            oauth_providers: row.get("oauth_providers"),
         }))
     }
 
@@ -122,18 +122,18 @@ impl ProfileStorage {
             "preferences": updated_profile.preferences
         });
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO audit_log (user_id, action, resource_type, resource_id, old_values, new_values)
             VALUES ($1, $2, $3, $4, $5, $6)
-            "#,
-            user_id,
-            "profile.update",
-            "user",
-            Some(user_id),
-            old_values,
-            Some(new_values)
+            "#
         )
+        .bind(user_id)
+        .bind("profile.update")
+        .bind("user")
+        .bind(Some(user_id))
+        .bind(old_values)
+        .bind(Some(new_values))
         .execute(&mut *tx)
         .await
         .map_err(|e| AuthError::Internal(format!("Audit log error: {}", e)))?;
@@ -154,27 +154,25 @@ impl ProfileStorage {
 
         let deleted_at = Utc::now();
 
-        sqlx::query!(
-            "UPDATE users SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL",
-            deleted_at.naive_utc(),
-            user_id
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| AuthError::Internal(format!("Delete error: {}", e)))?;
+        sqlx::query("UPDATE users SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL")
+            .bind(deleted_at.naive_utc())
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| AuthError::Internal(format!("Delete error: {}", e)))?;
 
         // Create audit log entry
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO audit_log (user_id, action, resource_type, resource_id, new_values)
             VALUES ($1, $2, $3, $4, $5)
             "#,
-            user_id,
-            "account.soft_delete",
-            "user",
-            Some(user_id),
-            Some(serde_json::json!({ "deleted_at": deleted_at }))
         )
+        .bind(user_id)
+        .bind("account.soft_delete")
+        .bind("user")
+        .bind(Some(user_id))
+        .bind(Some(serde_json::json!({ "deleted_at": deleted_at })))
         .execute(&mut *tx)
         .await
         .map_err(|e| AuthError::Internal(format!("Audit log error: {}", e)))?;
@@ -187,20 +185,20 @@ impl ProfileStorage {
     }
 
     pub async fn can_recover_account(&self, user_id: Uuid) -> Result<bool> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             SELECT deleted_at
             FROM users
             WHERE id = $1 AND deleted_at IS NOT NULL
             "#,
-            user_id
         )
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| AuthError::Internal(format!("Database error: {}", e)))?;
 
         if let Some(row) = result {
-            if let Some(deleted_at) = row.deleted_at {
+            if let Some(deleted_at) = row.get::<Option<chrono::NaiveDateTime>, _>("deleted_at") {
                 let grace_period_end = deleted_at.and_utc() + Duration::days(30);
                 return Ok(Utc::now() < grace_period_end);
             }
@@ -209,13 +207,8 @@ impl ProfileStorage {
         Ok(false)
     }
 
-    pub async fn get_audit_logs(
-        &self,
-        user_id: Uuid,
-        limit: i64,
-    ) -> Result<Vec<AuditLogEntry>> {
-        let logs = sqlx::query_as!(
-            AuditLogEntry,
+    pub async fn get_audit_logs(&self, user_id: Uuid, limit: i64) -> Result<Vec<AuditLogEntry>> {
+        let logs = sqlx::query_as::<_, AuditLogEntry>(
             r#"
             SELECT
                 id,
@@ -233,9 +226,9 @@ impl ProfileStorage {
             ORDER BY created_at DESC
             LIMIT $2
             "#,
-            user_id,
-            limit
         )
+        .bind(user_id)
+        .bind(limit)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| AuthError::Internal(format!("Database error: {}", e)))?;
@@ -244,14 +237,12 @@ impl ProfileStorage {
     }
 
     pub async fn update_avatar_url(&self, user_id: Uuid, avatar_url: String) -> Result<()> {
-        sqlx::query!(
-            "UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL",
-            avatar_url,
-            user_id
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(|e| AuthError::Internal(format!("Update error: {}", e)))?;
+        sqlx::query("UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL")
+            .bind(avatar_url)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| AuthError::Internal(format!("Update error: {}", e)))?;
 
         Ok(())
     }

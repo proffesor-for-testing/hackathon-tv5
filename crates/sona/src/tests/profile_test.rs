@@ -39,10 +39,7 @@ fn test_preference_vector_building_filters_low_engagement() {
     ];
 
     // Events with completion_rate < 0.3 should be filtered out
-    let high_engagement: Vec<_> = events
-        .iter()
-        .filter(|e| e.completion_rate >= 0.3)
-        .collect();
+    let high_engagement: Vec<_> = events.iter().filter(|e| e.completion_rate >= 0.3).collect();
 
     assert_eq!(high_engagement.len(), 1);
     assert_eq!(high_engagement[0].completion_rate, 0.50);
@@ -142,7 +139,8 @@ fn test_engagement_weight_rewatch_bonus() {
         dismissed: false,
     };
 
-    let weight_no_rewatch = BuildUserPreferenceVector::calculate_engagement_weight(&event_no_rewatch);
+    let weight_no_rewatch =
+        BuildUserPreferenceVector::calculate_engagement_weight(&event_no_rewatch);
     let weight_rewatch = BuildUserPreferenceVector::calculate_engagement_weight(&event_rewatch);
 
     assert!(weight_rewatch > weight_no_rewatch);
@@ -177,21 +175,13 @@ fn test_progressive_personalization_genre_update() {
     let mut profile = UserProfile::new(Uuid::new_v4());
 
     // First interaction with action genre
-    ProgressivePersonalization::update_genre_affinities(
-        &mut profile,
-        &["action".to_string()],
-        0.8,
-    );
+    ProgressivePersonalization::update_genre_affinities(&mut profile, &["action".to_string()], 0.8);
 
     let initial_affinity = profile.genre_affinities["action"];
     assert!(initial_affinity > 0.5); // Should be above default
 
     // Second interaction
-    ProgressivePersonalization::update_genre_affinities(
-        &mut profile,
-        &["action".to_string()],
-        0.9,
-    );
+    ProgressivePersonalization::update_genre_affinities(&mut profile, &["action".to_string()], 0.9);
 
     let updated_affinity = profile.genre_affinities["action"];
     assert!(updated_affinity > initial_affinity); // Should increase
@@ -203,7 +193,11 @@ fn test_progressive_personalization_multiple_genres() {
 
     ProgressivePersonalization::update_genre_affinities(
         &mut profile,
-        &["action".to_string(), "sci-fi".to_string(), "thriller".to_string()],
+        &[
+            "action".to_string(),
+            "sci-fi".to_string(),
+            "thriller".to_string(),
+        ],
         0.85,
     );
 
@@ -218,8 +212,12 @@ fn test_should_update_preference_vector() {
     // Should update every 5 interactions
     assert!(!ProgressivePersonalization::should_update_preference_vector(1));
     assert!(!ProgressivePersonalization::should_update_preference_vector(4));
-    assert!(ProgressivePersonalization::should_update_preference_vector(5));
-    assert!(ProgressivePersonalization::should_update_preference_vector(10));
+    assert!(ProgressivePersonalization::should_update_preference_vector(
+        5
+    ));
+    assert!(ProgressivePersonalization::should_update_preference_vector(
+        10
+    ));
     assert!(!ProgressivePersonalization::should_update_preference_vector(11));
 }
 

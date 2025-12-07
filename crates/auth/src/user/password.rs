@@ -1,7 +1,10 @@
 use crate::error::{AuthError, Result};
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher as Argon2PasswordHasher, PasswordVerifier, SaltString},
-    Argon2, Algorithm, ParamsBuilder, Version,
+    password_hash::{
+        rand_core::OsRng, PasswordHash, PasswordHasher as Argon2PasswordHasher, PasswordVerifier,
+        SaltString,
+    },
+    Algorithm, Argon2, ParamsBuilder, Version,
 };
 
 /// Password strength validation result
@@ -30,8 +33,8 @@ impl PasswordHasher {
     pub fn new() -> Self {
         let params = ParamsBuilder::new()
             .m_cost(19456) // 19 MiB
-            .t_cost(2)     // 2 iterations
-            .p_cost(1)     // 1 thread
+            .t_cost(2) // 2 iterations
+            .p_cost(1) // 1 thread
             .build()
             .expect("Failed to build Argon2 parameters");
 
@@ -57,10 +60,16 @@ impl PasswordHasher {
         let parsed_hash = PasswordHash::new(hash)
             .map_err(|e| AuthError::Internal(format!("Invalid password hash: {}", e)))?;
 
-        match self.argon2.verify_password(password.as_bytes(), &parsed_hash) {
+        match self
+            .argon2
+            .verify_password(password.as_bytes(), &parsed_hash)
+        {
             Ok(_) => Ok(true),
             Err(argon2::password_hash::Error::Password) => Ok(false),
-            Err(e) => Err(AuthError::Internal(format!("Password verification failed: {}", e))),
+            Err(e) => Err(AuthError::Internal(format!(
+                "Password verification failed: {}",
+                e
+            ))),
         }
     }
 
@@ -126,28 +135,36 @@ mod tests {
     fn test_password_strength_too_short() {
         let strength = PasswordHasher::validate_password_strength("Test1");
         assert!(!strength.is_valid);
-        assert!(strength.errors.contains(&"Password must be at least 8 characters long".to_string()));
+        assert!(strength
+            .errors
+            .contains(&"Password must be at least 8 characters long".to_string()));
     }
 
     #[test]
     fn test_password_strength_no_uppercase() {
         let strength = PasswordHasher::validate_password_strength("test1234");
         assert!(!strength.is_valid);
-        assert!(strength.errors.contains(&"Password must contain at least one uppercase letter".to_string()));
+        assert!(strength
+            .errors
+            .contains(&"Password must contain at least one uppercase letter".to_string()));
     }
 
     #[test]
     fn test_password_strength_no_lowercase() {
         let strength = PasswordHasher::validate_password_strength("TEST1234");
         assert!(!strength.is_valid);
-        assert!(strength.errors.contains(&"Password must contain at least one lowercase letter".to_string()));
+        assert!(strength
+            .errors
+            .contains(&"Password must contain at least one lowercase letter".to_string()));
     }
 
     #[test]
     fn test_password_strength_no_number() {
         let strength = PasswordHasher::validate_password_strength("TestTest");
         assert!(!strength.is_valid);
-        assert!(strength.errors.contains(&"Password must contain at least one number".to_string()));
+        assert!(strength
+            .errors
+            .contains(&"Password must contain at least one number".to_string()));
     }
 
     #[test]

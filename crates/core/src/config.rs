@@ -133,15 +133,9 @@ impl ConfigLoader for DatabaseConfig {
             DatabaseConfig::default().min_connections,
         )?;
 
-        let connect_timeout_secs = parse_env_var(
-            "MEDIA_GATEWAY_DATABASE_CONNECT_TIMEOUT",
-            30u64,
-        )?;
+        let connect_timeout_secs = parse_env_var("MEDIA_GATEWAY_DATABASE_CONNECT_TIMEOUT", 30u64)?;
 
-        let idle_timeout_secs = parse_env_var(
-            "MEDIA_GATEWAY_DATABASE_IDLE_TIMEOUT",
-            600u64,
-        )?;
+        let idle_timeout_secs = parse_env_var("MEDIA_GATEWAY_DATABASE_IDLE_TIMEOUT", 600u64)?;
 
         Ok(Self {
             url,
@@ -251,15 +245,10 @@ impl ConfigLoader for RedisConfig {
             RedisConfig::default().max_connections,
         )?;
 
-        let connection_timeout_secs = parse_env_var(
-            "MEDIA_GATEWAY_REDIS_CONNECTION_TIMEOUT",
-            10u64,
-        )?;
+        let connection_timeout_secs =
+            parse_env_var("MEDIA_GATEWAY_REDIS_CONNECTION_TIMEOUT", 10u64)?;
 
-        let response_timeout_secs = parse_env_var(
-            "MEDIA_GATEWAY_REDIS_RESPONSE_TIMEOUT",
-            5u64,
-        )?;
+        let response_timeout_secs = parse_env_var("MEDIA_GATEWAY_REDIS_RESPONSE_TIMEOUT", 5u64)?;
 
         Ok(Self {
             url,
@@ -355,11 +344,8 @@ impl ConfigLoader for ServiceConfig {
             .or_else(|_| std::env::var("HOST"))
             .unwrap_or_else(|_| ServiceConfig::default().host);
 
-        let port = parse_env_var(
-            "MEDIA_GATEWAY_SERVICE_PORT",
-            ServiceConfig::default().port,
-        )
-        .or_else(|_| parse_env_var("PORT", ServiceConfig::default().port))?;
+        let port = parse_env_var("MEDIA_GATEWAY_SERVICE_PORT", ServiceConfig::default().port)
+            .or_else(|_| parse_env_var("PORT", ServiceConfig::default().port))?;
 
         let workers = parse_env_var(
             "MEDIA_GATEWAY_SERVICE_WORKERS",
@@ -370,10 +356,7 @@ impl ConfigLoader for ServiceConfig {
             .or_else(|_| std::env::var("RUST_LOG"))
             .unwrap_or_else(|_| ServiceConfig::default().log_level);
 
-        let request_timeout_secs = parse_env_var(
-            "MEDIA_GATEWAY_SERVICE_REQUEST_TIMEOUT",
-            60u64,
-        )?;
+        let request_timeout_secs = parse_env_var("MEDIA_GATEWAY_SERVICE_REQUEST_TIMEOUT", 60u64)?;
 
         Ok(Self {
             host,
@@ -452,10 +435,11 @@ where
     std::env::var(key)
         .ok()
         .map(|v| {
-            v.parse::<T>().map_err(|e| MediaGatewayError::ConfigurationError {
-                message: format!("Failed to parse {}: {}", key, e),
-                key: Some(key.to_string()),
-            })
+            v.parse::<T>()
+                .map_err(|e| MediaGatewayError::ConfigurationError {
+                    message: format!("Failed to parse {}: {}", key, e),
+                    key: Some(key.to_string()),
+                })
         })
         .unwrap_or(Ok(default))
 }

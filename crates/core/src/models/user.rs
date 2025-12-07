@@ -399,12 +399,15 @@ impl UserProfile {
 
     /// Check if content is in watchlist
     pub fn is_in_watchlist(&self, content_id: Uuid) -> bool {
-        self.watchlist.iter().any(|entry| entry.content_id == content_id)
+        self.watchlist
+            .iter()
+            .any(|entry| entry.content_id == content_id)
     }
 
     /// Remove content from watchlist
     pub fn remove_from_watchlist(&mut self, content_id: Uuid) {
-        self.watchlist.retain(|entry| entry.content_id != content_id);
+        self.watchlist
+            .retain(|entry| entry.content_id != content_id);
     }
 
     /// Update last activity timestamp

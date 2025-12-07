@@ -143,11 +143,7 @@ pub struct ContentUpdatedEvent {
 
 impl ContentUpdatedEvent {
     /// Creates a new content updated event
-    pub fn new(
-        content_id: Uuid,
-        updated_fields: Vec<String>,
-        update_source: String,
-    ) -> Self {
+    pub fn new(content_id: Uuid, updated_fields: Vec<String>, update_source: String) -> Self {
         Self {
             base: BaseEvent::new("content.updated", content_id),
             updated_fields,
@@ -343,11 +339,10 @@ pub struct KafkaConfig {
 impl KafkaConfig {
     /// Creates a new Kafka configuration from environment variables
     pub fn from_env() -> EventResult<Self> {
-        let brokers = env::var("KAFKA_BROKERS")
-            .unwrap_or_else(|_| "localhost:9092".to_string());
+        let brokers = env::var("KAFKA_BROKERS").unwrap_or_else(|_| "localhost:9092".to_string());
 
-        let topic_prefix = env::var("KAFKA_TOPIC_PREFIX")
-            .unwrap_or_else(|_| DEFAULT_TOPIC_PREFIX.to_string());
+        let topic_prefix =
+            env::var("KAFKA_TOPIC_PREFIX").unwrap_or_else(|_| DEFAULT_TOPIC_PREFIX.to_string());
 
         let request_timeout_ms = env::var("KAFKA_REQUEST_TIMEOUT_MS")
             .ok()
@@ -522,8 +517,8 @@ impl KafkaEventProducer {
         let topic = self.config.topic_for_event(event.event_type());
 
         // Serialize event to JSON
-        let payload = serde_json::to_string(event)
-            .map_err(|e| EventError::SerializationError(e))?;
+        let payload =
+            serde_json::to_string(event).map_err(|e| EventError::SerializationError(e))?;
 
         info!(
             content_id = %event.content_id(),

@@ -43,9 +43,9 @@ async fn main() -> anyhow::Result<()> {
     let config = Arc::new(CacheConfig {
         redis_url: std::env::var("REDIS_URL")
             .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
-        search_ttl_sec: 1800,     // 30 minutes
-        embedding_ttl_sec: 3600,   // 1 hour
-        intent_ttl_sec: 600,       // 10 minutes
+        search_ttl_sec: 1800,    // 30 minutes
+        embedding_ttl_sec: 3600, // 1 hour
+        intent_ttl_sec: 600,     // 10 minutes
     });
 
     let cache = match RedisCache::new(config).await {
@@ -88,7 +88,9 @@ async fn main() -> anyhow::Result<()> {
     println!("   Result: {:?}", cached);
 
     // Cache the results
-    cache.cache_search_results(&search_query, &search_results).await?;
+    cache
+        .cache_search_results(&search_query, &search_results)
+        .await?;
     println!("✓ Results cached with 30-minute TTL\n");
 
     // Second request - cache hit
@@ -114,13 +116,13 @@ async fn main() -> anyhow::Result<()> {
     // 5. Cache embeddings
     println!("5. Caching text embeddings...");
     let text = "The quick brown fox jumps over the lazy dog";
-    let embedding = vec![
-        0.12, 0.34, 0.56, 0.78, 0.90,
-        0.11, 0.22, 0.33, 0.44, 0.55,
-    ];
+    let embedding = vec![0.12, 0.34, 0.56, 0.78, 0.90, 0.11, 0.22, 0.33, 0.44, 0.55];
 
     cache.cache_embedding(&text, &embedding).await?;
-    println!("✓ Embedding cached with 1-hour TTL (dimension: {})\n", embedding.len());
+    println!(
+        "✓ Embedding cached with 1-hour TTL (dimension: {})\n",
+        embedding.len()
+    );
 
     let cached_embedding = cache.get_embedding(&text).await?;
     println!("   Retrieved embedding: {:?}\n", cached_embedding);
@@ -174,7 +176,10 @@ async fn main() -> anyhow::Result<()> {
     println!("10. Cache key generation (SHA256)...");
     let key = RedisCache::generate_key("search", &search_query)?;
     println!("    Generated key: {}", key);
-    println!("    Key length: {} chars (prefix + 64 hex chars)\n", key.len());
+    println!(
+        "    Key length: {} chars (prefix + 64 hex chars)\n",
+        key.len()
+    );
 
     println!("=== All examples completed successfully! ===");
 

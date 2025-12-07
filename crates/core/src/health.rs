@@ -126,10 +126,7 @@ impl AggregatedHealth {
             .any(|c| c.critical && c.status == HealthStatus::Unhealthy)
         {
             HealthStatus::Unhealthy
-        } else if components
-            .iter()
-            .any(|c| c.status != HealthStatus::Healthy)
-        {
+        } else if components.iter().any(|c| c.status != HealthStatus::Healthy) {
             HealthStatus::Degraded
         } else {
             HealthStatus::Healthy
@@ -224,9 +221,7 @@ impl HealthCheck for PostgresHealthCheck {
 
         // Execute health check with 2-second timeout
         let result = timeout(Duration::from_secs(2), async {
-            sqlx::query("SELECT 1")
-                .fetch_one(&self.pool)
-                .await
+            sqlx::query("SELECT 1").fetch_one(&self.pool).await
         })
         .await;
 
@@ -308,9 +303,7 @@ impl HealthCheck for RedisHealthCheck {
         // Execute health check with 2-second timeout
         let result = timeout(Duration::from_secs(2), async {
             let mut conn = self.client.get_multiplexed_async_connection().await?;
-            redis::cmd("PING")
-                .query_async::<_, String>(&mut conn)
-                .await
+            redis::cmd("PING").query_async::<_, String>(&mut conn).await
         })
         .await;
 
@@ -403,11 +396,7 @@ impl HealthCheck for QdrantHealthCheck {
 
         // Execute health check with 2-second timeout
         let health_url = format!("{}/health", self.base_url.trim_end_matches('/'));
-        let result = timeout(
-            Duration::from_secs(2),
-            self.client.get(&health_url).send(),
-        )
-        .await;
+        let result = timeout(Duration::from_secs(2), self.client.get(&health_url).send()).await;
 
         let latency_ms = start.elapsed().as_millis() as u64;
 

@@ -2,7 +2,6 @@
 ///
 /// Used for watch progress and user preferences where latest update wins
 /// Conflict resolution: timestamp-based with device_id tie-breaker
-
 use super::hlc::HLCTimestamp;
 use serde::{Deserialize, Serialize};
 
@@ -171,7 +170,11 @@ mod tests {
         );
 
         // Update with newer timestamp
-        reg.set(200, HLCTimestamp::from_components(2000, 0), "device-b".to_string());
+        reg.set(
+            200,
+            HLCTimestamp::from_components(2000, 0),
+            "device-b".to_string(),
+        );
         assert_eq!(*reg.get(), 200);
     }
 

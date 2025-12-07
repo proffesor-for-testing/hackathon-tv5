@@ -14,7 +14,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::lora::{UserLoRAAdapter, ComputeLoRAForward};
+    use crate::lora::{ComputeLoRAForward, UserLoRAAdapter};
     use crate::lora_storage::LoRAStorage;
     use anyhow::Result;
     use sqlx::postgres::PgPoolOptions;

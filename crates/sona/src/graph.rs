@@ -5,10 +5,10 @@
 //! - User-user collaborative graphs (co-viewing patterns)
 //! - Weighted graph affinity scoring
 
-use anyhow::{Result, anyhow};
-use sqlx::PgPool;
-use uuid::Uuid;
+use anyhow::{anyhow, Result};
+use sqlx::{PgPool, Row};
 use std::collections::{HashMap, HashSet};
+use uuid::Uuid;
 
 const MAX_GRAPH_DEPTH: usize = 3;
 const GENRE_SIMILARITY_WEIGHT: f32 = 0.35;
@@ -35,11 +35,7 @@ impl GraphRecommender {
     /// 3. Traverse user-user collaborative graph
     /// 4. Compute weighted graph affinity scores
     /// 5. Return ranked content IDs with scores
-    pub async fn recommend(
-        &self,
-        user_id: Uuid,
-        limit: usize,
-    ) -> Result<Vec<(Uuid, f32)>> {
+    pub async fn recommend(&self, user_id: Uuid, limit: usize) -> Result<Vec<(Uuid, f32)>> {
         // Get user's watch history as seed nodes
         let seed_content = self.get_user_watch_history(user_id, 50).await?;
 
@@ -48,10 +44,14 @@ impl GraphRecommender {
         }
 
         // Compute content-content similarity scores
-        let content_scores = self.compute_content_similarity_scores(&seed_content).await?;
+        let content_scores = self
+            .compute_content_similarity_scores(&seed_content)
+            .await?;
 
         // Compute user-user collaborative scores
-        let collaborative_scores = self.compute_collaborative_scores(user_id, &seed_content).await?;
+        let collaborative_scores = self
+            .compute_collaborative_scores(user_id, &seed_content)
+            .await?;
 
         // Merge scores with weighted combination
         let mut merged_scores: HashMap<Uuid, f32> = HashMap::new();
@@ -78,7 +78,7 @@ impl GraphRecommender {
 
     /// Get user's watch history (most recent watched content)
     async fn get_user_watch_history(&self, user_id: Uuid, limit: usize) -> Result<Vec<Uuid>> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             SELECT DISTINCT content_id
             FROM watch_progress
@@ -86,13 +86,16 @@ impl GraphRecommender {
             ORDER BY last_watched DESC
             LIMIT $2
             "#,
-            user_id,
-            limit as i64
         )
+        .bind(user_id)
+        .bind(limit as i64)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| r.content_id).collect())
+        let content_ids: Result<Vec<Uuid>, _> =
+            rows.iter().map(|row| row.try_get("content_id")).collect();
+
+        Ok(content_ids?)
     }
 
     /// Compute content-content similarity based on shared attributes
@@ -145,7 +148,7 @@ impl GraphRecommender {
 
     /// Find content with similar genres
     async fn find_genre_similar(&self, content_id: Uuid, limit: usize) -> Result<Vec<(Uuid, f32)>> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             WITH seed_genres AS (
                 SELECT genre FROM content_genres WHERE content_id = $1
@@ -168,18 +171,27 @@ impl GraphRecommender {
             ORDER BY similarity DESC
             LIMIT $2
             "#,
-            content_id,
-            limit as i64
         )
+        .bind(content_id)
+        .bind(limit as i64)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| (r.content_id, r.similarity.unwrap_or(0.0) as f32)).collect())
+        let results: Result<Vec<(Uuid, f32)>, sqlx::Error> = rows
+            .iter()
+            .map(|row| {
+                let content_id: Uuid = row.try_get("content_id")?;
+                let similarity: Option<f64> = row.try_get("similarity")?;
+                Ok((content_id, similarity.unwrap_or(0.0) as f32))
+            })
+            .collect();
+
+        Ok(results?)
     }
 
     /// Find content with shared cast members
     async fn find_cast_similar(&self, content_id: Uuid, limit: usize) -> Result<Vec<(Uuid, f32)>> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             WITH seed_cast AS (
                 SELECT person_name FROM credits
@@ -205,18 +217,31 @@ impl GraphRecommender {
             ORDER BY similarity DESC
             LIMIT $2
             "#,
-            content_id,
-            limit as i64
         )
+        .bind(content_id)
+        .bind(limit as i64)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| (r.content_id, r.similarity.unwrap_or(0.0) as f32)).collect())
+        let results: Result<Vec<(Uuid, f32)>, sqlx::Error> = rows
+            .iter()
+            .map(|row| {
+                let content_id: Uuid = row.try_get("content_id")?;
+                let similarity: Option<f64> = row.try_get("similarity")?;
+                Ok((content_id, similarity.unwrap_or(0.0) as f32))
+            })
+            .collect();
+
+        Ok(results?)
     }
 
     /// Find content with same director
-    async fn find_director_similar(&self, content_id: Uuid, limit: usize) -> Result<Vec<(Uuid, f32)>> {
-        let rows = sqlx::query!(
+    async fn find_director_similar(
+        &self,
+        content_id: Uuid,
+        limit: usize,
+    ) -> Result<Vec<(Uuid, f32)>> {
+        let rows = sqlx::query(
             r#"
             WITH seed_directors AS (
                 SELECT person_name FROM credits
@@ -231,18 +256,27 @@ impl GraphRecommender {
               AND c.role_type = 'director'
             LIMIT $2
             "#,
-            content_id,
-            limit as i64
         )
+        .bind(content_id)
+        .bind(limit as i64)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| (r.content_id, r.similarity as f32)).collect())
+        let results: Result<Vec<(Uuid, f32)>, sqlx::Error> = rows
+            .iter()
+            .map(|row| {
+                let content_id: Uuid = row.try_get("content_id")?;
+                let similarity: f64 = row.try_get("similarity")?;
+                Ok((content_id, similarity as f32))
+            })
+            .collect();
+
+        Ok(results?)
     }
 
     /// Find content with similar themes
     async fn find_theme_similar(&self, content_id: Uuid, limit: usize) -> Result<Vec<(Uuid, f32)>> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             WITH seed_themes AS (
                 SELECT theme FROM content_themes WHERE content_id = $1
@@ -265,13 +299,22 @@ impl GraphRecommender {
             ORDER BY similarity DESC
             LIMIT $2
             "#,
-            content_id,
-            limit as i64
         )
+        .bind(content_id)
+        .bind(limit as i64)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| (r.content_id, r.similarity.unwrap_or(0.0) as f32)).collect())
+        let results: Result<Vec<(Uuid, f32)>, sqlx::Error> = rows
+            .iter()
+            .map(|row| {
+                let content_id: Uuid = row.try_get("content_id")?;
+                let similarity: Option<f64> = row.try_get("similarity")?;
+                Ok((content_id, similarity.unwrap_or(0.0) as f32))
+            })
+            .collect();
+
+        Ok(results?)
     }
 
     /// Compute user-user collaborative graph
@@ -290,7 +333,9 @@ impl GraphRecommender {
         let mut scores: HashMap<Uuid, f32> = HashMap::new();
 
         for (similar_user_id, similarity) in similar_users {
-            let user_content = self.get_user_highly_rated_content(similar_user_id, 30).await?;
+            let user_content = self
+                .get_user_highly_rated_content(similar_user_id, 30)
+                .await?;
 
             for (content_id, rating) in user_content {
                 let weighted_score = similarity * rating * COLLABORATIVE_DECAY;
@@ -312,7 +357,7 @@ impl GraphRecommender {
             return Ok(Vec::new());
         }
 
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             WITH user_content AS (
                 SELECT unnest($2::uuid[]) as content_id
@@ -335,15 +380,24 @@ impl GraphRecommender {
             ORDER BY similarity DESC
             LIMIT $4
             "#,
-            user_id,
-            seed_content,
-            seed_content.len() as i32,
-            limit as i64
         )
+        .bind(user_id)
+        .bind(seed_content)
+        .bind(seed_content.len() as i32)
+        .bind(limit as i64)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| (r.user_id, r.similarity.unwrap_or(0.0) as f32)).collect())
+        let results: Result<Vec<(Uuid, f32)>, sqlx::Error> = rows
+            .iter()
+            .map(|row| {
+                let user_id: Uuid = row.try_get("user_id")?;
+                let similarity: Option<f64> = row.try_get("similarity")?;
+                Ok((user_id, similarity.unwrap_or(0.0) as f32))
+            })
+            .collect();
+
+        Ok(results?)
     }
 
     /// Get user's highly-rated content (completion_rate > 0.7)
@@ -352,7 +406,7 @@ impl GraphRecommender {
         user_id: Uuid,
         limit: usize,
     ) -> Result<Vec<(Uuid, f32)>> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             SELECT
                 content_id,
@@ -363,13 +417,22 @@ impl GraphRecommender {
             ORDER BY completion_rate DESC, last_watched DESC
             LIMIT $2
             "#,
-            user_id,
-            limit as i64
         )
+        .bind(user_id)
+        .bind(limit as i64)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| (r.content_id, r.completion_rate as f32)).collect())
+        let results: Result<Vec<(Uuid, f32)>, sqlx::Error> = rows
+            .iter()
+            .map(|row| {
+                let content_id: Uuid = row.try_get("content_id")?;
+                let completion_rate: f64 = row.try_get("completion_rate")?;
+                Ok((content_id, completion_rate as f32))
+            })
+            .collect();
+
+        Ok(results?)
     }
 }
 
@@ -390,12 +453,17 @@ mod tests {
             + DIRECTOR_SIMILARITY_WEIGHT
             + THEME_SIMILARITY_WEIGHT;
 
-        assert!((total_weight - 1.0).abs() < 0.01, "Similarity weights should sum to 1.0");
+        assert!(
+            (total_weight - 1.0).abs() < 0.01,
+            "Similarity weights should sum to 1.0"
+        );
     }
 
     #[test]
     fn test_collaborative_decay() {
-        assert!(COLLABORATIVE_DECAY > 0.0 && COLLABORATIVE_DECAY < 1.0,
-            "Collaborative decay should be between 0 and 1");
+        assert!(
+            COLLABORATIVE_DECAY > 0.0 && COLLABORATIVE_DECAY < 1.0,
+            "Collaborative decay should be between 0 and 1"
+        );
     }
 }

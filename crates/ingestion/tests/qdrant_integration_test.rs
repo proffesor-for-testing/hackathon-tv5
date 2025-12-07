@@ -71,10 +71,7 @@ async fn test_qdrant_client_creation() {
         .expect("Failed to create Qdrant client");
 
     // Verify health check
-    let healthy = client
-        .health_check()
-        .await
-        .expect("Health check failed");
+    let healthy = client.health_check().await.expect("Health check failed");
     assert!(healthy, "Qdrant should be healthy");
 }
 
@@ -197,23 +194,15 @@ async fn test_similarity_search() {
 
     // Create action movies
     let action_content_id = Uuid::new_v4();
-    let action_content = create_test_content(
-        "Action Movie A",
-        vec!["Action".to_string()],
-        8.0,
-    );
+    let action_content = create_test_content("Action Movie A", vec!["Action".to_string()], 8.0);
     let action_point = to_content_point(&action_content, action_content_id)
         .expect("Failed to create action point");
 
     // Create drama movies
     let drama_content_id = Uuid::new_v4();
-    let drama_content = create_test_content(
-        "Drama Movie B",
-        vec!["Drama".to_string()],
-        8.5,
-    );
-    let drama_point = to_content_point(&drama_content, drama_content_id)
-        .expect("Failed to create drama point");
+    let drama_content = create_test_content("Drama Movie B", vec!["Drama".to_string()], 8.5);
+    let drama_point =
+        to_content_point(&drama_content, drama_content_id).expect("Failed to create drama point");
 
     // Upsert both
     client
@@ -230,7 +219,10 @@ async fn test_similarity_search() {
     assert_eq!(results.len(), 2);
     // First result should be the action movie itself (highest similarity)
     assert_eq!(results[0].0, action_content_id);
-    assert!(results[0].1 > results[1].1, "First result should have higher similarity");
+    assert!(
+        results[0].1 > results[1].1,
+        "First result should have higher similarity"
+    );
 }
 
 #[tokio::test]
@@ -249,11 +241,7 @@ async fn test_batch_size_limit() {
     let mut points = Vec::new();
     for i in 0..101 {
         let content_id = Uuid::new_v4();
-        let content = create_test_content(
-            &format!("Movie {}", i),
-            vec!["Action".to_string()],
-            7.0,
-        );
+        let content = create_test_content(&format!("Movie {}", i), vec!["Action".to_string()], 7.0);
         let point = to_content_point(&content, content_id).expect("Failed to create point");
         points.push(point);
     }
@@ -261,10 +249,7 @@ async fn test_batch_size_limit() {
     // Should fail due to batch size limit
     let result = client.upsert_batch(points).await;
     assert!(result.is_err(), "Should fail with batch size > 100");
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("exceeds maximum"));
+    assert!(result.unwrap_err().to_string().contains("exceeds maximum"));
 }
 
 #[tokio::test]
@@ -282,24 +267,20 @@ async fn test_upsert_updates_existing_point() {
     let content_id = Uuid::new_v4();
 
     // Initial upsert
-    let content_v1 = create_test_content(
-        "Original Title",
-        vec!["Action".to_string()],
-        7.0,
-    );
+    let content_v1 = create_test_content("Original Title", vec!["Action".to_string()], 7.0);
     let point_v1 = to_content_point(&content_v1, content_id).expect("Failed to create point");
 
     client
-        .upsert_point(point_v1.id, point_v1.vector.clone(), point_v1.payload.clone())
+        .upsert_point(
+            point_v1.id,
+            point_v1.vector.clone(),
+            point_v1.payload.clone(),
+        )
         .await
         .expect("Failed to upsert v1");
 
     // Update with new data (same ID)
-    let content_v2 = create_test_content(
-        "Updated Title",
-        vec!["Drama".to_string()],
-        9.0,
-    );
+    let content_v2 = create_test_content("Updated Title", vec!["Drama".to_string()], 9.0);
     let point_v2 = to_content_point(&content_v2, content_id).expect("Failed to create point");
 
     client
@@ -339,11 +320,7 @@ async fn test_empty_batch_upsert() {
 async fn test_content_without_embedding_fails() {
     let content_id = Uuid::new_v4();
 
-    let mut content = create_test_content(
-        "No Embedding",
-        vec!["Action".to_string()],
-        8.0,
-    );
+    let mut content = create_test_content("No Embedding", vec!["Action".to_string()], 8.0);
 
     // Remove embedding
     content.embedding = None;
@@ -351,7 +328,10 @@ async fn test_content_without_embedding_fails() {
     // Should fail when converting to point
     let result = to_content_point(&content, content_id);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("missing embedding"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("missing embedding"));
 }
 
 #[tokio::test]
@@ -370,11 +350,7 @@ async fn test_search_with_limit() {
     let mut points = Vec::new();
     for i in 0..10 {
         let content_id = Uuid::new_v4();
-        let content = create_test_content(
-            &format!("Movie {}", i),
-            vec!["Action".to_string()],
-            7.5,
-        );
+        let content = create_test_content(&format!("Movie {}", i), vec!["Action".to_string()], 7.5);
         let point = to_content_point(&content, content_id).expect("Failed to create point");
         points.push(point);
     }

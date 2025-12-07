@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{PgPool, FromRow};
+use sqlx::{FromRow, PgPool, Row};
 use uuid::Uuid;
 
 use super::query_log::QueryLog;
@@ -108,17 +108,19 @@ impl SearchAnalytics {
         &self,
         since: DateTime<Utc>,
     ) -> Result<LatencyStats, sqlx::Error> {
-        let latencies: Vec<i32> = sqlx::query_scalar!(
+        let rows = sqlx::query(
             r#"
             SELECT latency_ms
             FROM search_events
             WHERE created_at >= $1
             ORDER BY latency_ms ASC
             "#,
-            since
         )
+        .bind(since)
         .fetch_all(&self.pool)
         .await?;
+
+        let latencies: Vec<i32> = rows.iter().map(|row| row.get("latency_ms")).collect();
 
         if latencies.is_empty() {
             return Ok(LatencyStats {
@@ -150,7 +152,7 @@ impl SearchAnalytics {
         since: DateTime<Utc>,
         limit: i64,
     ) -> Result<Vec<PopularQuery>, sqlx::Error> {
-        let results = sqlx::query!(
+        let results = sqlx::query(
             r#"
             SELECT
                 query_text,
@@ -168,20 +170,20 @@ impl SearchAnalytics {
             ORDER BY search_count DESC
             LIMIT $2
             "#,
-            since,
-            limit
         )
+        .bind(since)
+        .bind(limit)
         .fetch_all(&self.pool)
         .await?;
 
         Ok(results
             .into_iter()
             .map(|r| PopularQuery {
-                query: r.query_text,
-                count: r.search_count.unwrap_or(0),
-                ctr: r.ctr.unwrap_or(0.0),
-                avg_results: r.avg_results.unwrap_or(0.0),
-                avg_latency_ms: r.avg_latency_ms.unwrap_or(0.0),
+                query: r.get("query_text"),
+                count: r.get::<Option<i64>, _>("search_count").unwrap_or(0),
+                ctr: r.get::<Option<f64>, _>("ctr").unwrap_or(0.0),
+                avg_results: r.get::<Option<f64>, _>("avg_results").unwrap_or(0.0),
+                avg_latency_ms: r.get::<Option<f64>, _>("avg_latency_ms").unwrap_or(0.0),
             })
             .collect())
     }
@@ -192,7 +194,7 @@ impl SearchAnalytics {
         since: DateTime<Utc>,
         limit: i64,
     ) -> Result<Vec<ZeroResultQuery>, sqlx::Error> {
-        let results = sqlx::query!(
+        let results = sqlx::query(
             r#"
             SELECT query_text, COUNT(*) as search_count
             FROM search_events
@@ -201,24 +203,24 @@ impl SearchAnalytics {
             ORDER BY search_count DESC
             LIMIT $2
             "#,
-            since,
-            limit
         )
+        .bind(since)
+        .bind(limit)
         .fetch_all(&self.pool)
         .await?;
 
         Ok(results
             .into_iter()
             .map(|r| ZeroResultQuery {
-                query: r.query_text,
-                count: r.search_count.unwrap_or(0),
+                query: r.get("query_text"),
+                count: r.get::<Option<i64>, _>("search_count").unwrap_or(0),
             })
             .collect())
     }
 
     /// Calculate overall click-through rate
     pub async fn calculate_ctr(&self, since: DateTime<Utc>) -> Result<f64, sqlx::Error> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             SELECT
                 COUNT(DISTINCT se.id) as total_searches,
@@ -227,13 +229,13 @@ impl SearchAnalytics {
             LEFT JOIN search_clicks sc ON se.id = sc.search_event_id
             WHERE se.created_at >= $1
             "#,
-            since
         )
+        .bind(since)
         .fetch_one(&self.pool)
         .await?;
 
-        let total_searches = result.total_searches.unwrap_or(0) as f64;
-        let total_clicks = result.total_clicks.unwrap_or(0) as f64;
+        let total_searches = result.get::<Option<i64>, _>("total_searches").unwrap_or(0) as f64;
+        let total_clicks = result.get::<Option<i64>, _>("total_clicks").unwrap_or(0) as f64;
 
         if total_searches == 0.0 {
             Ok(0.0)
@@ -250,7 +252,7 @@ impl SearchAnalytics {
     ) -> Result<(), sqlx::Error> {
         let period_end = period_start + period_type.duration();
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO popular_searches (query_text, period_type, period_start, search_count, avg_results, avg_latency_ms, ctr)
             SELECT
@@ -274,11 +276,11 @@ impl SearchAnalytics {
                 avg_results = EXCLUDED.avg_results,
                 avg_latency_ms = EXCLUDED.avg_latency_ms,
                 ctr = EXCLUDED.ctr
-            "#,
-            period_type.as_str(),
-            period_start,
-            period_end
+            "#
         )
+        .bind(period_type.as_str())
+        .bind(period_start)
+        .bind(period_end)
         .execute(&self.pool)
         .await?;
 
@@ -300,7 +302,7 @@ impl SearchAnalytics {
         };
 
         // Get total searches and unique queries
-        let stats = sqlx::query!(
+        let stats = sqlx::query(
             r#"
             SELECT
                 COUNT(*) as total_searches,
@@ -309,14 +311,14 @@ impl SearchAnalytics {
             FROM search_events
             WHERE created_at >= $1
             "#,
-            since
         )
+        .bind(since)
         .fetch_one(&self.pool)
         .await?;
 
-        let total_searches = stats.total_searches.unwrap_or(0);
-        let unique_queries = stats.unique_queries.unwrap_or(0);
-        let zero_results = stats.zero_results.unwrap_or(0);
+        let total_searches = stats.get::<Option<i64>, _>("total_searches").unwrap_or(0);
+        let unique_queries = stats.get::<Option<i64>, _>("unique_queries").unwrap_or(0);
+        let zero_results = stats.get::<Option<i64>, _>("zero_results").unwrap_or(0);
 
         let zero_result_rate = if total_searches > 0 {
             zero_results as f64 / total_searches as f64
@@ -392,7 +394,10 @@ mod tests {
 
         assert_eq!(stats.p50, 300, "P50 should be median");
         assert!(stats.p95 >= 450, "P95 should be near high end");
-        assert!(stats.avg > 200.0 && stats.avg < 400.0, "Average should be in middle range");
+        assert!(
+            stats.avg > 200.0 && stats.avg < 400.0,
+            "Average should be in middle range"
+        );
 
         cleanup_test_db(&pool).await;
     }
@@ -426,7 +431,10 @@ mod tests {
             .expect("Failed to get top queries");
 
         assert!(!top_queries.is_empty(), "Should have top queries");
-        assert_eq!(top_queries[0].query, "popular query", "Most popular should be first");
+        assert_eq!(
+            top_queries[0].query, "popular query",
+            "Most popular should be first"
+        );
         assert_eq!(top_queries[0].count, 5, "Should have correct count");
 
         cleanup_test_db(&pool).await;
@@ -442,7 +450,13 @@ mod tests {
         for _ in 0..3 {
             analytics
                 .query_log()
-                .log_search("nonexistent content", Some("user123"), 0, 100, HashMap::new())
+                .log_search(
+                    "nonexistent content",
+                    Some("user123"),
+                    0,
+                    100,
+                    HashMap::new(),
+                )
                 .await
                 .expect("Failed to log search");
         }
@@ -507,7 +521,11 @@ mod tests {
         let pool = setup_test_db().await;
         let analytics = SearchAnalytics::new(pool.clone());
 
-        let period_start = Utc::now().date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+        let period_start = Utc::now()
+            .date_naive()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_utc();
 
         // Log some searches
         for _ in 0..5 {
@@ -523,19 +541,26 @@ mod tests {
             .await
             .expect("Failed to aggregate");
 
-        let aggregated = sqlx::query!(
+        let aggregated = sqlx::query(
             r#"
             SELECT search_count, avg_results, avg_latency_ms
             FROM popular_searches
             WHERE query_text = 'test query' AND period_type = 'hourly'
-            "#
+            "#,
         )
         .fetch_one(&pool)
         .await
         .expect("Failed to fetch aggregated data");
 
-        assert_eq!(aggregated.search_count, 5, "Should aggregate search count");
-        assert!(aggregated.avg_results.is_some(), "Should have average results");
+        assert_eq!(
+            aggregated.get::<i32, _>("search_count"),
+            5,
+            "Should aggregate search count"
+        );
+        assert!(
+            aggregated.get::<Option<f64>, _>("avg_results").is_some(),
+            "Should have average results"
+        );
 
         cleanup_test_db(&pool).await;
     }
@@ -589,17 +614,20 @@ mod tests {
 
     // Test helpers
     async fn setup_test_db() -> PgPool {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url)
             .await
             .expect("Failed to connect to test database");
 
-        sqlx::query(include_str!("../../migrations/20251206_search_analytics.sql"))
-            .execute(&pool)
-            .await
-            .expect("Failed to run migrations");
+        sqlx::query(include_str!(
+            "../../migrations/20251206_search_analytics.sql"
+        ))
+        .execute(&pool)
+        .await
+        .expect("Failed to run migrations");
 
         pool
     }

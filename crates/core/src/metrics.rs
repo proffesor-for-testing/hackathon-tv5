@@ -271,9 +271,7 @@ pub fn decrement_active_connections() {
 /// update_db_pool_metrics(5, 15);
 /// ```
 pub fn update_db_pool_metrics(active: usize, idle: usize) {
-    METRICS_REGISTRY
-        .db_connections_active
-        .set(active as f64);
+    METRICS_REGISTRY.db_connections_active.set(active as f64);
     METRICS_REGISTRY.db_connections_idle.set(idle as f64);
 }
 
@@ -411,9 +409,8 @@ where
 {
     type Response = actix_web::dev::ServiceResponse<B>;
     type Error = actix_web::Error;
-    type Future = std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>>>,
-    >;
+    type Future =
+        std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>>>>;
 
     fn poll_ready(
         &self,

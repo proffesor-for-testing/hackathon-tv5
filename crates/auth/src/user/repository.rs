@@ -47,7 +47,12 @@ impl From<User> for UserResponse {
 
 #[async_trait]
 pub trait UserRepository: Send + Sync {
-    async fn create_user(&self, email: &str, password_hash: &str, display_name: &str) -> Result<User>;
+    async fn create_user(
+        &self,
+        email: &str,
+        password_hash: &str,
+        display_name: &str,
+    ) -> Result<User>;
     async fn find_by_email(&self, email: &str) -> Result<Option<User>>;
     async fn find_by_id(&self, id: Uuid) -> Result<Option<User>>;
     async fn update_email_verified(&self, id: Uuid, verified: bool) -> Result<()>;
@@ -66,7 +71,12 @@ impl PostgresUserRepository {
 
 #[async_trait]
 impl UserRepository for PostgresUserRepository {
-    async fn create_user(&self, email: &str, password_hash: &str, display_name: &str) -> Result<User> {
+    async fn create_user(
+        &self,
+        email: &str,
+        password_hash: &str,
+        display_name: &str,
+    ) -> Result<User> {
         let user = sqlx::query_as::<_, User>(
             r#"
             INSERT INTO users (email, password_hash, display_name)
@@ -127,7 +137,7 @@ impl UserRepository for PostgresUserRepository {
             UPDATE users
             SET email_verified = $1, updated_at = NOW()
             WHERE id = $2
-            "#
+            "#,
         )
         .bind(verified)
         .bind(id)
@@ -143,7 +153,7 @@ impl UserRepository for PostgresUserRepository {
             UPDATE users
             SET password_hash = $1, updated_at = NOW()
             WHERE id = $2
-            "#
+            "#,
         )
         .bind(password_hash)
         .bind(id)

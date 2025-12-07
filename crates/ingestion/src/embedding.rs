@@ -7,8 +7,8 @@
 //! - L2 normalization
 //! - Complexity: O(d) where d=768 (embedding dimensions)
 
-use crate::{normalizer::CanonicalContent, Result, IngestionError};
-use ndarray::{Array1, Array};
+use crate::{normalizer::CanonicalContent, IngestionError, Result};
+use ndarray::{Array, Array1};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -51,11 +51,8 @@ impl EmbeddingGenerator {
         let graph_embedding = self.generate_graph_embedding(content);
 
         // Weighted combination
-        let combined = self.combine_embeddings(
-            &text_embedding,
-            &metadata_embedding,
-            &graph_embedding,
-        );
+        let combined =
+            self.combine_embeddings(&text_embedding, &metadata_embedding, &graph_embedding);
 
         // L2 normalization
         let normalized = Self::l2_normalize(&combined);
@@ -131,18 +128,12 @@ impl EmbeddingGenerator {
     }
 
     /// Combine embeddings with weighted sum
-    fn combine_embeddings(
-        &self,
-        text: &[f32],
-        metadata: &[f32],
-        graph: &[f32],
-    ) -> Vec<f32> {
+    fn combine_embeddings(&self, text: &[f32], metadata: &[f32], graph: &[f32]) -> Vec<f32> {
         let mut combined = vec![0.0; EMBEDDING_DIM];
 
         for i in 0..EMBEDDING_DIM {
-            combined[i] = text[i] * TEXT_WEIGHT
-                + metadata[i] * METADATA_WEIGHT
-                + graph[i] * GRAPH_WEIGHT;
+            combined[i] =
+                text[i] * TEXT_WEIGHT + metadata[i] * METADATA_WEIGHT + graph[i] * GRAPH_WEIGHT;
         }
 
         combined
@@ -201,10 +192,24 @@ impl EmbeddingGenerator {
     /// For now, we create random but consistent embeddings for each genre.
     fn init_genre_embeddings(&mut self) {
         let genres = vec![
-            "Action", "Adventure", "Animation", "Comedy", "Crime",
-            "Documentary", "Drama", "Family", "Fantasy", "History",
-            "Horror", "Music", "Mystery", "Romance", "Science Fiction",
-            "Thriller", "War", "Western",
+            "Action",
+            "Adventure",
+            "Animation",
+            "Comedy",
+            "Crime",
+            "Documentary",
+            "Drama",
+            "Family",
+            "Fantasy",
+            "History",
+            "Horror",
+            "Music",
+            "Mystery",
+            "Romance",
+            "Science Fiction",
+            "Thriller",
+            "War",
+            "Western",
         ];
 
         for genre in genres {
@@ -236,7 +241,7 @@ impl Default for EmbeddingGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::normalizer::{ContentType, AvailabilityInfo, ImageSet};
+    use crate::normalizer::{AvailabilityInfo, ContentType, ImageSet};
 
     #[test]
     fn test_l2_normalization() {

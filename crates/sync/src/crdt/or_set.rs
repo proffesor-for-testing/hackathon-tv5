@@ -2,7 +2,6 @@
 ///
 /// Used for watchlists and collections with add-wins bias
 /// Each addition gets a unique tag to enable precise removal
-
 use super::hlc::HLCTimestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -67,7 +66,8 @@ impl ORSet {
     /// Remove content from set by content_id
     /// Marks all tags for this content_id as removed
     pub fn remove(&mut self, content_id: &str) {
-        let tags_to_remove: Vec<String> = self.additions
+        let tags_to_remove: Vec<String> = self
+            .additions
             .values()
             .filter(|e| e.content_id == content_id)
             .map(|e| e.unique_tag.clone())

@@ -1,7 +1,6 @@
 /// Integration tests for WebSocket broadcaster with multiple simulated clients
 ///
 /// Tests the complete flow: PubNub → Broadcaster → WebSocket connections
-
 use actix::Actor;
 use actix_rt::System;
 use media_gateway_sync::crdt::HLCTimestamp;

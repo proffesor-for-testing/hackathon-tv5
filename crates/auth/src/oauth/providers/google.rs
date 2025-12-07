@@ -62,8 +62,9 @@ impl GoogleOAuthProvider {
             .map_err(|_| AuthError::Config("GOOGLE_CLIENT_ID not set".to_string()))?;
         let client_secret = std::env::var("GOOGLE_CLIENT_SECRET")
             .map_err(|_| AuthError::Config("GOOGLE_CLIENT_SECRET not set".to_string()))?;
-        let redirect_uri = std::env::var("GOOGLE_REDIRECT_URI")
-            .unwrap_or_else(|_| "https://api.mediagateway.io/auth/oauth/google/callback".to_string());
+        let redirect_uri = std::env::var("GOOGLE_REDIRECT_URI").unwrap_or_else(|_| {
+            "https://api.mediagateway.io/auth/oauth/google/callback".to_string()
+        });
 
         let scopes = vec![
             "openid".to_string(),
@@ -123,9 +124,15 @@ impl GoogleOAuthProvider {
             .map_err(|e| AuthError::Internal(format!("Token exchange request failed: {}", e)))?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             tracing::error!("Google token exchange failed: {}", error_text);
-            return Err(AuthError::Internal(format!("Token exchange failed: {}", error_text)));
+            return Err(AuthError::Internal(format!(
+                "Token exchange failed: {}",
+                error_text
+            )));
         }
 
         let token_response: GoogleTokenResponse = response
@@ -148,9 +155,15 @@ impl GoogleOAuthProvider {
             .map_err(|e| AuthError::Internal(format!("User profile request failed: {}", e)))?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             tracing::error!("Google user profile fetch failed: {}", error_text);
-            return Err(AuthError::Internal(format!("User profile fetch failed: {}", error_text)));
+            return Err(AuthError::Internal(format!(
+                "User profile fetch failed: {}",
+                error_text
+            )));
         }
 
         let profile: GoogleUserProfile = response
@@ -187,7 +200,11 @@ mod tests {
             "client123".to_string(),
             "secret456".to_string(),
             "https://example.com/callback".to_string(),
-            vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
+            vec![
+                "openid".to_string(),
+                "email".to_string(),
+                "profile".to_string(),
+            ],
         );
 
         let pkce = PkceChallenge::generate();
@@ -237,7 +254,9 @@ mod tests {
         let auth_url = provider.generate_authorization_url(&pkce);
 
         // Scopes should be space-separated and URL-encoded
-        assert!(auth_url.contains("scope=openid+email+profile") ||
-                auth_url.contains("scope=openid%20email%20profile"));
+        assert!(
+            auth_url.contains("scope=openid+email+profile")
+                || auth_url.contains("scope=openid%20email%20profile")
+        );
     }
 }

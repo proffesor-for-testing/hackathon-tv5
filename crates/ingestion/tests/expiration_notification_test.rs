@@ -9,9 +9,11 @@
 //! Run with: cargo test --test expiration_notification_test -- --test-threads=1
 
 use chrono::{Duration, Utc};
-use media_gateway_ingestion::normalizer::{AvailabilityInfo, CanonicalContent, ContentType, ImageSet};
+use media_gateway_ingestion::normalizer::{
+    AvailabilityInfo, CanonicalContent, ContentType, ImageSet,
+};
 use media_gateway_ingestion::notifications::{
-    ExpirationNotificationJob, ExpirationNotificationConfig, NotificationWindow,
+    ExpirationNotificationConfig, ExpirationNotificationJob, NotificationWindow,
 };
 use media_gateway_ingestion::repository::{ContentRepository, PostgresContentRepository};
 use sqlx::postgres::PgPoolOptions;
@@ -43,7 +45,10 @@ fn create_expiring_content(
     expires_in_days: i64,
 ) -> CanonicalContent {
     let mut external_ids = HashMap::new();
-    external_ids.insert("imdb".to_string(), format!("tt{}", Uuid::new_v4().as_u128() % 10000000));
+    external_ids.insert(
+        "imdb".to_string(),
+        format!("tt{}", Uuid::new_v4().as_u128() % 10000000),
+    );
 
     let expires_at = Utc::now() + Duration::days(expires_in_days);
 
@@ -105,7 +110,7 @@ async fn test_initialize_tracking_table() {
             SELECT FROM information_schema.tables
             WHERE table_name = 'expiration_notifications'
         )
-        "#
+        "#,
     )
     .fetch_one(&pool)
     .await
@@ -122,7 +127,10 @@ async fn test_detect_expiring_content() {
 
     // Create content expiring in 5 days
     let content = create_expiring_content("Expiring Soon Movie", "netflix", "US", 5);
-    let content_id = repo.upsert(&content).await.expect("Failed to insert content");
+    let content_id = repo
+        .upsert(&content)
+        .await
+        .expect("Failed to insert content");
 
     // Find content expiring within 7 days
     let expiring = repo
@@ -141,7 +149,10 @@ async fn test_detect_expiring_content() {
         .expect("Failed to find expiring content");
 
     let found_3d = expiring_3d.iter().any(|c| c.content_id == content_id);
-    assert!(!found_3d, "Should not find content when window is too short");
+    assert!(
+        !found_3d,
+        "Should not find content when window is too short"
+    );
 
     // Cleanup
     cleanup_test_content(&pool, content_id).await;
@@ -163,7 +174,10 @@ async fn test_notification_tracking() {
 
     // Create content expiring in 7 days
     let content = create_expiring_content("Track Notification Movie", "netflix", "US", 7);
-    let content_id = repo.upsert(&content).await.expect("Failed to insert content");
+    let content_id = repo
+        .upsert(&content)
+        .await
+        .expect("Failed to insert content");
 
     // Get the expiring content
     let expiring = repo
@@ -225,7 +239,10 @@ async fn test_notification_history() {
 
     // Create content expiring in 7 days
     let content = create_expiring_content("History Test Movie", "netflix", "US", 7);
-    let content_id = repo.upsert(&content).await.expect("Failed to insert content");
+    let content_id = repo
+        .upsert(&content)
+        .await
+        .expect("Failed to insert content");
 
     // Get expiring content
     let expiring = repo
@@ -283,14 +300,23 @@ async fn test_check_and_notify_no_duplicates() {
 
     // Create content expiring in 7 days
     let content = create_expiring_content("No Duplicate Movie", "netflix", "US", 7);
-    let content_id = repo.upsert(&content).await.expect("Failed to insert content");
+    let content_id = repo
+        .upsert(&content)
+        .await
+        .expect("Failed to insert content");
 
     // First check - should send notification
-    let count1 = job.check_and_notify().await.expect("Failed to check and notify");
+    let count1 = job
+        .check_and_notify()
+        .await
+        .expect("Failed to check and notify");
     assert!(count1 > 0, "Should send at least one notification");
 
     // Second check - should not send duplicate
-    let count2 = job.check_and_notify().await.expect("Failed to check and notify");
+    let count2 = job
+        .check_and_notify()
+        .await
+        .expect("Failed to check and notify");
     assert_eq!(count2, 0, "Should not send duplicate notifications");
 
     // Cleanup
@@ -370,7 +396,7 @@ async fn test_cleanup_old_notifications() {
             content_id, platform, region, notification_window, expires_at, notified_at
         )
         VALUES ($1, $2, $3, $4, $5, $6)
-        "#
+        "#,
     )
     .bind(Uuid::new_v4())
     .bind("netflix")
@@ -402,7 +428,13 @@ async fn test_notification_window_helpers() {
     assert_eq!(NotificationWindow::ThreeDays.identifier(), "3d");
     assert_eq!(NotificationWindow::OneDay.identifier(), "1d");
 
-    assert_eq!(NotificationWindow::from_days(7), NotificationWindow::SevenDays);
-    assert_eq!(NotificationWindow::from_days(3), NotificationWindow::ThreeDays);
+    assert_eq!(
+        NotificationWindow::from_days(7),
+        NotificationWindow::SevenDays
+    );
+    assert_eq!(
+        NotificationWindow::from_days(3),
+        NotificationWindow::ThreeDays
+    );
     assert_eq!(NotificationWindow::from_days(1), NotificationWindow::OneDay);
 }

@@ -26,11 +26,7 @@ impl RateLimiter {
         Ok(Self { redis, config })
     }
 
-    pub async fn check_rate_limit(
-        &self,
-        user_id: &str,
-        tier: &str,
-    ) -> ApiResult<RateLimitInfo> {
+    pub async fn check_rate_limit(&self, user_id: &str, tier: &str) -> ApiResult<RateLimitInfo> {
         if !self.config.rate_limit.enabled {
             return Ok(RateLimitInfo {
                 limit: u32::MAX,
@@ -49,22 +45,12 @@ impl RateLimiter {
 
         // Check per-second rate limit using sliding window
         let second_info = self
-            .check_sliding_window(
-                user_id,
-                tier_config,
-                1,
-                tier_config.requests_per_second,
-            )
+            .check_sliding_window(user_id, tier_config, 1, tier_config.requests_per_second)
             .await?;
 
         // Check per-minute rate limit using sliding window
         let minute_info = self
-            .check_sliding_window(
-                user_id,
-                tier_config,
-                60,
-                tier_config.requests_per_minute,
-            )
+            .check_sliding_window(user_id, tier_config, 60, tier_config.requests_per_minute)
             .await?;
 
         // Return the most restrictive limit
@@ -75,11 +61,7 @@ impl RateLimiter {
         };
 
         if info.remaining == 0 {
-            warn!(
-                user_id = user_id,
-                tier = tier,
-                "Rate limit exceeded"
-            );
+            warn!(user_id = user_id, tier = tier, "Rate limit exceeded");
             return Err(ApiError::RateLimited {
                 retry_after: (info.reset - Utc::now().timestamp()) as u64,
             });

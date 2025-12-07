@@ -10,13 +10,12 @@
 /// ```bash
 /// REDIS_URL=redis://localhost:6379 cargo run --package media-gateway-api --example circuit_breaker_with_redis
 /// ```
-
 use media_gateway_api::circuit_breaker::CircuitBreakerManager;
-use media_gateway_api::config::{Config, CircuitBreakerServiceConfig};
+use media_gateway_api::config::{CircuitBreakerServiceConfig, Config};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::{info, error};
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,8 +28,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create configuration with Redis
     let mut config = Config::default();
-    config.redis.url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    config.redis.url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     config.circuit_breaker.enabled = true;
 
     // Configure circuit breaker for test service
@@ -47,8 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create circuit breaker manager with Redis persistence
     info!("Initializing circuit breaker manager with Redis persistence...");
-    let manager = CircuitBreakerManager::with_redis(config.clone())
-        .await?;
+    let manager = CircuitBreakerManager::with_redis(config.clone()).await?;
 
     info!("Circuit breaker manager initialized successfully");
 
@@ -149,8 +147,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("\n--- Phase 6: Multi-Instance State Sharing ---");
     info!("Creating second circuit breaker manager instance...");
 
-    let manager2 = CircuitBreakerManager::with_redis(config.clone())
-        .await?;
+    let manager2 = CircuitBreakerManager::with_redis(config.clone()).await?;
 
     if let Some(state) = manager2.get_state("test_service").await {
         info!("Second instance sees circuit state: {}", state);

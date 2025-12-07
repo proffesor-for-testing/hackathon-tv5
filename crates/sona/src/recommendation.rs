@@ -3,16 +3,16 @@
 //! Implements GenerateRecommendations algorithm from SPARC pseudocode.
 //! Combines collaborative, content-based, graph-based, and context-aware filtering.
 
-use crate::types::{Recommendation, RecommendationContext, RecommendationType, ScoredContent};
-use crate::profile::UserProfile;
-use crate::lora::{UserLoRAAdapter, compute_lora_score};
+use crate::collaborative::CollaborativeFilteringEngine;
 use crate::diversity::ApplyDiversityFilter;
 use crate::graph::GraphRecommender;
-use crate::collaborative::CollaborativeFilteringEngine;
+use crate::lora::{compute_lora_score, UserLoRAAdapter};
+use crate::profile::UserProfile;
+use crate::types::{Recommendation, RecommendationContext, RecommendationType, ScoredContent};
 use anyhow::Result;
-use uuid::Uuid;
 use chrono::Utc;
 use sqlx::PgPool;
+use uuid::Uuid;
 
 const COLLABORATIVE_WEIGHT: f32 = 0.35;
 const CONTENT_WEIGHT: f32 = 0.25;
@@ -96,11 +96,8 @@ impl GenerateRecommendations {
         if let Some(adapter) = lora_adapter {
             for candidate in &mut filtered_candidates {
                 let content_embedding = get_content_embedding(candidate.content_id)?;
-                let lora_score = compute_lora_score(
-                    adapter,
-                    &content_embedding,
-                    &profile.preference_vector,
-                )?;
+                let lora_score =
+                    compute_lora_score(adapter, &content_embedding, &profile.preference_vector)?;
                 candidate.score *= 1.0 + lora_score * 0.3;
             }
         }

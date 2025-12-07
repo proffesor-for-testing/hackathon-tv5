@@ -3,18 +3,17 @@
 //! These tests require Redis to be running.
 //! Set REDIS_URL environment variable or use default: redis://localhost:6379
 
-use media_gateway_ingestion::{
-    WebhookReceiver, WebhookHandler, WebhookPayload, WebhookEventType,
-    RedisWebhookQueue, WebhookDeduplicator, WebhookMetrics,
-    PlatformWebhookConfig, WebhookQueue, WebhookProcessor,
-    EventProducer, ContentEvent,
-};
+use chrono::Utc;
 use media_gateway_ingestion::webhooks::{
-    handlers::{NetflixWebhookHandler, GenericWebhookHandler},
+    handlers::{GenericWebhookHandler, NetflixWebhookHandler},
     verification::generate_hmac_signature,
 };
+use media_gateway_ingestion::{
+    ContentEvent, EventProducer, PlatformWebhookConfig, RedisWebhookQueue, WebhookDeduplicator,
+    WebhookEventType, WebhookHandler, WebhookMetrics, WebhookPayload, WebhookProcessor,
+    WebhookQueue, WebhookReceiver,
+};
 use std::sync::Arc;
-use chrono::Utc;
 
 fn get_redis_url() -> String {
     std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string())
@@ -75,7 +74,10 @@ async fn test_end_to_end_webhook_flow() {
     let signature = generate_hmac_signature(&body, "test-secret-e2e").unwrap();
 
     // Receive webhook
-    let event_id = receiver.receive("netflix", &body, &signature).await.unwrap();
+    let event_id = receiver
+        .receive("netflix", &body, &signature)
+        .await
+        .unwrap();
     assert!(!event_id.is_empty());
 
     // Check metrics
@@ -87,7 +89,11 @@ async fn test_end_to_end_webhook_flow() {
     let redis_client = redis::Client::open(get_redis_url()).unwrap();
     let mut conn = redis_client.get_async_connection().await.unwrap();
     let key = format!("webhook:hash:{}", event_id);
-    let _: () = redis::cmd("DEL").arg(&key).query_async(&mut conn).await.unwrap();
+    let _: () = redis::cmd("DEL")
+        .arg(&key)
+        .query_async(&mut conn)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -124,10 +130,16 @@ async fn test_duplicate_webhook_rejection() {
     let signature = generate_hmac_signature(&body, "test-secret-dup").unwrap();
 
     // First receive should succeed
-    let event_id1 = receiver.receive("netflix", &body, &signature).await.unwrap();
+    let event_id1 = receiver
+        .receive("netflix", &body, &signature)
+        .await
+        .unwrap();
 
     // Second receive should also succeed but return same event_id (duplicate)
-    let event_id2 = receiver.receive("netflix", &body, &signature).await.unwrap();
+    let event_id2 = receiver
+        .receive("netflix", &body, &signature)
+        .await
+        .unwrap();
 
     assert_eq!(event_id1, event_id2);
 
@@ -140,7 +152,11 @@ async fn test_duplicate_webhook_rejection() {
     let redis_client = redis::Client::open(get_redis_url()).unwrap();
     let mut conn = redis_client.get_async_connection().await.unwrap();
     let key = format!("webhook:hash:{}", event_id1);
-    let _: () = redis::cmd("DEL").arg(&key).query_async(&mut conn).await.unwrap();
+    let _: () = redis::cmd("DEL")
+        .arg(&key)
+        .query_async(&mut conn)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -215,7 +231,10 @@ async fn test_queue_processing() {
 
     let (dequeued_id, dequeued_webhook) = result.unwrap();
     assert_eq!(dequeued_webhook.platform, "netflix");
-    assert_eq!(dequeued_webhook.event_type, WebhookEventType::ContentUpdated);
+    assert_eq!(
+        dequeued_webhook.event_type,
+        WebhookEventType::ContentUpdated
+    );
 
     // Ack
     queue.ack(&dequeued_id).await.unwrap();
@@ -228,7 +247,11 @@ async fn test_queue_processing() {
     let redis_client = redis::Client::open(redis_url).unwrap();
     let mut conn = redis_client.get_async_connection().await.unwrap();
     let stream_key = "webhooks:incoming:netflix";
-    let _: () = redis::cmd("DEL").arg(stream_key).query_async(&mut conn).await.unwrap();
+    let _: () = redis::cmd("DEL")
+        .arg(stream_key)
+        .query_async(&mut conn)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -325,7 +348,11 @@ async fn test_generic_handler() {
     let redis_client = redis::Client::open(get_redis_url()).unwrap();
     let mut conn = redis_client.get_async_connection().await.unwrap();
     let key = format!("webhook:hash:{}", event_id);
-    let _: () = redis::cmd("DEL").arg(&key).query_async(&mut conn).await.unwrap();
+    let _: () = redis::cmd("DEL")
+        .arg(&key)
+        .query_async(&mut conn)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -362,7 +389,10 @@ async fn test_webhook_pipeline_integration_end_to_end() {
     let body = serde_json::to_vec(&webhook).unwrap();
     let signature = generate_hmac_signature(&body, "test-e2e-pipeline").unwrap();
 
-    let event_id = receiver.receive("netflix", &body, &signature).await.unwrap();
+    let event_id = receiver
+        .receive("netflix", &body, &signature)
+        .await
+        .unwrap();
     assert!(!event_id.is_empty());
 
     let metrics = receiver.metrics();
@@ -376,7 +406,11 @@ async fn test_webhook_pipeline_integration_end_to_end() {
     let redis_client = redis::Client::open(get_redis_url()).unwrap();
     let mut conn = redis_client.get_async_connection().await.unwrap();
     let key = format!("webhook:hash:{}", event_id);
-    let _: () = redis::cmd("DEL").arg(&key).query_async(&mut conn).await.unwrap();
+    let _: () = redis::cmd("DEL")
+        .arg(&key)
+        .query_async(&mut conn)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -423,7 +457,11 @@ async fn test_queue_metrics_tracking_integration() {
     let redis_client = redis::Client::open(redis_url).unwrap();
     let mut conn = redis_client.get_async_connection().await.unwrap();
     let stream_key = "webhooks:incoming:netflix";
-    let _: () = redis::cmd("DEL").arg(stream_key).query_async(&mut conn).await.unwrap();
+    let _: () = redis::cmd("DEL")
+        .arg(stream_key)
+        .query_async(&mut conn)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -470,5 +508,9 @@ async fn test_error_recovery_dead_letter_queue() {
     let redis_client = redis::Client::open(redis_url).unwrap();
     let mut conn = redis_client.get_async_connection().await.unwrap();
     let dlq_key = "webhooks:dlq:netflix";
-    let _: () = redis::cmd("DEL").arg(dlq_key).query_async(&mut conn).await.unwrap();
+    let _: () = redis::cmd("DEL")
+        .arg(dlq_key)
+        .query_async(&mut conn)
+        .await
+        .unwrap();
 }

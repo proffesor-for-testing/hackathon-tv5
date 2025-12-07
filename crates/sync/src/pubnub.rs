@@ -4,7 +4,6 @@
 /// - user.{userId}.sync - Watchlist, preferences, progress
 /// - user.{userId}.devices - Device presence, heartbeat
 /// - user.{userId}.notifications - Alerts, recommendations
-
 use crate::crdt::HLCTimestamp;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -29,8 +28,7 @@ pub struct PubNubConfig {
 impl Default for PubNubConfig {
     fn default() -> Self {
         Self {
-            publish_key: std::env::var("PUBNUB_PUBLISH_KEY")
-                .unwrap_or_else(|_| "demo".to_string()),
+            publish_key: std::env::var("PUBNUB_PUBLISH_KEY").unwrap_or_else(|_| "demo".to_string()),
             subscribe_key: std::env::var("PUBNUB_SUBSCRIBE_KEY")
                 .unwrap_or_else(|_| "demo".to_string()),
             origin: "ps.pndsn.com".to_string(),
@@ -119,9 +117,7 @@ impl PubNubClient {
         let channels_str = channels.join(",");
         let url = format!(
             "https://{}/v2/subscribe/{}/{}/0/0",
-            self.config.origin,
-            self.config.subscribe_key,
-            channels_str
+            self.config.origin, self.config.subscribe_key, channels_str
         );
 
         self.http_client
@@ -139,9 +135,7 @@ impl PubNubClient {
         let channels_str = channels.join(",");
         let url = format!(
             "https://{}/v2/presence/sub-key/{}/channel/{}/leave",
-            self.config.origin,
-            self.config.subscribe_key,
-            channels_str
+            self.config.origin, self.config.subscribe_key, channels_str
         );
 
         self.http_client
@@ -371,11 +365,15 @@ impl SubscriptionManager {
 
     /// Start subscription loop
     pub async fn start(&self) -> Result<(), PubNubError> {
-        self.running.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.running
+            .store(true, std::sync::atomic::Ordering::SeqCst);
 
         let mut timetoken = "0".to_string();
 
-        tracing::info!("Starting PubNub subscription for channels: {:?}", self.channels);
+        tracing::info!(
+            "Starting PubNub subscription for channels: {:?}",
+            self.channels
+        );
 
         while self.running.load(std::sync::atomic::Ordering::SeqCst) {
             match self.poll_messages(&timetoken).await {
@@ -398,7 +396,8 @@ impl SubscriptionManager {
 
     /// Stop subscription loop
     pub fn stop(&self) {
-        self.running.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.running
+            .store(false, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Poll for new messages (long-poll)
@@ -409,13 +408,12 @@ impl SubscriptionManager {
         let channels = self.channels.join(",");
         let url = format!(
             "https://{}/v2/subscribe/{}/{}/0/{}",
-            self.client.config.origin,
-            self.client.config.subscribe_key,
-            channels,
-            timetoken
+            self.client.config.origin, self.client.config.subscribe_key, channels, timetoken
         );
 
-        let response = self.client.http_client
+        let response = self
+            .client
+            .http_client
             .get(&url)
             .query(&[("uuid", &self.client.device_id)])
             .timeout(Duration::from_secs(310)) // PubNub long-poll timeout

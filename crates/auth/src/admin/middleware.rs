@@ -84,11 +84,13 @@ where
                 .get("Authorization")
                 .and_then(|h| h.to_str().ok())
                 .ok_or_else(|| {
-                    Error::from(AuthError::InvalidToken("Missing Authorization header".to_string()))
+                    Error::from(AuthError::InvalidToken(
+                        "Missing Authorization header".to_string(),
+                    ))
                 })?;
 
-            let token = JwtManager::extract_bearer_token(auth_header)
-                .map_err(|e| Error::from(e))?;
+            let token =
+                JwtManager::extract_bearer_token(auth_header).map_err(|e| Error::from(e))?;
 
             // Verify JWT
             let claims = jwt_manager

@@ -229,7 +229,10 @@ mod tests {
             updated_profile.avatar_url,
             Some("https://example.com/avatar.jpg".to_string())
         );
-        assert_eq!(updated_profile.preferences, serde_json::json!({"theme": "dark"}));
+        assert_eq!(
+            updated_profile.preferences,
+            serde_json::json!({"theme": "dark"})
+        );
     }
 
     #[actix_web::test]

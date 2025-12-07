@@ -326,10 +326,7 @@ pub fn calculate_resume_position(position: u32, duration: u32) -> Option<u32> {
 
     // If position < 30 seconds, start from beginning
     if position < 30 {
-        tracing::trace!(
-            "Position {} < 30s, starting from beginning",
-            position
-        );
+        tracing::trace!("Position {} < 30s, starting from beginning", position);
         return None;
     }
 
@@ -407,10 +404,9 @@ mod integration_tests {
     use sqlx::postgres::PgPoolOptions;
 
     async fn create_test_pool() -> Result<PgPool> {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| {
-                "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
-            });
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+        });
 
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -533,11 +529,17 @@ mod integration_tests {
         let content3 = Uuid::new_v4();
 
         // Create multiple history entries
-        manager.update_watch_history(user_id, content1, 1800, 3600).await?;
+        manager
+            .update_watch_history(user_id, content1, 1800, 3600)
+            .await?;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        manager.update_watch_history(user_id, content2, 900, 1800).await?;
+        manager
+            .update_watch_history(user_id, content2, 900, 1800)
+            .await?;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        manager.update_watch_history(user_id, content3, 300, 600).await?;
+        manager
+            .update_watch_history(user_id, content3, 300, 600)
+            .await?;
 
         // Get all user history
         let history = manager.get_user_history(user_id).await?;

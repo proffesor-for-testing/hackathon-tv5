@@ -42,21 +42,19 @@ pub mod telemetry;
 pub mod types;
 pub mod validation;
 
-#[cfg(test)]
-mod tests;
-
 // Re-export commonly used types
-pub use audit::{AuditAction, AuditError, AuditEvent, AuditFilter, AuditLogger, PostgresAuditLogger};
+pub use audit::{
+    AuditAction, AuditError, AuditEvent, AuditFilter, AuditLogger, PostgresAuditLogger,
+};
+pub use config::{
+    load_dotenv, ConfigLoader, DatabaseConfig as ConfigDatabaseConfig, RedisConfig, ServiceConfig,
+};
+pub use database::{DatabaseConfig, DatabasePool, PoolStats};
+pub use error::MediaGatewayError;
 pub use events::{
     ActivityEventError, ActivityEventResult, ActivityEventType, KafkaActivityProducer,
     UserActivityEvent, UserActivityProducer,
 };
-pub use config::{
-    ConfigLoader, DatabaseConfig as ConfigDatabaseConfig, RedisConfig, ServiceConfig,
-    load_dotenv,
-};
-pub use database::{DatabaseConfig, DatabasePool, PoolStats};
-pub use error::MediaGatewayError;
 pub use health::{
     AggregatedHealth, ComponentHealth, HealthCheck, HealthChecker, HealthStatus, SimpleHealth,
 };
@@ -79,9 +77,9 @@ pub use resilience::{CircuitBreaker, CircuitBreakerConfig, CircuitBreakerError, 
 pub use retry::{retry_with_backoff, RetryPolicy};
 pub use shutdown::{ShutdownConfig, ShutdownCoordinator, ShutdownHandle};
 pub use telemetry::{
-    TracingConfig, TelemetryError, init_tracing, shutdown_tracing,
-    create_span, db_query_span, redis_op_span, external_api_span,
-    TracingMiddleware, extract_trace_context, inject_trace_context, TraceContext,
+    create_span, db_query_span, external_api_span, extract_trace_context, init_tracing,
+    inject_trace_context, redis_op_span, shutdown_tracing, TelemetryError, TraceContext,
+    TracingConfig, TracingMiddleware,
 };
 pub use types::*;
 

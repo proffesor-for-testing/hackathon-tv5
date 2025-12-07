@@ -44,7 +44,11 @@ pub struct Permission {
 }
 
 impl Permission {
-    pub fn new(resource: impl Into<String>, action: impl Into<String>, scope: impl Into<String>) -> Self {
+    pub fn new(
+        resource: impl Into<String>,
+        action: impl Into<String>,
+        scope: impl Into<String>,
+    ) -> Self {
         Self {
             resource: resource.into(),
             action: action.into(),
@@ -123,10 +127,7 @@ impl RbacManager {
         role_permissions.insert(Role::PremiumUser, premium_perms);
 
         // Admin - full access
-        role_permissions.insert(
-            Role::Admin,
-            vec![Permission::new("*", "*", "*")],
-        );
+        role_permissions.insert(Role::Admin, vec![Permission::new("*", "*", "*")]);
 
         // Service Account - API access
         role_permissions.insert(
@@ -171,10 +172,7 @@ impl RbacManager {
 
     /// Get all permissions for a role
     pub fn get_role_permissions(&self, role: &Role) -> Vec<Permission> {
-        self.role_permissions
-            .get(role)
-            .cloned()
-            .unwrap_or_default()
+        self.role_permissions.get(role).cloned().unwrap_or_default()
     }
 }
 
@@ -241,15 +239,9 @@ mod tests {
         let admin_roles = vec![Role::Admin];
 
         // Admin should have all permissions
-        assert!(rbac.has_permission(
-            &admin_roles,
-            &Permission::new("content", "delete", "all")
-        ));
+        assert!(rbac.has_permission(&admin_roles, &Permission::new("content", "delete", "all")));
 
-        assert!(rbac.has_permission(
-            &admin_roles,
-            &Permission::new("user", "suspend", "any")
-        ));
+        assert!(rbac.has_permission(&admin_roles, &Permission::new("user", "suspend", "any")));
     }
 
     #[test]
@@ -268,10 +260,7 @@ mod tests {
 
         // Should fail
         assert!(rbac
-            .require_permission(
-                &free_user_roles,
-                &Permission::new("user", "delete", "any")
-            )
+            .require_permission(&free_user_roles, &Permission::new("user", "delete", "any"))
             .is_err());
     }
 }

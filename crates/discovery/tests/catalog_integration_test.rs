@@ -8,8 +8,9 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 async fn setup_test_service() -> (CatalogService, PgPool) {
-    let database_url = std::env::var("TEST_DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+    let database_url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| {
+        "postgresql://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+    });
 
     let pool = PgPool::connect(&database_url)
         .await
@@ -20,7 +21,8 @@ async fn setup_test_service() -> (CatalogService, PgPool) {
         .await
         .expect("Failed to clean test database");
 
-    let qdrant_url = std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://localhost:6334".to_string());
+    let qdrant_url =
+        std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://localhost:6334".to_string());
     let qdrant_client = Arc::new(
         Qdrant::from_url(&qdrant_url)
             .build()
@@ -58,7 +60,11 @@ async fn test_create_content_success() {
     };
 
     let result = service.create_content(request.clone()).await;
-    assert!(result.is_ok(), "Failed to create content: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Failed to create content: {:?}",
+        result.err()
+    );
 
     let content = result.unwrap();
     assert_eq!(content.title, "Test Movie");
@@ -158,7 +164,11 @@ async fn test_update_content_success() {
     };
 
     let updated = service.update_content(created.id, update_request).await;
-    assert!(updated.is_ok(), "Failed to update content: {:?}", updated.err());
+    assert!(
+        updated.is_ok(),
+        "Failed to update content: {:?}",
+        updated.err()
+    );
 
     let content = updated.unwrap();
     assert_eq!(content.title, "Updated Title");
@@ -221,13 +231,20 @@ async fn test_update_availability_success() {
         available_until: None,
     };
 
-    let result = service.update_availability(created.id, availability_update).await;
-    assert!(result.is_ok(), "Failed to update availability: {:?}", result.err());
+    let result = service
+        .update_availability(created.id, availability_update)
+        .await;
+    assert!(
+        result.is_ok(),
+        "Failed to update availability: {:?}",
+        result.err()
+    );
 }
 
 #[tokio::test]
 async fn test_create_content_with_kafka() {
-    let kafka_brokers = std::env::var("KAFKA_BROKERS").unwrap_or_else(|_| "localhost:9092".to_string());
+    let kafka_brokers =
+        std::env::var("KAFKA_BROKERS").unwrap_or_else(|_| "localhost:9092".to_string());
 
     let (mut service, _pool) = setup_test_service().await;
 

@@ -83,8 +83,8 @@ impl RedisCache {
     pub async fn new(config: Arc<CacheConfig>) -> Result<Self> {
         info!("Initializing Redis cache connection pool");
 
-        let client = Client::open(config.redis_url.as_str())
-            .context("Failed to create Redis client")?;
+        let client =
+            Client::open(config.redis_url.as_str()).context("Failed to create Redis client")?;
 
         let manager = ConnectionManager::new(client)
             .await
@@ -156,16 +156,12 @@ impl RedisCache {
     pub async fn get<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>, CacheError> {
         let mut conn = self.manager.clone();
 
-        let value: Option<String> = conn
-            .get(key)
-            .await
-            .map_err(CacheError::Connection)?;
+        let value: Option<String> = conn.get(key).await.map_err(CacheError::Connection)?;
 
         match value {
             Some(json) => {
                 debug!(key = %key, "Cache hit");
-                let data = serde_json::from_str(&json)
-                    .map_err(CacheError::Serialization)?;
+                let data = serde_json::from_str(&json).map_err(CacheError::Serialization)?;
                 Ok(Some(data))
             }
             None => {
@@ -194,8 +190,7 @@ impl RedisCache {
         value: &T,
         ttl_sec: u64,
     ) -> Result<(), CacheError> {
-        let json = serde_json::to_string(value)
-            .map_err(CacheError::Serialization)?;
+        let json = serde_json::to_string(value).map_err(CacheError::Serialization)?;
 
         let mut conn = self.manager.clone();
 
@@ -218,10 +213,7 @@ impl RedisCache {
     pub async fn delete(&self, key: &str) -> Result<u64, CacheError> {
         let mut conn = self.manager.clone();
 
-        let count: u64 = conn
-            .del(key)
-            .await
-            .map_err(CacheError::Connection)?;
+        let count: u64 = conn.del(key).await.map_err(CacheError::Connection)?;
 
         debug!(key = %key, deleted = %count, "Cache delete");
         Ok(count)
@@ -239,10 +231,7 @@ impl RedisCache {
         let mut conn = self.manager.clone();
 
         // Get keys matching pattern
-        let keys: Vec<String> = conn
-            .keys(pattern)
-            .await
-            .map_err(CacheError::Connection)?;
+        let keys: Vec<String> = conn.keys(pattern).await.map_err(CacheError::Connection)?;
 
         if keys.is_empty() {
             debug!(pattern = %pattern, "No keys found matching pattern");
@@ -250,10 +239,7 @@ impl RedisCache {
         }
 
         // Delete all matching keys
-        let count: u64 = conn
-            .del(&keys)
-            .await
-            .map_err(CacheError::Connection)?;
+        let count: u64 = conn.del(&keys).await.map_err(CacheError::Connection)?;
 
         info!(pattern = %pattern, deleted = %count, "Deleted keys by pattern");
         Ok(count)
@@ -290,11 +276,7 @@ impl RedisCache {
     /// # }
     /// ```
     #[instrument(skip(self, query, results), fields(cache_type = "search"))]
-    pub async fn cache_search_results<Q, R>(
-        &self,
-        query: &Q,
-        results: &R,
-    ) -> Result<(), CacheError>
+    pub async fn cache_search_results<Q, R>(&self, query: &Q, results: &R) -> Result<(), CacheError>
     where
         Q: Serialize,
         R: Serialize,
@@ -417,8 +399,9 @@ impl RedisCache {
     {
         let key = Self::generate_key(PREFIX_EMBEDDING, text)?;
         let ttl = self.config.embedding_ttl_sec;
+        let embedding_vec = embedding.to_vec();
 
-        self.set(&key, embedding, ttl).await?;
+        self.set(&key, &embedding_vec, ttl).await?;
 
         debug!(
             key = %key,
@@ -476,7 +459,8 @@ impl RedisCache {
     #[instrument(skip(self))]
     pub async fn clear_embedding_cache(&self) -> Result<u64, CacheError> {
         info!("Clearing all embedding caches");
-        self.delete_pattern(&format!("{}:*", PREFIX_EMBEDDING)).await
+        self.delete_pattern(&format!("{}:*", PREFIX_EMBEDDING))
+            .await
     }
 
     /// Clear all caches
@@ -540,10 +524,7 @@ impl RedisCache {
     pub async fn health_check(&self) -> Result<bool, CacheError> {
         let mut conn = self.manager.clone();
 
-        match redis::cmd("PING")
-            .query_async::<_, String>(&mut conn)
-            .await
-        {
+        match redis::cmd("PING").query_async::<_, String>(&mut conn).await {
             Ok(response) => {
                 let healthy = response == "PONG";
                 debug!(healthy = %healthy, "Cache health check");

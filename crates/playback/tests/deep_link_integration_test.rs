@@ -1,7 +1,7 @@
 //! Integration tests for deep linking functionality
 
 use media_gateway_playback::deep_link::{
-    DeepLinkGenerator, DeepLinkRequest, Platform, ContentType, DeviceCapabilities,
+    ContentType, DeepLinkGenerator, DeepLinkRequest, DeviceCapabilities, Platform,
 };
 
 #[test]
@@ -11,7 +11,11 @@ fn test_all_platforms_generate_valid_deep_links() {
     // Test each platform with valid content
     let platforms = vec![
         (Platform::Netflix, "80123456", ContentType::Video),
-        (Platform::Spotify, "3n3Ppam7vgaVa1iaRUc9Lp", ContentType::Track),
+        (
+            Platform::Spotify,
+            "3n3Ppam7vgaVa1iaRUc9Lp",
+            ContentType::Track,
+        ),
         (Platform::AppleMusic, "1234567890", ContentType::Track),
         (Platform::Hulu, "abc123", ContentType::Video),
         (Platform::DisneyPlus, "xyz789", ContentType::Video),
@@ -29,7 +33,11 @@ fn test_all_platforms_generate_valid_deep_links() {
         };
 
         let result = generator.generate(&request);
-        assert!(result.is_ok(), "Failed to generate deep link for {:?}", platform);
+        assert!(
+            result.is_ok(),
+            "Failed to generate deep link for {:?}",
+            platform
+        );
 
         let deep_link = result.unwrap();
         assert!(!deep_link.deep_link_url.is_empty());
@@ -54,9 +62,15 @@ fn test_netflix_complete_flow() {
 
     let result = generator.generate(&request).unwrap();
     assert_eq!(result.deep_link_url, "netflix://title/80123456");
-    assert_eq!(result.web_fallback_url, "https://www.netflix.com/watch/80123456");
+    assert_eq!(
+        result.web_fallback_url,
+        "https://www.netflix.com/watch/80123456"
+    );
     assert!(result.universal_link.is_some());
-    assert_eq!(result.universal_link.unwrap(), "https://www.netflix.com/watch/80123456");
+    assert_eq!(
+        result.universal_link.unwrap(),
+        "https://www.netflix.com/watch/80123456"
+    );
     assert!(result.is_supported); // Assumes supported when no capabilities provided
 
     // Test with iOS device that has Netflix installed
@@ -105,8 +119,14 @@ fn test_spotify_music_types() {
     };
 
     let track_result = generator.generate(&track_request).unwrap();
-    assert_eq!(track_result.deep_link_url, "spotify://track/3n3Ppam7vgaVa1iaRUc9Lp");
-    assert_eq!(track_result.web_fallback_url, "https://open.spotify.com/track/3n3Ppam7vgaVa1iaRUc9Lp");
+    assert_eq!(
+        track_result.deep_link_url,
+        "spotify://track/3n3Ppam7vgaVa1iaRUc9Lp"
+    );
+    assert_eq!(
+        track_result.web_fallback_url,
+        "https://open.spotify.com/track/3n3Ppam7vgaVa1iaRUc9Lp"
+    );
 
     // Test album deep link
     let album_request = DeepLinkRequest {
@@ -118,8 +138,14 @@ fn test_spotify_music_types() {
     };
 
     let album_result = generator.generate(&album_request).unwrap();
-    assert_eq!(album_result.deep_link_url, "spotify://album/6DEjYFkNZh67HP7R9PSZvv");
-    assert_eq!(album_result.web_fallback_url, "https://open.spotify.com/album/6DEjYFkNZh67HP7R9PSZvv");
+    assert_eq!(
+        album_result.deep_link_url,
+        "spotify://album/6DEjYFkNZh67HP7R9PSZvv"
+    );
+    assert_eq!(
+        album_result.web_fallback_url,
+        "https://open.spotify.com/album/6DEjYFkNZh67HP7R9PSZvv"
+    );
 
     // Test playlist deep link
     let playlist_request = DeepLinkRequest {
@@ -131,8 +157,14 @@ fn test_spotify_music_types() {
     };
 
     let playlist_result = generator.generate(&playlist_request).unwrap();
-    assert_eq!(playlist_result.deep_link_url, "spotify://playlist/37i9dQZF1DXcBWIGoYBM5M");
-    assert_eq!(playlist_result.web_fallback_url, "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M");
+    assert_eq!(
+        playlist_result.deep_link_url,
+        "spotify://playlist/37i9dQZF1DXcBWIGoYBM5M"
+    );
+    assert_eq!(
+        playlist_result.web_fallback_url,
+        "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
+    );
 }
 
 #[test]
@@ -148,8 +180,14 @@ fn test_apple_music_deep_links() {
     };
 
     let result = generator.generate(&request).unwrap();
-    assert_eq!(result.deep_link_url, "music://itunes.apple.com/us/album/1440857781");
-    assert_eq!(result.web_fallback_url, "https://music.apple.com/us/album/1440857781");
+    assert_eq!(
+        result.deep_link_url,
+        "music://itunes.apple.com/us/album/1440857781"
+    );
+    assert_eq!(
+        result.web_fallback_url,
+        "https://music.apple.com/us/album/1440857781"
+    );
     assert!(result.universal_link.is_some());
 }
 
@@ -167,7 +205,10 @@ fn test_hulu_deep_links() {
 
     let result = generator.generate(&request).unwrap();
     assert_eq!(result.deep_link_url, "hulu://watch/series-123?t=600");
-    assert_eq!(result.web_fallback_url, "https://www.hulu.com/watch/series-123?t=600");
+    assert_eq!(
+        result.web_fallback_url,
+        "https://www.hulu.com/watch/series-123?t=600"
+    );
 }
 
 #[test]
@@ -183,8 +224,14 @@ fn test_disney_plus_deep_links() {
     };
 
     let result = generator.generate(&request).unwrap();
-    assert_eq!(result.deep_link_url, "disneyplus://content/mandalorian-s1e1");
-    assert_eq!(result.web_fallback_url, "https://www.disneyplus.com/video/mandalorian-s1e1");
+    assert_eq!(
+        result.deep_link_url,
+        "disneyplus://content/mandalorian-s1e1"
+    );
+    assert_eq!(
+        result.web_fallback_url,
+        "https://www.disneyplus.com/video/mandalorian-s1e1"
+    );
 }
 
 #[test]
@@ -201,7 +248,10 @@ fn test_hbo_max_deep_links() {
 
     let result = generator.generate(&request).unwrap();
     assert_eq!(result.deep_link_url, "hbomax://content/got-finale?t=1800");
-    assert_eq!(result.web_fallback_url, "https://www.max.com/video/got-finale?t=1800");
+    assert_eq!(
+        result.web_fallback_url,
+        "https://www.max.com/video/got-finale?t=1800"
+    );
 }
 
 #[test]
@@ -218,7 +268,10 @@ fn test_prime_video_deep_links() {
 
     let result = generator.generate(&request).unwrap();
     assert_eq!(result.deep_link_url, "primevideo://detail?id=B08XYZABC");
-    assert_eq!(result.web_fallback_url, "https://www.amazon.com/gp/video/detail/B08XYZABC");
+    assert_eq!(
+        result.web_fallback_url,
+        "https://www.amazon.com/gp/video/detail/B08XYZABC"
+    );
 }
 
 #[test]
@@ -283,11 +336,7 @@ fn test_generate_all_platforms() {
     let generator = DeepLinkGenerator::new();
 
     // Generate deep links for all platforms
-    let all_links = generator.generate_all(
-        "test-content-123",
-        ContentType::Video,
-        None,
-    );
+    let all_links = generator.generate_all("test-content-123", ContentType::Video, None);
 
     // Verify all 7 platforms are included
     assert_eq!(all_links.len(), 7);
@@ -303,9 +352,21 @@ fn test_generate_all_platforms() {
 
     // Verify each has valid URLs
     for (platform, link) in all_links.iter() {
-        assert!(!link.deep_link_url.is_empty(), "Empty deep link for {:?}", platform);
-        assert!(!link.web_fallback_url.is_empty(), "Empty fallback for {:?}", platform);
-        assert!(link.deep_link_url.contains("test-content-123"), "Missing content ID in {:?}", platform);
+        assert!(
+            !link.deep_link_url.is_empty(),
+            "Empty deep link for {:?}",
+            platform
+        );
+        assert!(
+            !link.web_fallback_url.is_empty(),
+            "Empty fallback for {:?}",
+            platform
+        );
+        assert!(
+            link.deep_link_url.contains("test-content-123"),
+            "Missing content ID in {:?}",
+            platform
+        );
     }
 }
 
@@ -316,11 +377,7 @@ fn test_generate_all_with_device_capabilities() {
     let mut ios_caps = DeviceCapabilities::new("ios".to_string());
     ios_caps.installed_apps = vec!["Netflix".to_string(), "Hulu".to_string()];
 
-    let all_links = generator.generate_all(
-        "test-123",
-        ContentType::Video,
-        Some(ios_caps),
-    );
+    let all_links = generator.generate_all("test-123", ContentType::Video, Some(ios_caps));
 
     // Netflix should be supported
     let netflix_link = all_links.get(&Platform::Netflix).unwrap();

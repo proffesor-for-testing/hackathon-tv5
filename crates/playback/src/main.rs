@@ -3,21 +3,22 @@
 //! Port: 8086
 //! SLA: 99.5% availability
 
-mod session;
-mod events;
-mod watch_history;
-mod progress;
-mod continue_watching;
 mod cleanup;
+mod continue_watching;
+mod events;
+mod progress;
+mod session;
+mod watch_history;
 
-use actix_web::{web, App, HttpServer, HttpResponse, Responder};
-use session::{
-    SessionManager, PlaybackSession, CreateSessionRequest,
-    UpdatePositionRequest, SessionError, CreateSessionResponse,
-};
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use continue_watching::{
-    ContinueWatchingService, ContinueWatchingError, ProgressUpdateRequest,
-    MockContentMetadataProvider, HttpContentMetadataProvider, SyncServiceClient,
+    ContinueWatchingError, ContinueWatchingService, HttpContentMetadataProvider,
+    MockContentMetadataProvider, ProgressUpdateRequest, SyncServiceClient,
+};
+use serde::Deserialize;
+use session::{
+    CreateSessionRequest, CreateSessionResponse, PlaybackSession, SessionError, SessionManager,
+    UpdatePositionRequest,
 };
 use std::sync::Arc;
 use tracing::info;
@@ -38,12 +39,12 @@ async fn main() -> std::io::Result<()> {
 
     info!("Starting Playback Service on port 8086");
 
-    let session_manager = SessionManager::from_env()
-        .expect("Failed to connect to Redis");
+    let session_manager = SessionManager::from_env().expect("Failed to connect to Redis");
 
     // Initialize continue watching service
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/media_gateway".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost:5432/media_gateway".to_string()
+    });
 
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(10)
@@ -54,8 +55,8 @@ async fn main() -> std::io::Result<()> {
     let catalog_service_url = std::env::var("CATALOG_SERVICE_URL")
         .unwrap_or_else(|_| "http://localhost:8084".to_string());
 
-    let sync_service_url = std::env::var("SYNC_SERVICE_URL")
-        .unwrap_or_else(|_| "http://localhost:8083".to_string());
+    let sync_service_url =
+        std::env::var("SYNC_SERVICE_URL").unwrap_or_else(|_| "http://localhost:8083".to_string());
 
     let metadata_provider: Arc<dyn continue_watching::ContentMetadataProvider> =
         Arc::new(HttpContentMetadataProvider::new(catalog_service_url));
@@ -63,8 +64,7 @@ async fn main() -> std::io::Result<()> {
     let sync_client = Arc::new(SyncServiceClient::new(sync_service_url));
 
     let continue_watching_service = Arc::new(
-        ContinueWatchingService::new(pool, metadata_provider)
-            .with_sync_service(sync_client)
+        ContinueWatchingService::new(pool, metadata_provider).with_sync_service(sync_client),
     );
 
     // Start background cleanup task
@@ -89,9 +89,15 @@ async fn main() -> std::io::Result<()> {
                     .route("/sessions/{id}", web::get().to(get_session))
                     .route("/sessions/{id}", web::delete().to(delete_session))
                     .route("/sessions/{id}/position", web::patch().to(update_position))
-                    .route("/users/{user_id}/sessions", web::get().to(get_user_sessions))
-                    .route("/playback/continue-watching", web::get().to(get_continue_watching))
-                    .route("/playback/progress", web::post().to(update_progress))
+                    .route(
+                        "/users/{user_id}/sessions",
+                        web::get().to(get_user_sessions),
+                    )
+                    .route(
+                        "/playback/continue-watching",
+                        web::get().to(get_continue_watching),
+                    )
+                    .route("/playback/progress", web::post().to(update_progress)),
             )
     })
     .bind(("0.0.0.0", 8086))?
@@ -136,7 +142,10 @@ async fn get_session(
     path: web::Path<Uuid>,
 ) -> Result<HttpResponse, SessionError> {
     let session_id = path.into_inner();
-    let session = state.session_manager.get(session_id).await?
+    let session = state
+        .session_manager
+        .get(session_id)
+        .await?
         .ok_or(SessionError::NotFound)?;
     Ok(HttpResponse::Ok().json(session))
 }
@@ -156,7 +165,8 @@ async fn update_position(
     request: web::Json<UpdatePositionRequest>,
 ) -> Result<HttpResponse, SessionError> {
     let session_id = path.into_inner();
-    let session = state.session_manager
+    let session = state
+        .session_manager
         .update_position(session_id, request.into_inner())
         .await?;
     Ok(HttpResponse::Ok().json(session))

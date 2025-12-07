@@ -9,12 +9,11 @@
 
 use chrono::{Duration, Utc};
 use media_gateway_ingestion::{
-    EmbeddingGenerator, IngestionPipeline, IngestionSchedule, PostgresContentRepository,
-    QdrantClient, ContentRepository, StaleContent,
-    events::{KafkaConfig, MockEventProducer, ContentEvent},
-    normalizer::{CanonicalContent, ContentType, AvailabilityInfo, ImageSet},
+    events::{ContentEvent, KafkaConfig, MockEventProducer},
+    normalizer::{AvailabilityInfo, CanonicalContent, ContentType, ImageSet},
     rate_limit::RateLimitManager,
-    VECTOR_DIM,
+    ContentRepository, EmbeddingGenerator, IngestionPipeline, IngestionSchedule,
+    PostgresContentRepository, QdrantClient, StaleContent, VECTOR_DIM,
 };
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -22,8 +21,9 @@ use uuid::Uuid;
 
 /// Helper to create test database connection
 async fn create_test_pool() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+    });
 
     PgPool::connect(&database_url)
         .await
@@ -55,7 +55,7 @@ fn create_test_content(platform: &str, title: &str) -> CanonicalContent {
         images: ImageSet::default(),
         rating: Some("PG-13".to_string()),
         user_rating: Some(7.5),
-        embedding: None, // Will be generated
+        embedding: None,                            // Will be generated
         updated_at: Utc::now() - Duration::days(8), // Stale (older than 7 days)
     }
 }
@@ -68,7 +68,10 @@ async fn test_find_stale_embeddings() {
 
     // Insert test content with old timestamp
     let test_content = create_test_content("netflix", "Test Movie - Stale");
-    let content_id = repository.upsert(&test_content).await.expect("Failed to insert test content");
+    let content_id = repository
+        .upsert(&test_content)
+        .await
+        .expect("Failed to insert test content");
 
     // Query for stale embeddings (older than 7 days)
     let stale_threshold = Utc::now() - Duration::days(7);
@@ -81,7 +84,10 @@ async fn test_find_stale_embeddings() {
     assert!(!stale_content.is_empty(), "Should find stale content");
 
     let found = stale_content.iter().find(|s| s.content_id == content_id);
-    assert!(found.is_some(), "Should find our test content in stale results");
+    assert!(
+        found.is_some(),
+        "Should find our test content in stale results"
+    );
 
     // Cleanup
     sqlx::query("DELETE FROM content WHERE id = $1")
@@ -99,7 +105,10 @@ async fn test_update_embedding() {
 
     // Insert test content
     let test_content = create_test_content("netflix", "Test Movie - Embedding");
-    let content_id = repository.upsert(&test_content).await.expect("Failed to insert test content");
+    let content_id = repository
+        .upsert(&test_content)
+        .await
+        .expect("Failed to insert test content");
 
     // Generate test embedding
     let test_embedding: Vec<f32> = (0..768).map(|i| (i as f32) / 768.0).collect();
@@ -111,19 +120,18 @@ async fn test_update_embedding() {
         .expect("Failed to update embedding");
 
     // Verify embedding was stored
-    let stored_embedding = sqlx::query_scalar::<_, serde_json::Value>(
-        "SELECT embedding FROM content WHERE id = $1"
-    )
-    .bind(content_id)
-    .fetch_one(&pool)
-    .await
-    .expect("Failed to fetch embedding");
+    let stored_embedding =
+        sqlx::query_scalar::<_, serde_json::Value>("SELECT embedding FROM content WHERE id = $1")
+            .bind(content_id)
+            .fetch_one(&pool)
+            .await
+            .expect("Failed to fetch embedding");
 
     assert!(!stored_embedding.is_null(), "Embedding should be stored");
 
     // Verify last_updated was updated
     let last_updated = sqlx::query_scalar::<_, chrono::DateTime<Utc>>(
-        "SELECT last_updated FROM content WHERE id = $1"
+        "SELECT last_updated FROM content WHERE id = $1",
     )
     .bind(content_id)
     .fetch_one(&pool)
@@ -132,7 +140,10 @@ async fn test_update_embedding() {
 
     let now = Utc::now();
     let diff = (now - last_updated).num_seconds();
-    assert!(diff < 10, "last_updated should be recent (within 10 seconds)");
+    assert!(
+        diff < 10,
+        "last_updated should be recent (within 10 seconds)"
+    );
 
     // Cleanup
     sqlx::query("DELETE FROM content WHERE id = $1")
@@ -150,7 +161,10 @@ async fn test_update_quality_score() {
 
     // Insert test content
     let test_content = create_test_content("netflix", "Test Movie - Quality");
-    let content_id = repository.upsert(&test_content).await.expect("Failed to insert test content");
+    let content_id = repository
+        .upsert(&test_content)
+        .await
+        .expect("Failed to insert test content");
 
     // Update quality score
     let quality_score = 0.85;
@@ -160,15 +174,17 @@ async fn test_update_quality_score() {
         .expect("Failed to update quality score");
 
     // Verify quality score was stored
-    let stored_score = sqlx::query_scalar::<_, f64>(
-        "SELECT quality_score FROM content WHERE id = $1"
-    )
-    .bind(content_id)
-    .fetch_one(&pool)
-    .await
-    .expect("Failed to fetch quality score");
+    let stored_score =
+        sqlx::query_scalar::<_, f64>("SELECT quality_score FROM content WHERE id = $1")
+            .bind(content_id)
+            .fetch_one(&pool)
+            .await
+            .expect("Failed to fetch quality score");
 
-    assert!((stored_score - quality_score).abs() < 0.001, "Quality score should match");
+    assert!(
+        (stored_score - quality_score).abs() < 0.001,
+        "Quality score should match"
+    );
 
     // Cleanup
     sqlx::query("DELETE FROM content WHERE id = $1")
@@ -187,14 +203,17 @@ async fn test_metadata_enrichment_full_flow() {
     // Insert test content with stale timestamp
     let mut test_content = create_test_content("netflix", "Test Movie - Full Flow");
     test_content.updated_at = Utc::now() - Duration::days(10); // Very stale
-    let content_id = repository.upsert(&test_content).await.expect("Failed to insert test content");
+    let content_id = repository
+        .upsert(&test_content)
+        .await
+        .expect("Failed to insert test content");
 
     // Create embedding generator
     let embedding_generator = EmbeddingGenerator::new();
 
     // Create Qdrant client
-    let qdrant_url = std::env::var("QDRANT_URL")
-        .unwrap_or_else(|_| "http://localhost:6334".to_string());
+    let qdrant_url =
+        std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://localhost:6334".to_string());
     let qdrant_client = QdrantClient::new(&qdrant_url, "test_enrichment")
         .await
         .expect("Failed to create Qdrant client");
@@ -297,7 +316,10 @@ async fn test_metadata_enrichment_full_flow() {
         .expect("Failed to find stale embeddings");
 
     let still_stale = stale_after.iter().find(|s| s.content_id == content_id);
-    assert!(still_stale.is_none(), "Content should no longer be stale after enrichment");
+    assert!(
+        still_stale.is_none(),
+        "Content should no longer be stale after enrichment"
+    );
 
     // Cleanup
     sqlx::query("DELETE FROM content WHERE id = $1")
@@ -318,7 +340,10 @@ async fn test_batch_enrichment() {
     for i in 0..5 {
         let mut test_content = create_test_content("netflix", &format!("Test Movie {}", i));
         test_content.updated_at = Utc::now() - Duration::days(8); // Stale
-        let content_id = repository.upsert(&test_content).await.expect("Failed to insert test content");
+        let content_id = repository
+            .upsert(&test_content)
+            .await
+            .expect("Failed to insert test content");
         content_ids.push(content_id);
     }
 
@@ -367,24 +392,30 @@ async fn test_batch_enrichment() {
     // Verify all items were updated
     for content_id in &content_ids {
         let embedding = sqlx::query_scalar::<_, serde_json::Value>(
-            "SELECT embedding FROM content WHERE id = $1"
+            "SELECT embedding FROM content WHERE id = $1",
         )
         .bind(content_id)
         .fetch_one(&pool)
         .await
         .expect("Failed to fetch embedding");
 
-        assert!(!embedding.is_null(), "Embedding should be stored for {}", content_id);
+        assert!(
+            !embedding.is_null(),
+            "Embedding should be stored for {}",
+            content_id
+        );
 
-        let quality_score = sqlx::query_scalar::<_, f64>(
-            "SELECT quality_score FROM content WHERE id = $1"
-        )
-        .bind(content_id)
-        .fetch_one(&pool)
-        .await
-        .expect("Failed to fetch quality score");
+        let quality_score =
+            sqlx::query_scalar::<_, f64>("SELECT quality_score FROM content WHERE id = $1")
+                .bind(content_id)
+                .fetch_one(&pool)
+                .await
+                .expect("Failed to fetch quality score");
 
-        assert!((quality_score - 0.75).abs() < 0.001, "Quality score should match");
+        assert!(
+            (quality_score - 0.75).abs() < 0.001,
+            "Quality score should match"
+        );
     }
 
     // Cleanup
@@ -462,31 +493,59 @@ async fn test_quality_score_computation() {
     };
 
     // Insert and verify quality scores would be different
-    let minimal_id = repository.upsert(&minimal).await.expect("Failed to insert minimal content");
-    let complete_id = repository.upsert(&complete).await.expect("Failed to insert complete content");
+    let minimal_id = repository
+        .upsert(&minimal)
+        .await
+        .expect("Failed to insert minimal content");
+    let complete_id = repository
+        .upsert(&complete)
+        .await
+        .expect("Failed to insert complete content");
 
     // Note: Actual quality score computation happens in enrich_metadata
     // Here we just verify the update_quality_score function works
 
-    repository.update_quality_score(minimal_id, 0.1).await.expect("Failed to update minimal score");
-    repository.update_quality_score(complete_id, 1.0).await.expect("Failed to update complete score");
-
-    let minimal_score = sqlx::query_scalar::<_, f64>("SELECT quality_score FROM content WHERE id = $1")
-        .bind(minimal_id)
-        .fetch_one(&pool)
+    repository
+        .update_quality_score(minimal_id, 0.1)
         .await
-        .expect("Failed to fetch minimal score");
-
-    let complete_score = sqlx::query_scalar::<_, f64>("SELECT quality_score FROM content WHERE id = $1")
-        .bind(complete_id)
-        .fetch_one(&pool)
+        .expect("Failed to update minimal score");
+    repository
+        .update_quality_score(complete_id, 1.0)
         .await
-        .expect("Failed to fetch complete score");
+        .expect("Failed to update complete score");
 
-    assert!((minimal_score - 0.1).abs() < 0.001, "Minimal content should have low quality score");
-    assert!((complete_score - 1.0).abs() < 0.001, "Complete content should have high quality score");
+    let minimal_score =
+        sqlx::query_scalar::<_, f64>("SELECT quality_score FROM content WHERE id = $1")
+            .bind(minimal_id)
+            .fetch_one(&pool)
+            .await
+            .expect("Failed to fetch minimal score");
+
+    let complete_score =
+        sqlx::query_scalar::<_, f64>("SELECT quality_score FROM content WHERE id = $1")
+            .bind(complete_id)
+            .fetch_one(&pool)
+            .await
+            .expect("Failed to fetch complete score");
+
+    assert!(
+        (minimal_score - 0.1).abs() < 0.001,
+        "Minimal content should have low quality score"
+    );
+    assert!(
+        (complete_score - 1.0).abs() < 0.001,
+        "Complete content should have high quality score"
+    );
 
     // Cleanup
-    sqlx::query("DELETE FROM content WHERE id = $1").bind(minimal_id).execute(&pool).await.ok();
-    sqlx::query("DELETE FROM content WHERE id = $1").bind(complete_id).execute(&pool).await.ok();
+    sqlx::query("DELETE FROM content WHERE id = $1")
+        .bind(minimal_id)
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("DELETE FROM content WHERE id = $1")
+        .bind(complete_id)
+        .execute(&pool)
+        .await
+        .ok();
 }

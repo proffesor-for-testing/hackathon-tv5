@@ -119,132 +119,98 @@ impl From<anyhow::Error> for AuthError {
 impl ResponseError for AuthError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            AuthError::InvalidCredentials => {
-                HttpResponse::Unauthorized().json(serde_json::json!({
-                    "error": "invalid_credentials",
-                    "error_description": "Invalid username or password"
-                }))
-            }
-            AuthError::InvalidToken(_) | AuthError::TokenExpired => {
-                HttpResponse::Unauthorized().json(serde_json::json!({
+            AuthError::InvalidCredentials => HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "invalid_credentials",
+                "error_description": "Invalid username or password"
+            })),
+            AuthError::InvalidToken(_) | AuthError::TokenExpired => HttpResponse::Unauthorized()
+                .json(serde_json::json!({
                     "error": "invalid_token",
                     "error_description": self.to_string()
-                }))
-            }
-            AuthError::InvalidPkceVerifier => {
-                HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "invalid_grant",
-                    "error_description": "Invalid code verifier"
-                }))
-            }
-            AuthError::InvalidAuthCode | AuthError::AuthCodeReused => {
-                HttpResponse::BadRequest().json(serde_json::json!({
+                })),
+            AuthError::InvalidPkceVerifier => HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "invalid_grant",
+                "error_description": "Invalid code verifier"
+            })),
+            AuthError::InvalidAuthCode | AuthError::AuthCodeReused => HttpResponse::BadRequest()
+                .json(serde_json::json!({
                     "error": "invalid_grant",
                     "error_description": self.to_string()
-                }))
-            }
+                })),
             AuthError::InsufficientPermissions => {
                 HttpResponse::Forbidden().json(serde_json::json!({
                     "error": "insufficient_scope",
                     "error_description": "Insufficient permissions"
                 }))
             }
-            AuthError::InvalidScope(scope) => {
-                HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "invalid_scope",
-                    "error_description": format!("Invalid scope: {}", scope)
-                }))
-            }
-            AuthError::InvalidRedirectUri => {
-                HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "invalid_request",
-                    "error_description": "Invalid redirect URI"
-                }))
-            }
-            AuthError::InvalidClient => {
-                HttpResponse::Unauthorized().json(serde_json::json!({
-                    "error": "invalid_client",
-                    "error_description": "Invalid client ID"
-                }))
-            }
+            AuthError::InvalidScope(scope) => HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "invalid_scope",
+                "error_description": format!("Invalid scope: {}", scope)
+            })),
+            AuthError::InvalidRedirectUri => HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "invalid_request",
+                "error_description": "Invalid redirect URI"
+            })),
+            AuthError::InvalidClient => HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "invalid_client",
+                "error_description": "Invalid client ID"
+            })),
             AuthError::RateLimitExceeded => {
                 HttpResponse::TooManyRequests().json(serde_json::json!({
                     "error": "rate_limit_exceeded",
                     "error_description": "Too many requests"
                 }))
             }
-            AuthError::AuthorizationPending => {
-                HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "authorization_pending",
-                    "error_description": "User has not yet completed authorization"
-                }))
-            }
-            AuthError::AccessDenied => {
-                HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "access_denied",
-                    "error_description": "User denied authorization"
-                }))
-            }
-            AuthError::DeviceCodeExpired => {
-                HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "expired_token",
-                    "error_description": "Device code expired"
-                }))
-            }
-            AuthError::InvalidUserCode => {
-                HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "invalid_grant",
-                    "error_description": "Invalid user code"
-                }))
-            }
+            AuthError::AuthorizationPending => HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "authorization_pending",
+                "error_description": "User has not yet completed authorization"
+            })),
+            AuthError::AccessDenied => HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "access_denied",
+                "error_description": "User denied authorization"
+            })),
+            AuthError::DeviceCodeExpired => HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "expired_token",
+                "error_description": "Device code expired"
+            })),
+            AuthError::InvalidUserCode => HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "invalid_grant",
+                "error_description": "Invalid user code"
+            })),
             AuthError::DeviceAlreadyApproved => {
                 HttpResponse::BadRequest().json(serde_json::json!({
                     "error": "invalid_grant",
                     "error_description": "Device already approved"
                 }))
             }
-            AuthError::Unauthorized => {
-                HttpResponse::Unauthorized().json(serde_json::json!({
-                    "error": "unauthorized",
-                    "error_description": "Authentication required"
-                }))
-            }
-            AuthError::MfaNotEnrolled => {
-                HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "mfa_not_enrolled",
-                    "error_description": "MFA is not enrolled for this user"
-                }))
-            }
-            AuthError::MfaAlreadyEnrolled => {
-                HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "mfa_already_enrolled",
-                    "error_description": "MFA is already enrolled for this user"
-                }))
-            }
-            AuthError::InvalidMfaCode => {
-                HttpResponse::Unauthorized().json(serde_json::json!({
-                    "error": "invalid_mfa_code",
-                    "error_description": "Invalid MFA code"
-                }))
-            }
-            AuthError::InvalidBackupCode => {
-                HttpResponse::Unauthorized().json(serde_json::json!({
-                    "error": "invalid_backup_code",
-                    "error_description": "Invalid backup code"
-                }))
-            }
-            AuthError::EmailNotVerified => {
-                HttpResponse::Forbidden().json(serde_json::json!({
-                    "error": "email_not_verified",
-                    "error_description": "Please verify your email address before logging in"
-                }))
-            }
-            AuthError::ValidationError(msg) => {
-                HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "validation_error",
-                    "error_description": msg
-                }))
-            }
+            AuthError::Unauthorized => HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "unauthorized",
+                "error_description": "Authentication required"
+            })),
+            AuthError::MfaNotEnrolled => HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "mfa_not_enrolled",
+                "error_description": "MFA is not enrolled for this user"
+            })),
+            AuthError::MfaAlreadyEnrolled => HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "mfa_already_enrolled",
+                "error_description": "MFA is already enrolled for this user"
+            })),
+            AuthError::InvalidMfaCode => HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "invalid_mfa_code",
+                "error_description": "Invalid MFA code"
+            })),
+            AuthError::InvalidBackupCode => HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "invalid_backup_code",
+                "error_description": "Invalid backup code"
+            })),
+            AuthError::EmailNotVerified => HttpResponse::Forbidden().json(serde_json::json!({
+                "error": "email_not_verified",
+                "error_description": "Please verify your email address before logging in"
+            })),
+            AuthError::ValidationError(msg) => HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "validation_error",
+                "error_description": msg
+            })),
             AuthError::DatabaseError(msg) => {
                 HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "database_error",
@@ -257,18 +223,14 @@ impl ResponseError for AuthError {
                     "error_description": "Internal server error"
                 }))
             }
-            AuthError::UserNotFound => {
-                HttpResponse::NotFound().json(serde_json::json!({
-                    "error": "user_not_found",
-                    "error_description": "User not found"
-                }))
-            }
-            _ => {
-                HttpResponse::InternalServerError().json(serde_json::json!({
-                    "error": "server_error",
-                    "error_description": "Internal server error"
-                }))
-            }
+            AuthError::UserNotFound => HttpResponse::NotFound().json(serde_json::json!({
+                "error": "user_not_found",
+                "error_description": "User not found"
+            })),
+            _ => HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "server_error",
+                "error_description": "Internal server error"
+            })),
         }
     }
 }

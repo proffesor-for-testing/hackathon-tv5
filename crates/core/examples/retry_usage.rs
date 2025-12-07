@@ -9,7 +9,9 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 /// Simulates a flaky network operation that fails intermittently
-async fn flaky_network_request(attempt_counter: Arc<AtomicU32>) -> Result<String, MediaGatewayError> {
+async fn flaky_network_request(
+    attempt_counter: Arc<AtomicU32>,
+) -> Result<String, MediaGatewayError> {
     let attempts = attempt_counter.fetch_add(1, Ordering::SeqCst);
 
     if attempts < 2 {
@@ -112,7 +114,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(msg) => println!("   ✓ {}", msg),
         Err(e) => println!("   ✗ Failed immediately: {}", e),
     }
-    println!("   Total attempts: {} (should be 1)\n", counter.load(Ordering::SeqCst));
+    println!(
+        "   Total attempts: {} (should be 1)\n",
+        counter.load(Ordering::SeqCst)
+    );
 
     // Example 4: Custom retry policy
     println!("4. Custom retry policy (10 retries, 50ms base delay):");
@@ -120,10 +125,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let counter_clone = counter.clone();
 
     let custom_policy = RetryPolicy::new(
-        10,    // max_retries
-        50,    // base_delay_ms
-        2000,  // max_delay_ms
-        true,  // jitter
+        10,   // max_retries
+        50,   // base_delay_ms
+        2000, // max_delay_ms
+        true, // jitter
     );
 
     let result = retry_with_backoff(
@@ -164,7 +169,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(msg) => println!("   ✓ {}", msg),
         Err(e) => println!("   ✗ All retries exhausted: {}", e),
     }
-    println!("   Total attempts: {} (initial + 2 retries)\n", counter.load(Ordering::SeqCst));
+    println!(
+        "   Total attempts: {} (initial + 2 retries)\n",
+        counter.load(Ordering::SeqCst)
+    );
 
     println!("=== Examples Complete ===");
     Ok(())

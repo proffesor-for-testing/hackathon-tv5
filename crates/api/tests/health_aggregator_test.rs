@@ -243,14 +243,7 @@ async fn test_expected_services_present() {
         let body = test::read_body(resp).await;
         let health: AggregatedHealth = serde_json::from_slice(&body).unwrap();
 
-        let expected_services = vec![
-            "discovery",
-            "sona",
-            "auth",
-            "sync",
-            "ingestion",
-            "playback",
-        ];
+        let expected_services = vec!["discovery", "sona", "auth", "sync", "ingestion", "playback"];
 
         for expected in expected_services {
             assert!(

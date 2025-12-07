@@ -2,7 +2,6 @@
 ///
 /// Handles publishing watchlist and progress updates with retry logic,
 /// batching, and comprehensive error handling.
-
 use crate::crdt::HLCTimestamp;
 use crate::pubnub::{PubNubClient, PubNubConfig, PubNubError, PublishResponse};
 use crate::sync::{ProgressUpdate, WatchlistOperation, WatchlistUpdate};
@@ -34,14 +33,11 @@ pub trait SyncPublisher: Send + Sync {
     async fn publish(&self, message: SyncMessage) -> Result<(), PublisherError>;
 
     /// Publish watchlist update
-    async fn publish_watchlist_update(
-        &self,
-        update: WatchlistUpdate,
-    ) -> Result<(), PublisherError>;
+    async fn publish_watchlist_update(&self, update: WatchlistUpdate)
+        -> Result<(), PublisherError>;
 
     /// Publish progress update
-    async fn publish_progress_update(&self, update: ProgressUpdate)
-        -> Result<(), PublisherError>;
+    async fn publish_progress_update(&self, update: ProgressUpdate) -> Result<(), PublisherError>;
 
     /// Publish batch of updates
     async fn publish_batch(&self, messages: Vec<SyncMessage>) -> Result<(), PublisherError>;
@@ -132,11 +128,7 @@ impl PubNubPublisher {
     }
 
     /// Create a new PubNub publisher with batching enabled
-    pub fn new_with_batching(
-        config: PubNubConfig,
-        user_id: String,
-        device_id: String,
-    ) -> Self {
+    pub fn new_with_batching(config: PubNubConfig, user_id: String, device_id: String) -> Self {
         let client = Arc::new(PubNubClient::new(
             config,
             user_id.clone(),
@@ -180,10 +172,7 @@ impl PubNubPublisher {
             match self.client.publish(channel, message).await {
                 Ok(response) => {
                     if attempt > 1 {
-                        info!(
-                            "Successfully published message after {} attempts",
-                            attempt
-                        );
+                        info!("Successfully published message after {} attempts", attempt);
                     } else {
                         debug!("Published message to channel: {}", channel);
                     }
@@ -247,11 +236,7 @@ impl PubNubPublisher {
     }
 
     /// Flush batch of messages
-    async fn flush_batch(
-        client: &Arc<PubNubClient>,
-        user_id: &str,
-        batch: &mut Vec<SyncMessage>,
-    ) {
+    async fn flush_batch(client: &Arc<PubNubClient>, user_id: &str, batch: &mut Vec<SyncMessage>) {
         if batch.is_empty() {
             return;
         }
@@ -366,16 +351,16 @@ impl SyncPublisher for PubNubPublisher {
         info!(
             "Publishing watchlist update: {:?} for content {}",
             update.operation,
-            message.payload.get_content_id().unwrap_or_else(|| "unknown".to_string())
+            message
+                .payload
+                .get_content_id()
+                .unwrap_or_else(|| "unknown".to_string())
         );
 
         self.publish(message).await
     }
 
-    async fn publish_progress_update(
-        &self,
-        update: ProgressUpdate,
-    ) -> Result<(), PublisherError> {
+    async fn publish_progress_update(&self, update: ProgressUpdate) -> Result<(), PublisherError> {
         let message = SyncMessage {
             payload: MessagePayload::ProgressUpdate {
                 content_id: update.content_id.clone(),
@@ -481,11 +466,8 @@ mod tests {
     #[tokio::test]
     async fn test_publisher_creation() {
         let config = PubNubConfig::default();
-        let publisher = PubNubPublisher::new(
-            config,
-            "test-user".to_string(),
-            "test-device".to_string(),
-        );
+        let publisher =
+            PubNubPublisher::new(config, "test-user".to_string(), "test-device".to_string());
 
         assert_eq!(publisher.user_id, "test-user");
         assert_eq!(publisher.device_id, "test-device");
@@ -508,11 +490,8 @@ mod tests {
     #[test]
     fn test_sync_channel_format() {
         let config = PubNubConfig::default();
-        let publisher = PubNubPublisher::new(
-            config,
-            "user-123".to_string(),
-            "device-abc".to_string(),
-        );
+        let publisher =
+            PubNubPublisher::new(config, "user-123".to_string(), "device-abc".to_string());
 
         assert_eq!(publisher.sync_channel(), "user.user-123.sync");
     }
@@ -596,8 +575,7 @@ mod tests {
         assert!(json.contains("watchlist_update"));
         assert!(json.contains("content-1"));
 
-        let deserialized: SyncMessage =
-            serde_json::from_str(&json).expect("Failed to deserialize");
+        let deserialized: SyncMessage = serde_json::from_str(&json).expect("Failed to deserialize");
         assert_eq!(
             deserialized.payload.get_content_id(),
             Some("content-1".to_string())

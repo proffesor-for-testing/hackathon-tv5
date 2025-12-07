@@ -1,6 +1,6 @@
 use actix_web::{test, web, App};
 use auth::{
-    email::{EmailConfig, EmailManager, EmailProviderConfig, ConsoleProvider},
+    email::{ConsoleProvider, EmailConfig, EmailManager, EmailProviderConfig},
     error::AuthError,
     password_reset::{ForgotPasswordRequest, ResetPasswordRequest},
     password_reset_handlers::{forgot_password, reset_password, AppState},
@@ -21,8 +21,8 @@ async fn setup_test_state(pool: PgPool) -> web::Data<AppState> {
         verification_ttl_hours: 24,
     };
 
-    let redis_client = redis::Client::open("redis://127.0.0.1:6379")
-        .expect("Failed to create Redis client");
+    let redis_client =
+        redis::Client::open("redis://127.0.0.1:6379").expect("Failed to create Redis client");
 
     let console_provider = Arc::new(ConsoleProvider::new(
         email_config.from_email.clone(),
@@ -36,13 +36,9 @@ async fn setup_test_state(pool: PgPool) -> web::Data<AppState> {
         email_config,
     ));
 
-    let session_manager = Arc::new(auth::session::SessionManager::new(
-        storage.clone()
-    ));
+    let session_manager = Arc::new(auth::session::SessionManager::new(storage.clone()));
 
-    let token_family_manager = Arc::new(auth::token_family::TokenFamilyManager::new(
-        pool.clone()
-    ));
+    let token_family_manager = Arc::new(auth::token_family::TokenFamilyManager::new(pool.clone()));
 
     web::Data::new(AppState {
         storage,
@@ -53,8 +49,9 @@ async fn setup_test_state(pool: PgPool) -> web::Data<AppState> {
 }
 
 async fn setup_test_db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+    });
 
     PgPool::connect(&database_url)
         .await
@@ -63,8 +60,8 @@ async fn setup_test_db() -> PgPool {
 
 async fn create_test_user(pool: &PgPool, email: &str, password: &str) -> uuid::Uuid {
     let user_repo = PostgresUserRepository::new(pool.clone());
-    let password_hash = auth::user::PasswordHasher::hash_password(password)
-        .expect("Failed to hash password");
+    let password_hash =
+        auth::user::PasswordHasher::hash_password(password).expect("Failed to hash password");
 
     sqlx::query!(
         r#"
@@ -95,7 +92,7 @@ async fn test_forgot_password_sends_email() {
         App::new()
             .app_data(state.clone())
             .app_data(web::Data::new(pool.clone()))
-            .service(forgot_password)
+            .service(forgot_password),
     )
     .await;
 
@@ -111,7 +108,10 @@ async fn test_forgot_password_sends_email() {
 
     // Verify response
     let body: serde_json::Value = test::read_body_json(resp).await;
-    assert!(body["message"].as_str().unwrap().contains("reset link has been sent"));
+    assert!(body["message"]
+        .as_str()
+        .unwrap()
+        .contains("reset link has been sent"));
 
     // Cleanup
     sqlx::query!("DELETE FROM users WHERE email = $1", test_email)
@@ -132,7 +132,7 @@ async fn test_forgot_password_rate_limiting() {
         App::new()
             .app_data(state.clone())
             .app_data(web::Data::new(pool.clone()))
-            .service(forgot_password)
+            .service(forgot_password),
     )
     .await;
 
@@ -176,7 +176,7 @@ async fn test_forgot_password_nonexistent_email() {
         App::new()
             .app_data(state.clone())
             .app_data(web::Data::new(pool.clone()))
-            .service(forgot_password)
+            .service(forgot_password),
     )
     .await;
 
@@ -193,7 +193,10 @@ async fn test_forgot_password_nonexistent_email() {
     assert_eq!(resp.status(), 200);
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    assert!(body["message"].as_str().unwrap().contains("reset link has been sent"));
+    assert!(body["message"]
+        .as_str()
+        .unwrap()
+        .contains("reset link has been sent"));
 }
 
 #[actix_web::test]
@@ -205,12 +208,12 @@ async fn test_reset_password_sends_notification() {
     let user_id = create_test_user(&pool, test_email, "OldPassword123!").await;
 
     // Create a reset token
-    let reset_token = auth::password_reset::PasswordResetToken::new(
-        user_id.to_string(),
-        test_email.to_string(),
-    );
+    let reset_token =
+        auth::password_reset::PasswordResetToken::new(user_id.to_string(), test_email.to_string());
 
-    state.storage.store_password_reset_token(&reset_token.token, &reset_token)
+    state
+        .storage
+        .store_password_reset_token(&reset_token.token, &reset_token)
         .await
         .expect("Failed to store reset token");
 
@@ -218,7 +221,7 @@ async fn test_reset_password_sends_notification() {
         App::new()
             .app_data(state.clone())
             .app_data(web::Data::new(pool.clone()))
-            .service(reset_password)
+            .service(reset_password),
     )
     .await;
 
@@ -234,10 +237,16 @@ async fn test_reset_password_sends_notification() {
     assert_eq!(resp.status(), 200);
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    assert!(body["message"].as_str().unwrap().contains("reset successfully"));
+    assert!(body["message"]
+        .as_str()
+        .unwrap()
+        .contains("reset successfully"));
 
     // Verify token was deleted (single-use)
-    let token_result = state.storage.get_password_reset_token(&reset_token.token).await;
+    let token_result = state
+        .storage
+        .get_password_reset_token(&reset_token.token)
+        .await;
     assert!(token_result.is_ok());
     assert!(token_result.unwrap().is_none());
 
@@ -257,7 +266,7 @@ async fn test_reset_password_with_invalid_token() {
         App::new()
             .app_data(state.clone())
             .app_data(web::Data::new(pool.clone()))
-            .service(reset_password)
+            .service(reset_password),
     )
     .await;
 
@@ -281,12 +290,12 @@ async fn test_reset_password_weak_password() {
     let test_email = "weak_pwd_test@example.com";
     let user_id = create_test_user(&pool, test_email, "OldPassword123!").await;
 
-    let reset_token = auth::password_reset::PasswordResetToken::new(
-        user_id.to_string(),
-        test_email.to_string(),
-    );
+    let reset_token =
+        auth::password_reset::PasswordResetToken::new(user_id.to_string(), test_email.to_string());
 
-    state.storage.store_password_reset_token(&reset_token.token, &reset_token)
+    state
+        .storage
+        .store_password_reset_token(&reset_token.token, &reset_token)
         .await
         .expect("Failed to store reset token");
 
@@ -294,7 +303,7 @@ async fn test_reset_password_weak_password() {
         App::new()
             .app_data(state.clone())
             .app_data(web::Data::new(pool.clone()))
-            .service(reset_password)
+            .service(reset_password),
     )
     .await;
 
@@ -329,7 +338,7 @@ async fn test_complete_password_reset_flow_with_emails() {
             .app_data(state.clone())
             .app_data(web::Data::new(pool.clone()))
             .service(forgot_password)
-            .service(reset_password)
+            .service(reset_password),
     )
     .await;
 
@@ -350,11 +359,11 @@ async fn test_complete_password_reset_flow_with_emails() {
     let user = user_repo.find_by_email(test_email).await.unwrap().unwrap();
 
     // Simulate getting token from email (in test, we'll create a fresh one)
-    let reset_token = auth::password_reset::PasswordResetToken::new(
-        user.id.to_string(),
-        test_email.to_string(),
-    );
-    state.storage.store_password_reset_token(&reset_token.token, &reset_token)
+    let reset_token =
+        auth::password_reset::PasswordResetToken::new(user.id.to_string(), test_email.to_string());
+    state
+        .storage
+        .store_password_reset_token(&reset_token.token, &reset_token)
         .await
         .expect("Failed to store reset token");
 

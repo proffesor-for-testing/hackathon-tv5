@@ -16,8 +16,8 @@ mod google_oauth_endpoint_tests {
 
         // Note: This test requires Redis to be running
         // In a real test environment, we would use a test Redis instance
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379/15".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379/15".to_string());
 
         let storage = match AuthStorage::new(&redis_url) {
             Ok(s) => Arc::new(s),
@@ -30,8 +30,9 @@ mod google_oauth_endpoint_tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .service(google_authorize)
-        ).await;
+                .service(google_authorize),
+        )
+        .await;
 
         let req = test::TestRequest::get()
             .uri("/auth/oauth/google/authorize")
@@ -53,8 +54,8 @@ mod google_oauth_endpoint_tests {
 
     #[actix_rt::test]
     async fn test_google_callback_endpoint_missing_code() {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379/15".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379/15".to_string());
 
         let storage = match AuthStorage::new(&redis_url) {
             Ok(s) => Arc::new(s),
@@ -67,8 +68,9 @@ mod google_oauth_endpoint_tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .service(google_callback)
-        ).await;
+                .service(google_callback),
+        )
+        .await;
 
         let req = test::TestRequest::get()
             .uri("/auth/oauth/google/callback?error=access_denied&error_description=User%20denied%20access")
@@ -82,8 +84,8 @@ mod google_oauth_endpoint_tests {
 
     #[actix_rt::test]
     async fn test_google_callback_endpoint_invalid_state() {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379/15".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379/15".to_string());
 
         let storage = match AuthStorage::new(&redis_url) {
             Ok(s) => Arc::new(s),
@@ -96,8 +98,9 @@ mod google_oauth_endpoint_tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .service(google_callback)
-        ).await;
+                .service(google_callback),
+        )
+        .await;
 
         let req = test::TestRequest::get()
             .uri("/auth/oauth/google/callback?code=test_code&state=invalid_state")
@@ -122,14 +125,9 @@ mod google_oauth_endpoint_tests {
     #[test]
     fn test_required_environment_variables() {
         // Test validates that required env vars are documented
-        let required_vars = vec![
-            "GOOGLE_CLIENT_ID",
-            "GOOGLE_CLIENT_SECRET",
-        ];
+        let required_vars = vec!["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"];
 
-        let optional_vars = vec![
-            "GOOGLE_REDIRECT_URI",
-        ];
+        let optional_vars = vec!["GOOGLE_REDIRECT_URI"];
 
         assert_eq!(required_vars.len(), 2);
         assert_eq!(optional_vars.len(), 1);
@@ -143,8 +141,8 @@ mod google_oauth_pkce_flow_tests {
 
     #[actix_rt::test]
     async fn test_pkce_session_storage_and_retrieval() {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379/15".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379/15".to_string());
 
         let storage = match AuthStorage::new(&redis_url) {
             Ok(s) => s,
@@ -175,8 +173,8 @@ mod google_oauth_pkce_flow_tests {
 
     #[actix_rt::test]
     async fn test_pkce_session_expiration() {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379/15".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379/15".to_string());
 
         let storage = match AuthStorage::new(&redis_url) {
             Ok(s) => s,

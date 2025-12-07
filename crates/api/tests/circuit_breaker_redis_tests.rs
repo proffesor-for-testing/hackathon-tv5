@@ -1,5 +1,5 @@
 use media_gateway_api::circuit_breaker::CircuitBreakerManager;
-use media_gateway_api::config::{Config, CircuitBreakerServiceConfig};
+use media_gateway_api::config::{CircuitBreakerServiceConfig, Config};
 use redis::aio::ConnectionManager;
 use redis::AsyncCommands;
 use std::sync::Arc;
@@ -22,10 +22,7 @@ async fn cleanup_redis_keys(redis_url: &str, pattern: &str) -> Result<(), redis:
         .await?;
 
     if !keys.is_empty() {
-        let _: () = redis::cmd("DEL")
-            .arg(&keys)
-            .query_async(&mut conn)
-            .await?;
+        let _: () = redis::cmd("DEL").arg(&keys).query_async(&mut conn).await?;
     }
 
     Ok(())
@@ -86,10 +83,10 @@ async fn test_circuit_breaker_persist_open_state() {
         timeout_seconds: 60,
         error_rate_threshold: 0.5,
     };
-    config.circuit_breaker.services.insert(
-        "test_persist_open".to_string(),
-        service_config.clone(),
-    );
+    config
+        .circuit_breaker
+        .services
+        .insert("test_persist_open".to_string(), service_config.clone());
 
     let manager = CircuitBreakerManager::with_redis(Arc::new(config))
         .await
@@ -98,10 +95,12 @@ async fn test_circuit_breaker_persist_open_state() {
     // Trigger failures to open the circuit
     for _ in 0..3 {
         let _ = manager
-            .call("test_persist_open", || Err::<String, _>(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "test failure",
-            )))
+            .call("test_persist_open", || {
+                Err::<String, _>(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "test failure",
+                ))
+            })
             .await;
     }
 
@@ -146,10 +145,10 @@ async fn test_circuit_breaker_load_state_from_redis() {
             timeout_seconds: 60,
             error_rate_threshold: 0.5,
         };
-        config.circuit_breaker.services.insert(
-            "test_load_state".to_string(),
-            service_config.clone(),
-        );
+        config
+            .circuit_breaker
+            .services
+            .insert("test_load_state".to_string(), service_config.clone());
 
         let manager1 = CircuitBreakerManager::with_redis(Arc::new(config))
             .await
@@ -158,10 +157,12 @@ async fn test_circuit_breaker_load_state_from_redis() {
         // Trigger failures to open the circuit
         for _ in 0..3 {
             let _ = manager1
-                .call("test_load_state", || Err::<String, _>(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "test failure",
-                )))
+                .call("test_load_state", || {
+                    Err::<String, _>(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "test failure",
+                    ))
+                })
                 .await;
         }
 
@@ -184,10 +185,10 @@ async fn test_circuit_breaker_load_state_from_redis() {
             timeout_seconds: 60,
             error_rate_threshold: 0.5,
         };
-        config.circuit_breaker.services.insert(
-            "test_load_state".to_string(),
-            service_config.clone(),
-        );
+        config
+            .circuit_breaker
+            .services
+            .insert("test_load_state".to_string(), service_config.clone());
 
         let manager2 = CircuitBreakerManager::with_redis(Arc::new(config))
             .await
@@ -197,7 +198,10 @@ async fn test_circuit_breaker_load_state_from_redis() {
         let breaker = manager2.get_or_create("test_load_state").await;
 
         // Verify it loaded the open state
-        assert!(breaker.is_open().await, "Circuit should be open after loading from Redis");
+        assert!(
+            breaker.is_open().await,
+            "Circuit should be open after loading from Redis"
+        );
     }
 
     cleanup_redis_keys(&redis_url, "circuit_breaker:test_load_state:*")
@@ -231,12 +235,12 @@ async fn test_circuit_breaker_redis_ttl() {
     let client = redis::Client::open(redis_url.as_str()).unwrap();
     let mut conn = ConnectionManager::new(client).await.unwrap();
 
-    let ttl: i64 = conn
-        .ttl("circuit_breaker:test_ttl:state")
-        .await
-        .unwrap();
+    let ttl: i64 = conn.ttl("circuit_breaker:test_ttl:state").await.unwrap();
 
-    assert!(ttl > 0 && ttl <= 3600, "TTL should be set to 1 hour (3600 seconds)");
+    assert!(
+        ttl > 0 && ttl <= 3600,
+        "TTL should be set to 1 hour (3600 seconds)"
+    );
 
     cleanup_redis_keys(&redis_url, "circuit_breaker:test_ttl:*")
         .await
@@ -259,7 +263,10 @@ async fn test_circuit_breaker_fallback_without_redis() {
         .call("test_fallback", || Ok::<_, std::io::Error>("success"))
         .await;
 
-    assert!(result.is_ok(), "Circuit breaker should work in-memory without Redis");
+    assert!(
+        result.is_ok(),
+        "Circuit breaker should work in-memory without Redis"
+    );
 }
 
 #[tokio::test]
@@ -278,10 +285,10 @@ async fn test_circuit_breaker_state_transition_persistence() {
         timeout_seconds: 1, // Short timeout for testing
         error_rate_threshold: 0.5,
     };
-    config.circuit_breaker.services.insert(
-        "test_transition".to_string(),
-        service_config.clone(),
-    );
+    config
+        .circuit_breaker
+        .services
+        .insert("test_transition".to_string(), service_config.clone());
 
     let manager = CircuitBreakerManager::with_redis(Arc::new(config))
         .await
@@ -290,10 +297,9 @@ async fn test_circuit_breaker_state_transition_persistence() {
     // 1. Closed -> Open
     for _ in 0..3 {
         let _ = manager
-            .call("test_transition", || Err::<String, _>(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "failure",
-            )))
+            .call("test_transition", || {
+                Err::<String, _>(std::io::Error::new(std::io::ErrorKind::Other, "failure"))
+            })
             .await;
     }
 
@@ -342,10 +348,10 @@ async fn test_circuit_breaker_multiple_instances_share_state() {
         timeout_seconds: 60,
         error_rate_threshold: 0.5,
     };
-    config1.circuit_breaker.services.insert(
-        "test_shared".to_string(),
-        service_config.clone(),
-    );
+    config1
+        .circuit_breaker
+        .services
+        .insert("test_shared".to_string(), service_config.clone());
 
     // Create first manager and open circuit
     let manager1 = CircuitBreakerManager::with_redis(Arc::new(config1))
@@ -354,10 +360,9 @@ async fn test_circuit_breaker_multiple_instances_share_state() {
 
     for _ in 0..3 {
         let _ = manager1
-            .call("test_shared", || Err::<String, _>(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "failure",
-            )))
+            .call("test_shared", || {
+                Err::<String, _>(std::io::Error::new(std::io::ErrorKind::Other, "failure"))
+            })
             .await;
     }
 
@@ -367,10 +372,10 @@ async fn test_circuit_breaker_multiple_instances_share_state() {
     let mut config2 = Config::default();
     config2.redis.url = redis_url.clone();
     config2.circuit_breaker.enabled = true;
-    config2.circuit_breaker.services.insert(
-        "test_shared".to_string(),
-        service_config.clone(),
-    );
+    config2
+        .circuit_breaker
+        .services
+        .insert("test_shared".to_string(), service_config.clone());
 
     let manager2 = CircuitBreakerManager::with_redis(Arc::new(config2))
         .await
@@ -380,7 +385,10 @@ async fn test_circuit_breaker_multiple_instances_share_state() {
     let breaker2 = manager2.get_or_create("test_shared").await;
 
     // It should load the open state from Redis
-    assert!(breaker2.is_open().await, "Second instance should see circuit as open");
+    assert!(
+        breaker2.is_open().await,
+        "Second instance should see circuit as open"
+    );
 
     cleanup_redis_keys(&redis_url, "circuit_breaker:test_shared:*")
         .await

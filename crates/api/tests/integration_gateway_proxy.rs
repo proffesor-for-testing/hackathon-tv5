@@ -1,9 +1,6 @@
 use actix_web::{test, web, App};
 use media_gateway_api::{
-    circuit_breaker::CircuitBreakerManager,
-    config::Config,
-    proxy::ServiceProxy,
-    routes,
+    circuit_breaker::CircuitBreakerManager, config::Config, proxy::ServiceProxy, routes,
 };
 use std::sync::Arc;
 

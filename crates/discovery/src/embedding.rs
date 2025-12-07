@@ -38,8 +38,8 @@ impl EmbeddingProvider {
 /// Embedding model configuration
 #[derive(Debug, Clone)]
 pub enum EmbeddingModel {
-    Small,  // text-embedding-3-small (768 dims)
-    Large,  // text-embedding-3-large (1536 dims)
+    Small, // text-embedding-3-small (768 dims)
+    Large, // text-embedding-3-large (1536 dims)
 }
 
 impl EmbeddingModel {
@@ -164,10 +164,8 @@ impl EmbeddingClient {
         let model = EmbeddingModel::from_env();
 
         let api_key = match provider {
-            EmbeddingProvider::OpenAI => {
-                std::env::var("OPENAI_API_KEY")
-                    .map_err(|_| anyhow!("OPENAI_API_KEY environment variable not set"))?
-            }
+            EmbeddingProvider::OpenAI => std::env::var("OPENAI_API_KEY")
+                .map_err(|_| anyhow!("OPENAI_API_KEY environment variable not set"))?,
             EmbeddingProvider::Local => String::new(),
         };
 
@@ -257,7 +255,7 @@ impl EmbeddingClient {
 
                 // Cache the embedding
                 if let Some(cache) = &self.cache {
-                    if let Err(e) = cache.cache_embedding(&uncached_texts[i], embedding).await {
+                    if let Err(e) = cache.cache_embedding(&uncached_texts[*i], embedding).await {
                         warn!("Failed to cache embedding: {}", e);
                     }
                 }
@@ -279,7 +277,9 @@ impl EmbeddingClient {
         for attempt in 1..=MAX_RETRIES {
             match self.call_openai_api(&[text.to_string()]).await {
                 Ok(mut embeddings) => {
-                    return embeddings.pop().ok_or_else(|| anyhow!("Empty embedding response"));
+                    return embeddings
+                        .pop()
+                        .ok_or_else(|| anyhow!("Empty embedding response"));
                 }
                 Err(e) => {
                     warn!(
@@ -329,7 +329,8 @@ impl EmbeddingClient {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| anyhow!("Batch embedding failed after {} retries", MAX_RETRIES)))
+        Err(last_error
+            .unwrap_or_else(|| anyhow!("Batch embedding failed after {} retries", MAX_RETRIES)))
     }
 
     /// Call OpenAI API

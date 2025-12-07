@@ -1,6 +1,8 @@
-use media_gateway_ingestion::quality::{QualityScorer, QualityWeights, FreshnessDecay};
-use media_gateway_ingestion::normalizer::{CanonicalContent, ContentType, ImageSet, AvailabilityInfo};
-use chrono::{Utc, Duration};
+use chrono::{Duration, Utc};
+use media_gateway_ingestion::normalizer::{
+    AvailabilityInfo, CanonicalContent, ContentType, ImageSet,
+};
+use media_gateway_ingestion::quality::{FreshnessDecay, QualityScorer, QualityWeights};
 use std::collections::HashMap;
 
 fn create_high_quality_content() -> CanonicalContent {
@@ -61,7 +63,10 @@ fn test_decay_calculation_fresh_content() {
     let base_score = 0.9;
 
     let score = decay.calculate_decay(base_score, 0.0);
-    assert!((score - 0.9).abs() < 0.001, "Fresh content should maintain full score");
+    assert!(
+        (score - 0.9).abs() < 0.001,
+        "Fresh content should maintain full score"
+    );
 }
 
 #[test]
@@ -74,7 +79,10 @@ fn test_decay_calculation_30_days() {
 
     assert!((score - expected).abs() < 0.01);
     assert!(score < 0.8, "Score should decay after 30 days");
-    assert!(score > 0.4, "Score should not hit minimum cap after 30 days");
+    assert!(
+        score > 0.4,
+        "Score should not hit minimum cap after 30 days"
+    );
 }
 
 #[test]
@@ -87,7 +95,10 @@ fn test_decay_calculation_90_days() {
 
     assert!((score - expected).abs() < 0.01);
     assert!(score < 1.0, "Score should decay after 90 days");
-    assert!(score > 0.5, "Score should not hit minimum cap after 90 days");
+    assert!(
+        score > 0.5,
+        "Score should not hit minimum cap after 90 days"
+    );
 }
 
 #[test]
@@ -98,7 +109,10 @@ fn test_decay_calculation_365_days() {
     let score = decay.calculate_decay(base_score, 365.0);
     let min_score = 0.8 * 0.5;
 
-    assert!((score - min_score).abs() < 0.05, "Score should be near minimum after 1 year");
+    assert!(
+        (score - min_score).abs() < 0.05,
+        "Score should be near minimum after 1 year"
+    );
 }
 
 #[test]
@@ -109,7 +123,10 @@ fn test_decay_minimum_cap() {
     let score_very_old = decay.calculate_decay(base_score, 10000.0);
     let expected_min = 0.8 * 0.5;
 
-    assert_eq!(score_very_old, expected_min, "Score should hit minimum cap for very old content");
+    assert_eq!(
+        score_very_old, expected_min,
+        "Score should hit minimum cap for very old content"
+    );
 }
 
 #[test]
@@ -120,9 +137,18 @@ fn test_decay_with_different_base_scores() {
     let score_high = decay.calculate_decay(0.9, days);
     let score_low = decay.calculate_decay(0.5, days);
 
-    assert!(score_high > score_low, "Higher base scores should maintain higher decayed scores");
-    assert!(score_high >= 0.45, "High quality content minimum should be 0.45");
-    assert!(score_low >= 0.25, "Low quality content minimum should be 0.25");
+    assert!(
+        score_high > score_low,
+        "Higher base scores should maintain higher decayed scores"
+    );
+    assert!(
+        score_high >= 0.45,
+        "High quality content minimum should be 0.45"
+    );
+    assert!(
+        score_low >= 0.25,
+        "Low quality content minimum should be 0.25"
+    );
 }
 
 #[test]
@@ -134,7 +160,10 @@ fn test_scorer_with_freshness_decay() {
     let content = create_high_quality_content();
     let base_score = scorer.score_content(&content);
 
-    assert!(base_score > 0.7, "High quality content should have high base score");
+    assert!(
+        base_score > 0.7,
+        "High quality content should have high base score"
+    );
 }
 
 #[test]
@@ -149,7 +178,10 @@ fn test_scorer_freshness_recent_content() {
     let score = scorer.score_content_with_freshness(&content, recent_date);
     let base_score = scorer.score_content(&content);
 
-    assert!((score - base_score).abs() < 0.05, "Recent content should have score close to base");
+    assert!(
+        (score - base_score).abs() < 0.05,
+        "Recent content should have score close to base"
+    );
 }
 
 #[test]
@@ -164,8 +196,14 @@ fn test_scorer_freshness_old_content() {
     let score = scorer.score_content_with_freshness(&content, old_date);
     let base_score = scorer.score_content(&content);
 
-    assert!(score < base_score, "Old content should have lower score than base");
-    assert!(score >= base_score * 0.5, "Score should not go below 50% of base");
+    assert!(
+        score < base_score,
+        "Old content should have lower score than base"
+    );
+    assert!(
+        score >= base_score * 0.5,
+        "Score should not go below 50% of base"
+    );
 }
 
 #[test]
@@ -199,7 +237,10 @@ fn test_custom_decay_rate() {
     let score_fast = scorer_fast.score_content_with_freshness(&content, old_date);
     let score_slow = scorer_slow.score_content_with_freshness(&content, old_date);
 
-    assert!(score_fast < score_slow, "Faster decay rate should result in lower score");
+    assert!(
+        score_fast < score_slow,
+        "Faster decay rate should result in lower score"
+    );
 }
 
 #[test]
@@ -218,8 +259,14 @@ fn test_custom_min_score_ratio() {
     let score_low_min = scorer_low_min.score_content_with_freshness(&content, very_old_date);
     let base_score = scorer_high_min.score_content(&content);
 
-    assert!((score_high_min - base_score * 0.7).abs() < 0.01, "High minimum should cap at 70%");
-    assert!((score_low_min - base_score * 0.3).abs() < 0.01, "Low minimum should cap at 30%");
+    assert!(
+        (score_high_min - base_score * 0.7).abs() < 0.01,
+        "High minimum should cap at 70%"
+    );
+    assert!(
+        (score_low_min - base_score * 0.3).abs() < 0.01,
+        "Low minimum should cap at 30%"
+    );
 }
 
 #[test]
@@ -254,7 +301,10 @@ fn test_scorer_maintains_backwards_compatibility() {
     let score_old = scorer_old.score_content(&content);
     let score_new = scorer_new.score_content(&content);
 
-    assert_eq!(score_old, score_new, "score_content should work the same way");
+    assert_eq!(
+        score_old, score_new,
+        "score_content should work the same way"
+    );
 }
 
 #[test]
@@ -269,7 +319,10 @@ fn test_zero_days_equals_base_score() {
     let base_score = scorer.score_content(&content);
     let fresh_score = scorer.score_content_with_freshness(&content, now);
 
-    assert!((fresh_score - base_score).abs() < 0.001, "Zero days old should equal base score");
+    assert!(
+        (fresh_score - base_score).abs() < 0.001,
+        "Zero days old should equal base score"
+    );
 }
 
 #[test]
@@ -280,8 +333,14 @@ fn test_decay_boundary_conditions() {
     assert_eq!(score_zero, 0.0, "Zero base score should remain zero");
 
     let score_one = decay.calculate_decay(1.0, 0.0);
-    assert_eq!(score_one, 1.0, "Perfect score with zero days should remain 1.0");
+    assert_eq!(
+        score_one, 1.0,
+        "Perfect score with zero days should remain 1.0"
+    );
 
     let score_negative_days = decay.calculate_decay(0.8, -10.0);
-    assert!(score_negative_days >= 0.0 && score_negative_days <= 1.0, "Should handle negative days gracefully");
+    assert!(
+        score_negative_days >= 0.0 && score_negative_days <= 1.0,
+        "Should handle negative days gracefully"
+    );
 }

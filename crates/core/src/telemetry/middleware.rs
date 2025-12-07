@@ -4,7 +4,7 @@ use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
     Error, HttpMessage,
 };
-use futures::future::{ok, Ready, LocalBoxFuture};
+use futures::future::{ok, LocalBoxFuture, Ready};
 use std::task::{Context, Poll};
 use tracing::{span, Level};
 use uuid::Uuid;
@@ -125,10 +125,7 @@ where
 
             // Record response status
             let status = res.status().as_u16();
-            tracing::info!(
-                http.status_code = status,
-                "HTTP request completed"
-            );
+            tracing::info!(http.status_code = status, "HTTP request completed");
 
             Ok(res)
         })
@@ -225,10 +222,7 @@ fn parse_traceparent(value: &str) -> Option<TraceContext> {
 /// let mut headers = reqwest::header::HeaderMap::new();
 /// inject_trace_context(&context, &mut headers);
 /// ```
-pub fn inject_trace_context(
-    context: &TraceContext,
-    headers: &mut reqwest::header::HeaderMap,
-) {
+pub fn inject_trace_context(context: &TraceContext, headers: &mut reqwest::header::HeaderMap) {
     // Generate new span ID for this outgoing request
     let new_span_id = generate_span_id();
 
@@ -273,12 +267,11 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .wrap(TracingMiddleware)
-                .route("/test", web::get().to(test_handler))
-        ).await;
+                .route("/test", web::get().to(test_handler)),
+        )
+        .await;
 
-        let req = test::TestRequest::get()
-            .uri("/test")
-            .to_request();
+        let req = test::TestRequest::get().uri("/test").to_request();
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
@@ -289,14 +282,15 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .wrap(TracingMiddleware)
-                .route("/test", web::get().to(test_handler))
-        ).await;
+                .route("/test", web::get().to(test_handler)),
+        )
+        .await;
 
         let req = test::TestRequest::get()
             .uri("/test")
             .insert_header((
                 "traceparent",
-                "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
+                "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
             ))
             .to_request();
 
@@ -309,8 +303,9 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .wrap(TracingMiddleware)
-                .route("/test", web::get().to(test_handler))
-        ).await;
+                .route("/test", web::get().to(test_handler)),
+        )
+        .await;
 
         let req = test::TestRequest::get()
             .uri("/test")
@@ -351,7 +346,7 @@ mod tests {
         let req = test::TestRequest::default()
             .insert_header((
                 "traceparent",
-                "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
+                "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
             ))
             .to_srv_request();
 

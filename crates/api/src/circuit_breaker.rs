@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{debug, warn, error};
+use tracing::{debug, error, warn};
 
 #[derive(Clone, Debug)]
 enum CircuitState {
@@ -148,8 +148,7 @@ impl CircuitBreaker {
                 Ok(json) => {
                     let mut conn = redis_manager.write().await;
                     // Set with 1 hour TTL to auto-cleanup stale circuits
-                    let result: Result<(), redis::RedisError> =
-                        conn.set_ex(&key, json, 3600).await;
+                    let result: Result<(), redis::RedisError> = conn.set_ex(&key, json, 3600).await;
 
                     if let Err(e) = result {
                         error!(
@@ -381,7 +380,9 @@ impl CircuitBreakerManager {
     }
 
     /// Create a Redis connection
-    async fn create_redis_connection(redis_url: &str) -> Result<ConnectionManager, redis::RedisError> {
+    async fn create_redis_connection(
+        redis_url: &str,
+    ) -> Result<ConnectionManager, redis::RedisError> {
         let client = redis::Client::open(redis_url)?;
         ConnectionManager::new(client).await
     }
@@ -441,19 +442,14 @@ impl CircuitBreakerManager {
         breaker
     }
 
-    pub async fn call<F, T, E>(
-        &self,
-        service: &str,
-        operation: F,
-    ) -> ApiResult<T>
+    pub async fn call<F, T, E>(&self, service: &str, operation: F) -> ApiResult<T>
     where
         F: FnOnce() -> Result<T, E> + Send,
         E: std::error::Error + Send + Sync + 'static,
     {
         if !self.config.circuit_breaker.enabled {
-            return operation().map_err(|e| {
-                ApiError::ProxyError(format!("Service {} error: {}", service, e))
-            });
+            return operation()
+                .map_err(|e| ApiError::ProxyError(format!("Service {} error: {}", service, e)));
         }
 
         let breaker = self.get_or_create(service).await;
@@ -476,7 +472,10 @@ impl CircuitBreakerManager {
             Err(e) => {
                 breaker.record_failure().await;
                 warn!(service = service, error = %e, "Service call failed");
-                Err(ApiError::ProxyError(format!("Service {} error: {}", service, e)))
+                Err(ApiError::ProxyError(format!(
+                    "Service {} error: {}",
+                    service, e
+                )))
             }
         }
     }

@@ -22,7 +22,10 @@ fn test_score_normalization() {
     let normalized: Vec<f32> = scores.iter().map(|s| s / seed_count).collect();
 
     for score in normalized {
-        assert!(score >= 0.0 && score <= 1.0, "Normalized scores should be in [0, 1]");
+        assert!(
+            score >= 0.0 && score <= 1.0,
+            "Normalized scores should be in [0, 1]"
+        );
     }
 }
 
@@ -45,7 +48,10 @@ fn test_weighted_combination() {
 
     let combined = (content_score * 0.6) + (collaborative_score * 0.4);
 
-    assert!((combined - 0.72).abs() < 0.001, "Weighted combination should be 0.72");
+    assert!(
+        (combined - 0.72).abs() < 0.001,
+        "Weighted combination should be 0.72"
+    );
 }
 
 #[test]
@@ -58,7 +64,10 @@ fn test_jaccard_similarity_concept() {
 
     let jaccard = intersection as f32 / union as f32;
 
-    assert!(jaccard >= 0.0 && jaccard <= 1.0, "Jaccard should be in [0, 1]");
+    assert!(
+        jaccard >= 0.0 && jaccard <= 1.0,
+        "Jaccard should be in [0, 1]"
+    );
     assert!((jaccard - 0.333).abs() < 0.01, "Jaccard should be ~0.333");
 }
 
@@ -116,8 +125,15 @@ fn test_recommendation_ranking() {
 
     recommendations.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
-    assert_eq!(recommendations[0].0, "content2", "Highest score should be first");
-    assert_eq!(recommendations.last().unwrap().0, "content3", "Lowest score should be last");
+    assert_eq!(
+        recommendations[0].0, "content2",
+        "Highest score should be first"
+    );
+    assert_eq!(
+        recommendations.last().unwrap().0,
+        "content3",
+        "Lowest score should be last"
+    );
 }
 
 #[test]
@@ -134,10 +150,7 @@ fn test_completion_rate_threshold() {
     // Content with completion_rate >= 0.7 is considered highly rated
     let completion_rates = vec![0.5, 0.7, 0.85, 0.6, 0.95];
 
-    let highly_rated: Vec<f32> = completion_rates
-        .into_iter()
-        .filter(|&r| r >= 0.7)
-        .collect();
+    let highly_rated: Vec<f32> = completion_rates.into_iter().filter(|&r| r >= 0.7).collect();
 
     assert_eq!(highly_rated.len(), 3, "Should have 3 highly rated items");
 }

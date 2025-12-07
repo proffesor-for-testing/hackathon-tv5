@@ -1,14 +1,15 @@
+use chrono::Utc;
 use media_gateway_ingestion::{
     entity_resolution::EntityResolver,
-    normalizer::{CanonicalContent, ContentType, AvailabilityInfo, ImageSet},
+    normalizer::{AvailabilityInfo, CanonicalContent, ContentType, ImageSet},
 };
-use sqlx::postgres::{PgPoolOptions, PgPool};
+use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::collections::HashMap;
-use chrono::Utc;
 
 async fn setup_test_pool() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgresql://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+    });
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -33,7 +34,7 @@ async fn setup_test_pool() -> PgPool {
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             UNIQUE(external_id, id_type)
         )
-        "#
+        "#,
     )
     .execute(&pool)
     .await
@@ -43,10 +44,12 @@ async fn setup_test_pool() -> PgPool {
         .execute(&pool)
         .await
         .ok();
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_entity_mappings_entity ON entity_mappings(entity_id)")
-        .execute(&pool)
-        .await
-        .ok();
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_entity_mappings_entity ON entity_mappings(entity_id)",
+    )
+    .execute(&pool)
+    .await
+    .ok();
 
     pool
 }
@@ -67,17 +70,18 @@ async fn benchmark_cache_lookup_performance() {
         .await
         .expect("Failed to create resolver");
 
-    resolver.add_entity(
-        "bench_entity_1".to_string(),
-        "Benchmark Movie".to_string(),
-        Some(2020),
-        Some("10.5240/BENCH-1".to_string()),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Failed to add entity");
+    resolver
+        .add_entity(
+            "bench_entity_1".to_string(),
+            "Benchmark Movie".to_string(),
+            Some(2020),
+            Some("10.5240/BENCH-1".to_string()),
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to add entity");
 
     let mut content = CanonicalContent {
         platform_content_id: "bench1".to_string(),
@@ -106,7 +110,9 @@ async fn benchmark_cache_lookup_performance() {
         updated_at: Utc::now(),
     };
 
-    content.external_ids.insert("eidr".to_string(), "10.5240/BENCH-1".to_string());
+    content
+        .external_ids
+        .insert("eidr".to_string(), "10.5240/BENCH-1".to_string());
 
     resolver.resolve(&content).await.unwrap();
 
@@ -122,7 +128,11 @@ async fn benchmark_cache_lookup_performance() {
     let avg_duration_micros = total_duration.as_micros() / iterations;
 
     println!("Average cache lookup time: {}μs", avg_duration_micros);
-    assert!(avg_duration_micros < 5000, "Cache lookup should be <5ms (5000μs), got {}μs", avg_duration_micros);
+    assert!(
+        avg_duration_micros < 5000,
+        "Cache lookup should be <5ms (5000μs), got {}μs",
+        avg_duration_micros
+    );
 
     cleanup_test_data(&pool).await;
 }
@@ -137,17 +147,18 @@ async fn benchmark_database_lookup_performance() {
         .expect("Failed to create resolver");
 
     for i in 0..10 {
-        resolver.add_entity(
-            format!("entity_{}", i),
-            format!("Movie {}", i),
-            Some(2020 + i),
-            None,
-            Some(format!("tt{:07}", i)),
-            None,
-            None,
-        )
-        .await
-        .expect("Failed to add entity");
+        resolver
+            .add_entity(
+                format!("entity_{}", i),
+                format!("Movie {}", i),
+                Some(2020 + i),
+                None,
+                Some(format!("tt{:07}", i)),
+                None,
+                None,
+            )
+            .await
+            .expect("Failed to add entity");
     }
 
     let iterations = 50;
@@ -181,7 +192,9 @@ async fn benchmark_database_lookup_performance() {
             updated_at: Utc::now(),
         };
 
-        content.external_ids.insert("imdb".to_string(), format!("tt{:07}", i % 10));
+        content
+            .external_ids
+            .insert("imdb".to_string(), format!("tt{:07}", i % 10));
 
         let start = std::time::Instant::now();
         let result = resolver.resolve(&content).await.unwrap();
@@ -192,8 +205,15 @@ async fn benchmark_database_lookup_performance() {
 
     let avg_duration_micros = total_duration.as_micros() / iterations;
 
-    println!("Average database lookup time (with cache): {}μs", avg_duration_micros);
-    assert!(avg_duration_micros < 20000, "Database lookup should be <20ms (20000μs), got {}μs", avg_duration_micros);
+    println!(
+        "Average database lookup time (with cache): {}μs",
+        avg_duration_micros
+    );
+    assert!(
+        avg_duration_micros < 20000,
+        "Database lookup should be <20ms (20000μs), got {}μs",
+        avg_duration_micros
+    );
 
     cleanup_test_data(&pool).await;
 }
@@ -211,24 +231,29 @@ async fn benchmark_persistence_write_performance() {
     let start = std::time::Instant::now();
 
     for i in 0..iterations {
-        resolver.add_entity(
-            format!("write_entity_{}", i),
-            format!("Write Test {}", i),
-            Some(2020),
-            None,
-            Some(format!("tt{:07}", 1000 + i)),
-            None,
-            None,
-        )
-        .await
-        .expect("Failed to add entity");
+        resolver
+            .add_entity(
+                format!("write_entity_{}", i),
+                format!("Write Test {}", i),
+                Some(2020),
+                None,
+                Some(format!("tt{:07}", 1000 + i)),
+                None,
+                None,
+            )
+            .await
+            .expect("Failed to add entity");
     }
 
     let total_duration = start.elapsed();
     let avg_duration_micros = total_duration.as_micros() / iterations;
 
     println!("Average persistence write time: {}μs", avg_duration_micros);
-    assert!(avg_duration_micros < 50000, "Write should be <50ms (50000μs), got {}μs", avg_duration_micros);
+    assert!(
+        avg_duration_micros < 50000,
+        "Write should be <50ms (50000μs), got {}μs",
+        avg_duration_micros
+    );
 
     cleanup_test_data(&pool).await;
 }

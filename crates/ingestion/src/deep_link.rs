@@ -151,7 +151,10 @@ mod tests {
         let generator = DeepLinkGenerator::new();
         let result = generator.generate("netflix", "80057281");
 
-        assert_eq!(result.mobile_url, Some("netflix://title/80057281".to_string()));
+        assert_eq!(
+            result.mobile_url,
+            Some("netflix://title/80057281".to_string())
+        );
         assert_eq!(result.web_url, "https://www.netflix.com/title/80057281");
         assert_eq!(result.tv_url, Some("netflix://title/80057281".to_string()));
     }
@@ -161,9 +164,18 @@ mod tests {
         let generator = DeepLinkGenerator::new();
         let result = generator.generate("prime_video", "B08WJM48TX");
 
-        assert_eq!(result.mobile_url, Some("aiv://aiv/view?gti=B08WJM48TX".to_string()));
-        assert_eq!(result.web_url, "https://www.amazon.com/gp/video/detail/B08WJM48TX");
-        assert_eq!(result.tv_url, Some("aiv://aiv/view?gti=B08WJM48TX".to_string()));
+        assert_eq!(
+            result.mobile_url,
+            Some("aiv://aiv/view?gti=B08WJM48TX".to_string())
+        );
+        assert_eq!(
+            result.web_url,
+            "https://www.amazon.com/gp/video/detail/B08WJM48TX"
+        );
+        assert_eq!(
+            result.tv_url,
+            Some("aiv://aiv/view?gti=B08WJM48TX".to_string())
+        );
     }
 
     #[test]
@@ -171,9 +183,18 @@ mod tests {
         let generator = DeepLinkGenerator::new();
         let result = generator.generate("youtube", "dQw4w9WgXcQ");
 
-        assert_eq!(result.mobile_url, Some("vnd.youtube://watch?v=dQw4w9WgXcQ".to_string()));
-        assert_eq!(result.web_url, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-        assert_eq!(result.tv_url, Some("vnd.youtube://watch?v=dQw4w9WgXcQ".to_string()));
+        assert_eq!(
+            result.mobile_url,
+            Some("vnd.youtube://watch?v=dQw4w9WgXcQ".to_string())
+        );
+        assert_eq!(
+            result.web_url,
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        );
+        assert_eq!(
+            result.tv_url,
+            Some("vnd.youtube://watch?v=dQw4w9WgXcQ".to_string())
+        );
     }
 
     #[test]
@@ -181,9 +202,15 @@ mod tests {
         let generator = DeepLinkGenerator::new();
         let result = generator.generate("disney_plus", "123abc");
 
-        assert_eq!(result.mobile_url, Some("disneyplus://content/123abc".to_string()));
+        assert_eq!(
+            result.mobile_url,
+            Some("disneyplus://content/123abc".to_string())
+        );
         assert_eq!(result.web_url, "https://www.disneyplus.com/video/123abc");
-        assert_eq!(result.tv_url, Some("disneyplus://content/123abc".to_string()));
+        assert_eq!(
+            result.tv_url,
+            Some("disneyplus://content/123abc".to_string())
+        );
     }
 
     #[test]
@@ -201,9 +228,15 @@ mod tests {
         let generator = DeepLinkGenerator::new();
         let result = generator.generate("apple_tv_plus", "content123");
 
-        assert_eq!(result.mobile_url, Some("videos://watch/content123".to_string()));
+        assert_eq!(
+            result.mobile_url,
+            Some("videos://watch/content123".to_string())
+        );
         assert_eq!(result.web_url, "https://tv.apple.com/us/video/content123");
-        assert_eq!(result.tv_url, Some("com.apple.tv://watch/content123".to_string()));
+        assert_eq!(
+            result.tv_url,
+            Some("com.apple.tv://watch/content123".to_string())
+        );
     }
 
     #[test]
@@ -212,7 +245,10 @@ mod tests {
         let result = generator.generate("unknown_platform", "content456");
 
         assert_eq!(result.mobile_url, None);
-        assert_eq!(result.web_url, "https://unknown_platform.com/watch/content456");
+        assert_eq!(
+            result.web_url,
+            "https://unknown_platform.com/watch/content456"
+        );
         assert_eq!(result.tv_url, None);
     }
 }

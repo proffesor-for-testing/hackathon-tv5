@@ -3,8 +3,8 @@
 //! Implements BuildUserPreferenceVector algorithm from SPARC pseudocode.
 //! Generates 512-dim preference vectors with temporal decay and engagement weighting.
 
-use crate::types::{ViewingEvent, TemporalContext, MoodState, GenreAffinities, PreferenceVector};
-use anyhow::{Result, anyhow};
+use crate::types::{GenreAffinities, MoodState, PreferenceVector, TemporalContext, ViewingEvent};
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use ndarray::{Array1, ArrayView1};
 use std::collections::HashMap;
@@ -160,10 +160,7 @@ impl ProgressivePersonalization {
         engagement: f32,
     ) {
         for genre in content_genres {
-            let current_affinity = profile.genre_affinities
-                .get(genre)
-                .copied()
-                .unwrap_or(0.5);
+            let current_affinity = profile.genre_affinities.get(genre).copied().unwrap_or(0.5);
 
             // Exponential moving average
             let new_affinity = current_affinity * 0.9 + engagement * 0.1;

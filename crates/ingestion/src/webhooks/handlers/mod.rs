@@ -1,7 +1,7 @@
 //! Platform-specific webhook handlers
 
-pub mod netflix;
 pub mod generic;
+pub mod netflix;
 
-pub use netflix::NetflixWebhookHandler;
 pub use generic::GenericWebhookHandler;
+pub use netflix::NetflixWebhookHandler;

@@ -1,12 +1,11 @@
 /// Watchlist synchronization using OR-Set CRDT
 ///
 /// Supports add/remove operations with add-wins conflict resolution
-
 use crate::crdt::{HLCTimestamp, HybridLogicalClock, ORSet, ORSetDelta, ORSetOperation};
 use crate::sync::publisher::{PublisherError, SyncPublisher};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use parking_lot::RwLock;
 use tracing::{debug, error, info};
 
 /// Watchlist sync manager

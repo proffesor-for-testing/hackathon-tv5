@@ -1,6 +1,8 @@
 use crate::{
     error::AuthError,
-    password_reset::{ForgotPasswordRequest, PasswordResetToken, PasswordValidator, ResetPasswordRequest},
+    password_reset::{
+        ForgotPasswordRequest, PasswordResetToken, PasswordValidator, ResetPasswordRequest,
+    },
     storage::AuthStorage,
     user::{CreateUserRequest, PasswordHasher, PostgresUserRepository, UserRepository},
 };
@@ -73,11 +75,10 @@ async fn test_reset_password_updates_password(pool: PgPool) {
 
     // Verify new password works
     let fetched_user = user_repo.find_by_id(user.id).await.unwrap().unwrap();
-    assert!(PasswordHasher::verify_password(
-        new_password,
-        &fetched_user.password_hash.unwrap()
-    )
-    .unwrap());
+    assert!(
+        PasswordHasher::verify_password(new_password, &fetched_user.password_hash.unwrap())
+            .unwrap()
+    );
 
     // Verify old password doesn't work
     let old_hash = PasswordHasher::hash_password("OldPassword123").unwrap();
@@ -154,7 +155,13 @@ async fn test_password_reset_rate_limiting(pool: PgPool) {
             .check_password_reset_rate_limit(email)
             .await
             .unwrap();
-        assert_eq!(remaining, 3 - i, "Attempt {} should have {} remaining", i, 3 - i);
+        assert_eq!(
+            remaining,
+            3 - i,
+            "Attempt {} should have {} remaining",
+            i,
+            3 - i
+        );
     }
 
     // 4th request should be rate limited
@@ -171,18 +178,34 @@ async fn test_delete_user_sessions(pool: PgPool) {
     let user_id = Uuid::new_v4().to_string();
 
     // Simulate creating sessions by storing some keys
-    let mut conn = storage.client.get_multiplexed_async_connection().await.unwrap();
+    let mut conn = storage
+        .client
+        .get_multiplexed_async_connection()
+        .await
+        .unwrap();
     use redis::AsyncCommands;
 
-    let _: () = conn.set(format!("session:user:{}:session1", user_id), "data1").await.unwrap();
-    let _: () = conn.set(format!("session:user:{}:session2", user_id), "data2").await.unwrap();
+    let _: () = conn
+        .set(format!("session:user:{}:session1", user_id), "data1")
+        .await
+        .unwrap();
+    let _: () = conn
+        .set(format!("session:user:{}:session2", user_id), "data2")
+        .await
+        .unwrap();
 
     // Delete all sessions
     storage.delete_user_sessions(&user_id).await.unwrap();
 
     // Verify sessions are deleted
-    let result1: Option<String> = conn.get(format!("session:user:{}:session1", user_id)).await.unwrap();
-    let result2: Option<String> = conn.get(format!("session:user:{}:session2", user_id)).await.unwrap();
+    let result1: Option<String> = conn
+        .get(format!("session:user:{}:session1", user_id))
+        .await
+        .unwrap();
+    let result2: Option<String> = conn
+        .get(format!("session:user:{}:session2", user_id))
+        .await
+        .unwrap();
 
     assert!(result1.is_none());
     assert!(result2.is_none());
@@ -267,15 +290,17 @@ async fn test_password_reset_flow_integration(pool: PgPool) {
         .unwrap();
 
     // Step 8: Invalidate all sessions
-    storage.delete_user_sessions(&user.id.to_string()).await.unwrap();
+    storage
+        .delete_user_sessions(&user.id.to_string())
+        .await
+        .unwrap();
 
     // Step 9: Verify new password works
     let updated_user = user_repo.find_by_id(user.id).await.unwrap().unwrap();
-    assert!(PasswordHasher::verify_password(
-        new_password,
-        &updated_user.password_hash.unwrap()
-    )
-    .unwrap());
+    assert!(
+        PasswordHasher::verify_password(new_password, &updated_user.password_hash.unwrap())
+            .unwrap()
+    );
 
     // Step 10: Verify token is deleted
     let should_be_none = storage

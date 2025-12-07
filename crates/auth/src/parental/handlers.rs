@@ -43,8 +43,8 @@ pub async fn update_parental_controls(
     state: web::Data<ParentalControlsState>,
 ) -> Result<impl Responder> {
     let user_context = extract_user_context(&req)?;
-    let user_id =
-        Uuid::parse_str(&user_context.user_id).map_err(|e| AuthError::InvalidToken(e.to_string()))?;
+    let user_id = Uuid::parse_str(&user_context.user_id)
+        .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
 
     let controls = set_parental_controls(&state.db_pool, user_id, body.into_inner()).await?;
 
@@ -62,8 +62,8 @@ pub async fn verify_parental_pin(
     state: web::Data<ParentalControlsState>,
 ) -> Result<impl Responder> {
     let user_context = extract_user_context(&req)?;
-    let user_id =
-        Uuid::parse_str(&user_context.user_id).map_err(|e| AuthError::InvalidToken(e.to_string()))?;
+    let user_id = Uuid::parse_str(&user_context.user_id)
+        .map_err(|e| AuthError::InvalidToken(e.to_string()))?;
 
     let response = verify_pin(
         &state.db_pool,

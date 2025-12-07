@@ -9,7 +9,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 // Test database URL - should match development environment
-const TEST_DATABASE_URL: &str = "postgresql://mediagateway:localdev123@localhost:5432/media_gateway";
+const TEST_DATABASE_URL: &str =
+    "postgresql://mediagateway:localdev123@localhost:5432/media_gateway";
 
 async fn setup_test_pool() -> Result<PgPool> {
     let pool = PgPool::connect(TEST_DATABASE_URL).await?;
@@ -254,15 +255,8 @@ async fn test_experiment_metrics_with_multiple_users() -> Result<()> {
         // 80% conversion rate for control, 90% for treatment
         let convert = if i < 5 { i < 4 } else { i < 9 };
         if convert {
-            repo.record_metric(
-                experiment.id,
-                variant.id,
-                user_id,
-                "conversion",
-                1.0,
-                None,
-            )
-            .await?;
+            repo.record_metric(experiment.id, variant.id, user_id, "conversion", 1.0, None)
+                .await?;
         }
     }
 

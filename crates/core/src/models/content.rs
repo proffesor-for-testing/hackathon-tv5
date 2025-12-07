@@ -376,12 +376,9 @@ impl CanonicalContent {
 
     /// Check if content is available in a specific region
     pub fn is_available_in_region(&self, region: &str) -> bool {
-        self.platform_availability.iter().any(|avail| {
-            avail
-                .regions
-                .iter()
-                .any(|r| r.eq_ignore_ascii_case(region))
-        })
+        self.platform_availability
+            .iter()
+            .any(|avail| avail.regions.iter().any(|r| r.eq_ignore_ascii_case(region)))
     }
 
     /// Update the timestamp to reflect changes

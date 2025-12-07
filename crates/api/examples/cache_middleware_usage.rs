@@ -2,7 +2,6 @@
 ///
 /// This demonstrates how to integrate the Redis-backed response caching middleware
 /// into an Actix-web application.
-
 use actix_web::{web, App, HttpResponse, HttpServer};
 use media_gateway_api::middleware::{CacheConfig, CacheMiddleware};
 use std::sync::Arc;
@@ -13,13 +12,13 @@ async fn main() -> std::io::Result<()> {
     tracing_subscriber::fmt::init();
 
     // Redis connection string
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     // Create custom cache configuration
     let cache_config = CacheConfig {
-        default_ttl: 60,         // 1 minute for general endpoints
-        content_ttl: 300,        // 5 minutes for content endpoints
+        default_ttl: 60,            // 1 minute for general endpoints
+        content_ttl: 300,           // 5 minutes for content endpoints
         cache_authenticated: false, // Don't cache user-specific responses
         skip_paths: vec![
             "/api/user/".to_string(),
@@ -55,7 +54,10 @@ async fn main() -> std::io::Result<()> {
             .route("/health", web::get().to(health))
             // Cache management endpoints
             .route("/cache/invalidate", web::post().to(invalidate_cache))
-            .route("/cache/invalidate/{pattern}", web::delete().to(invalidate_pattern))
+            .route(
+                "/cache/invalidate/{pattern}",
+                web::delete().to(invalidate_pattern),
+            )
     })
     .bind(("127.0.0.1", 8080))?
     .run()

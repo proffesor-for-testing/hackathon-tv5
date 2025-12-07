@@ -147,15 +147,14 @@ impl AuditLogger for PostgresAuditLogger {
             "#,
         );
 
-        let mut params: Vec<Box<dyn sqlx::Encode<'_, sqlx::Postgres> + Send>> = vec![];
         let mut param_count = 1;
 
-        if let Some(start) = &filter.start_date {
+        if filter.start_date.is_some() {
             query.push_str(&format!(" AND timestamp >= ${}", param_count));
             param_count += 1;
         }
 
-        if let Some(end) = &filter.end_date {
+        if filter.end_date.is_some() {
             query.push_str(&format!(" AND timestamp <= ${}", param_count));
             param_count += 1;
         }
@@ -165,7 +164,7 @@ impl AuditLogger for PostgresAuditLogger {
             param_count += 1;
         }
 
-        if let Some(action) = &filter.action {
+        if filter.action.is_some() {
             query.push_str(&format!(" AND action = ${}", param_count));
             param_count += 1;
         }
@@ -177,12 +176,12 @@ impl AuditLogger for PostgresAuditLogger {
 
         query.push_str(" ORDER BY timestamp DESC");
 
-        if let Some(limit) = filter.limit {
+        if filter.limit.is_some() {
             query.push_str(&format!(" LIMIT ${}", param_count));
             param_count += 1;
         }
 
-        if let Some(offset) = filter.offset {
+        if filter.offset.is_some() {
             query.push_str(&format!(" OFFSET ${}", param_count));
         }
 
@@ -215,19 +214,19 @@ impl AuditLogger for PostgresAuditLogger {
         let events = rows
             .into_iter()
             .filter_map(|row| {
-                let action_str: String = row.get("action");
+                let action_str: String = row.try_get("action").ok()?;
                 let action = AuditAction::from_str(&action_str)?;
 
                 Some(AuditEvent {
-                    id: row.get("id"),
-                    timestamp: row.get("timestamp"),
-                    user_id: row.get("user_id"),
+                    id: row.try_get("id").ok()?,
+                    timestamp: row.try_get("timestamp").ok()?,
+                    user_id: row.try_get("user_id").ok()?,
                     action,
-                    resource_type: row.get("resource_type"),
-                    resource_id: row.get("resource_id"),
-                    details: row.get("details"),
-                    ip_address: row.get("ip_address"),
-                    user_agent: row.get("user_agent"),
+                    resource_type: row.try_get("resource_type").ok()?,
+                    resource_id: row.try_get("resource_id").ok()?,
+                    details: row.try_get("details").ok()?,
+                    ip_address: row.try_get("ip_address").ok()?,
+                    user_agent: row.try_get("user_agent").ok()?,
                 })
             })
             .collect();
@@ -244,8 +243,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_postgres_audit_logger_new() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -281,8 +281,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_audit_logger_log_single_event() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -331,8 +332,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_audit_logger_log_batch() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -366,7 +368,8 @@ mod tests {
         let events = vec![
             AuditEvent::new(AuditAction::AuthLogin, "user".to_string()).with_user_id(user_id),
             AuditEvent::new(AuditAction::UserCreated, "user".to_string()).with_user_id(user_id),
-            AuditEvent::new(AuditAction::ContentCreated, "content".to_string()).with_user_id(user_id),
+            AuditEvent::new(AuditAction::ContentCreated, "content".to_string())
+                .with_user_id(user_id),
         ];
 
         logger.log_batch(events).await.unwrap();
@@ -379,8 +382,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_audit_logger_query_with_filters() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -417,7 +421,8 @@ mod tests {
             AuditEvent::new(AuditAction::AuthLogin, "user".to_string()).with_user_id(user_id_1),
             AuditEvent::new(AuditAction::UserCreated, "user".to_string()).with_user_id(user_id_1),
             AuditEvent::new(AuditAction::AuthLogin, "user".to_string()).with_user_id(user_id_2),
-            AuditEvent::new(AuditAction::ContentCreated, "content".to_string()).with_user_id(user_id_1),
+            AuditEvent::new(AuditAction::ContentCreated, "content".to_string())
+                .with_user_id(user_id_1),
         ];
 
         logger.log_batch(events).await.unwrap();
@@ -434,8 +439,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_audit_logger_query_date_range() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -476,7 +482,10 @@ mod tests {
         logger.log_batch(events).await.unwrap();
 
         let filter = AuditFilter::new()
-            .with_date_range(now - chrono::Duration::hours(1), now + chrono::Duration::hours(1))
+            .with_date_range(
+                now - chrono::Duration::hours(1),
+                now + chrono::Duration::hours(1),
+            )
             .with_user_id(user_id);
         let results = logger.query(filter).await.unwrap();
 
@@ -485,8 +494,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_audit_logger_buffer_flush() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
 

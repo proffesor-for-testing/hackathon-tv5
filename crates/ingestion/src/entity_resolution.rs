@@ -6,15 +6,15 @@
 //! 3. Fuzzy title + year matching (90-98% confidence, threshold 0.85)
 //! 4. Embedding similarity matching (85-95% confidence, threshold 0.92)
 
-use crate::{normalizer::CanonicalContent, Result, IngestionError};
+use crate::{normalizer::CanonicalContent, IngestionError, Result};
+use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use strsim::normalized_levenshtein;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use moka::future::Cache;
 use std::time::Duration;
+use strsim::normalized_levenshtein;
+use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 /// Entity match result
@@ -105,7 +105,7 @@ impl EntityResolver {
             SELECT external_id, id_type, entity_id, confidence
             FROM entity_mappings
             ORDER BY created_at ASC
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await
@@ -158,7 +158,7 @@ impl EntityResolver {
             SET entity_id = EXCLUDED.entity_id,
                 confidence = EXCLUDED.confidence,
                 updated_at = NOW()
-            "#
+            "#,
         )
         .bind(external_id)
         .bind(id_type)
@@ -168,7 +168,10 @@ impl EntityResolver {
         .await
         .map_err(|e| IngestionError::DatabaseError(e.to_string()))?;
 
-        debug!("Persisted {} mapping: {} -> {}", id_type, external_id, entity_id);
+        debug!(
+            "Persisted {} mapping: {} -> {}",
+            id_type, external_id, entity_id
+        );
         Ok(())
     }
 
@@ -204,7 +207,8 @@ impl EntityResolver {
                 let entity_id_clone = entity_id.clone();
                 drop(eidr_idx);
 
-                self.store_cache(cache_key, Some(entity_id_clone.clone())).await;
+                self.store_cache(cache_key, Some(entity_id_clone.clone()))
+                    .await;
                 return Ok(EntityMatch {
                     entity_id: Some(entity_id_clone),
                     confidence: 1.0,
@@ -233,8 +237,10 @@ impl EntityResolver {
                 let entity_id_clone = entity_id.clone();
                 drop(imdb_idx);
 
-                self.store_cache(cache_key, Some(entity_id_clone.clone())).await;
-                self.persist_mapping(imdb_id, "imdb", &entity_id_clone, 0.99).await?;
+                self.store_cache(cache_key, Some(entity_id_clone.clone()))
+                    .await;
+                self.persist_mapping(imdb_id, "imdb", &entity_id_clone, 0.99)
+                    .await?;
 
                 return Ok(EntityMatch {
                     entity_id: Some(entity_id_clone),
@@ -265,8 +271,10 @@ impl EntityResolver {
                 let entity_id_clone = entity_id.clone();
                 drop(tmdb_idx);
 
-                self.store_cache(cache_key, Some(entity_id_clone.clone())).await;
-                self.persist_mapping(tmdb_id, "tmdb", &entity_id_clone, 0.99).await?;
+                self.store_cache(cache_key, Some(entity_id_clone.clone()))
+                    .await;
+                self.persist_mapping(tmdb_id, "tmdb", &entity_id_clone, 0.99)
+                    .await?;
 
                 return Ok(EntityMatch {
                     entity_id: Some(entity_id_clone),
@@ -284,7 +292,8 @@ impl EntityResolver {
             if let Some(ref entity_id) = fuzzy_match.entity_id {
                 if let Some(first_external_id) = content.external_ids.iter().next() {
                     let (id_type, external_id) = first_external_id;
-                    self.persist_mapping(external_id, id_type, entity_id, fuzzy_match.confidence).await?;
+                    self.persist_mapping(external_id, id_type, entity_id, fuzzy_match.confidence)
+                        .await?;
                 }
             }
             return Ok(fuzzy_match);
@@ -297,7 +306,13 @@ impl EntityResolver {
                 if let Some(ref entity_id) = embedding_match.entity_id {
                     if let Some(first_external_id) = content.external_ids.iter().next() {
                         let (id_type, external_id) = first_external_id;
-                        self.persist_mapping(external_id, id_type, entity_id, embedding_match.confidence).await?;
+                        self.persist_mapping(
+                            external_id,
+                            id_type,
+                            entity_id,
+                            embedding_match.confidence,
+                        )
+                        .await?;
                     }
                 }
                 return Ok(embedding_match);
@@ -323,7 +338,9 @@ impl EntityResolver {
         let entity_idx = self.entity_index.read().await;
         for record in entity_idx.values() {
             // Year must match (if available)
-            if let (Some(content_year), Some(record_year)) = (content.release_year, record.release_year) {
+            if let (Some(content_year), Some(record_year)) =
+                (content.release_year, record.release_year)
+            {
                 if (content_year - record_year).abs() > 1 {
                     continue; // Allow 1 year tolerance
                 }
@@ -452,19 +469,22 @@ impl EntityResolver {
             let mut eidr_idx = self.eidr_index.write().await;
             eidr_idx.insert(eidr_val.clone(), entity_id.clone());
             drop(eidr_idx);
-            self.persist_mapping(eidr_val, "eidr", &entity_id, 1.0).await?;
+            self.persist_mapping(eidr_val, "eidr", &entity_id, 1.0)
+                .await?;
         }
         if let Some(imdb_val) = &imdb_id {
             let mut imdb_idx = self.imdb_index.write().await;
             imdb_idx.insert(imdb_val.clone(), entity_id.clone());
             drop(imdb_idx);
-            self.persist_mapping(imdb_val, "imdb", &entity_id, 0.99).await?;
+            self.persist_mapping(imdb_val, "imdb", &entity_id, 0.99)
+                .await?;
         }
         if let Some(tmdb_val) = &tmdb_id {
             let mut tmdb_idx = self.tmdb_index.write().await;
             tmdb_idx.insert(tmdb_val.clone(), entity_id.clone());
             drop(tmdb_idx);
-            self.persist_mapping(tmdb_val, "tmdb", &entity_id, 0.99).await?;
+            self.persist_mapping(tmdb_val, "tmdb", &entity_id, 0.99)
+                .await?;
         }
 
         let mut entity_idx = self.entity_index.write().await;
@@ -512,5 +532,4 @@ mod tests {
         assert!((EntityResolver::calculate_embedding_confidence(0.92) - 0.85).abs() < 0.01);
         assert!((EntityResolver::calculate_embedding_confidence(1.0) - 0.95).abs() < 0.01);
     }
-
 }

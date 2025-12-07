@@ -9,22 +9,22 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
 
-pub mod receiver;
-pub mod handlers;
-pub mod queue;
-pub mod verification;
-pub mod deduplication;
-pub mod metrics;
 pub mod api;
+pub mod deduplication;
+pub mod handlers;
+pub mod metrics;
 pub mod processor;
+pub mod queue;
+pub mod receiver;
+pub mod verification;
 
-pub use receiver::WebhookReceiver;
-pub use queue::{WebhookQueue, RedisWebhookQueue, QueueStats};
-pub use verification::verify_hmac_signature;
+pub use api::configure_routes;
 pub use deduplication::WebhookDeduplicator;
 pub use metrics::WebhookMetrics;
-pub use api::configure_routes;
 pub use processor::WebhookProcessor;
+pub use queue::{QueueStats, RedisWebhookQueue, WebhookQueue};
+pub use receiver::WebhookReceiver;
+pub use verification::verify_hmac_signature;
 
 /// Webhook errors
 #[derive(Debug, Error)]
@@ -145,7 +145,12 @@ pub trait WebhookHandler: Send + Sync {
     fn platform_id(&self) -> &'static str;
 
     /// Verify webhook signature
-    fn verify_signature(&self, payload: &[u8], signature: &str, secret: &str) -> WebhookResult<bool>;
+    fn verify_signature(
+        &self,
+        payload: &[u8],
+        signature: &str,
+        secret: &str,
+    ) -> WebhookResult<bool>;
 
     /// Parse and validate webhook payload
     fn parse_payload(&self, body: &[u8]) -> WebhookResult<WebhookPayload>;

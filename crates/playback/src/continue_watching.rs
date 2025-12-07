@@ -160,10 +160,7 @@ pub struct ContinueWatchingService {
 
 impl ContinueWatchingService {
     /// Create new continue watching service
-    pub fn new(
-        pool: PgPool,
-        metadata_provider: Arc<dyn ContentMetadataProvider>,
-    ) -> Self {
+    pub fn new(pool: PgPool, metadata_provider: Arc<dyn ContentMetadataProvider>) -> Self {
         Self {
             progress_repo: ProgressRepository::new(pool),
             metadata_provider,
@@ -274,11 +271,10 @@ pub enum ContinueWatchingError {
 impl actix_web::ResponseError for ContinueWatchingError {
     fn error_response(&self) -> actix_web::HttpResponse {
         match self {
-            ContinueWatchingError::InvalidRequest(msg) => {
-                actix_web::HttpResponse::BadRequest().json(serde_json::json!({
+            ContinueWatchingError::InvalidRequest(msg) => actix_web::HttpResponse::BadRequest()
+                .json(serde_json::json!({
                     "error": msg
-                }))
-            }
+                })),
             _ => actix_web::HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": self.to_string()
             })),
@@ -292,8 +288,9 @@ mod tests {
     use sqlx::postgres::PgPoolOptions;
 
     async fn setup_test_db() -> PgPool {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+        });
 
         PgPoolOptions::new()
             .max_connections(5)
@@ -303,7 +300,8 @@ mod tests {
     }
 
     async fn cleanup_test_data(pool: &PgPool, user_id: Uuid) {
-        sqlx::query!("DELETE FROM playback_progress WHERE user_id = $1", user_id)
+        sqlx::query("DELETE FROM playback_progress WHERE user_id = $1")
+            .bind(user_id)
             .execute(pool)
             .await
             .ok();
@@ -312,10 +310,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_continue_watching_empty() {
         let pool = setup_test_db().await;
-        let service = ContinueWatchingService::new(
-            pool.clone(),
-            Arc::new(MockContentMetadataProvider),
-        );
+        let service =
+            ContinueWatchingService::new(pool.clone(), Arc::new(MockContentMetadataProvider));
 
         let user_id = Uuid::new_v4();
         let result = service.get_continue_watching(user_id, None).await;
@@ -329,10 +325,8 @@ mod tests {
     #[tokio::test]
     async fn test_update_progress_creates_record() {
         let pool = setup_test_db().await;
-        let service = ContinueWatchingService::new(
-            pool.clone(),
-            Arc::new(MockContentMetadataProvider),
-        );
+        let service =
+            ContinueWatchingService::new(pool.clone(), Arc::new(MockContentMetadataProvider));
 
         let user_id = Uuid::new_v4();
         let content_id = Uuid::new_v4();
@@ -359,10 +353,8 @@ mod tests {
     #[tokio::test]
     async fn test_update_progress_marks_completed() {
         let pool = setup_test_db().await;
-        let service = ContinueWatchingService::new(
-            pool.clone(),
-            Arc::new(MockContentMetadataProvider),
-        );
+        let service =
+            ContinueWatchingService::new(pool.clone(), Arc::new(MockContentMetadataProvider));
 
         let user_id = Uuid::new_v4();
         let content_id = Uuid::new_v4();
@@ -388,10 +380,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_continue_watching_with_items() {
         let pool = setup_test_db().await;
-        let service = ContinueWatchingService::new(
-            pool.clone(),
-            Arc::new(MockContentMetadataProvider),
-        );
+        let service =
+            ContinueWatchingService::new(pool.clone(), Arc::new(MockContentMetadataProvider));
 
         let user_id = Uuid::new_v4();
 
@@ -425,10 +415,8 @@ mod tests {
     #[tokio::test]
     async fn test_continue_watching_excludes_completed() {
         let pool = setup_test_db().await;
-        let service = ContinueWatchingService::new(
-            pool.clone(),
-            Arc::new(MockContentMetadataProvider),
-        );
+        let service =
+            ContinueWatchingService::new(pool.clone(), Arc::new(MockContentMetadataProvider));
 
         let user_id = Uuid::new_v4();
 
@@ -439,7 +427,10 @@ mod tests {
             duration_seconds: 6000,
             device_id: None,
         };
-        service.update_progress(user_id, incomplete_request).await.unwrap();
+        service
+            .update_progress(user_id, incomplete_request)
+            .await
+            .unwrap();
 
         let completed_request = ProgressUpdateRequest {
             content_id: Uuid::new_v4(),
@@ -448,7 +439,10 @@ mod tests {
             duration_seconds: 6000,
             device_id: None,
         };
-        service.update_progress(user_id, completed_request).await.unwrap();
+        service
+            .update_progress(user_id, completed_request)
+            .await
+            .unwrap();
 
         let result = service.get_continue_watching(user_id, None).await.unwrap();
         assert_eq!(result.total, 1);
@@ -460,10 +454,8 @@ mod tests {
     #[tokio::test]
     async fn test_cleanup_stale_progress() {
         let pool = setup_test_db().await;
-        let service = ContinueWatchingService::new(
-            pool.clone(),
-            Arc::new(MockContentMetadataProvider),
-        );
+        let service =
+            ContinueWatchingService::new(pool.clone(), Arc::new(MockContentMetadataProvider));
 
         let user_id = Uuid::new_v4();
         let content_id = Uuid::new_v4();
@@ -478,10 +470,10 @@ mod tests {
 
         service.update_progress(user_id, request).await.unwrap();
 
-        sqlx::query!(
-            "UPDATE playback_progress SET updated_at = NOW() - INTERVAL '31 days' WHERE user_id = $1",
-            user_id
+        sqlx::query(
+            "UPDATE playback_progress SET updated_at = NOW() - INTERVAL '31 days' WHERE user_id = $1"
         )
+        .bind(user_id)
         .execute(&pool)
         .await
         .unwrap();
@@ -496,10 +488,8 @@ mod tests {
     #[tokio::test]
     async fn test_continue_watching_ordering() {
         let pool = setup_test_db().await;
-        let service = ContinueWatchingService::new(
-            pool.clone(),
-            Arc::new(MockContentMetadataProvider),
-        );
+        let service =
+            ContinueWatchingService::new(pool.clone(), Arc::new(MockContentMetadataProvider));
 
         let user_id = Uuid::new_v4();
         let mut content_ids = Vec::new();
@@ -532,10 +522,8 @@ mod tests {
     #[tokio::test]
     async fn test_update_progress_updates_existing() {
         let pool = setup_test_db().await;
-        let service = ContinueWatchingService::new(
-            pool.clone(),
-            Arc::new(MockContentMetadataProvider),
-        );
+        let service =
+            ContinueWatchingService::new(pool.clone(), Arc::new(MockContentMetadataProvider));
 
         let user_id = Uuid::new_v4();
         let content_id = Uuid::new_v4();

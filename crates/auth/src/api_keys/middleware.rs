@@ -82,13 +82,16 @@ where
                 .get("Authorization")
                 .and_then(|h| h.to_str().ok())
                 .ok_or_else(|| {
-                    Error::from(AuthError::InvalidToken("Missing Authorization header".to_string()))
+                    Error::from(AuthError::InvalidToken(
+                        "Missing Authorization header".to_string(),
+                    ))
                 })?;
 
-            let api_key = extract_api_key(auth_header)
-                .map_err(|e| Error::from(e))?;
+            let api_key = extract_api_key(auth_header).map_err(|e| Error::from(e))?;
 
-            let verified_key = manager.verify_key(&api_key).await
+            let verified_key = manager
+                .verify_key(&api_key)
+                .await
                 .map_err(|e| Error::from(e))?;
 
             let context = ApiKeyContext {
@@ -118,7 +121,9 @@ fn extract_api_key(auth_header: &str) -> Result<String> {
     if let Some(stripped) = auth_header.strip_prefix("Bearer ") {
         Ok(stripped.to_string())
     } else {
-        Err(AuthError::InvalidToken("Invalid Authorization header format".to_string()))
+        Err(AuthError::InvalidToken(
+            "Invalid Authorization header format".to_string(),
+        ))
     }
 }
 

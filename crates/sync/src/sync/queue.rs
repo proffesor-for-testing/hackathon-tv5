@@ -2,9 +2,8 @@
 ///
 /// Provides a persistent queue for sync operations with FIFO ordering,
 /// automatic reconnection handling, and CRDT merge conflict resolution.
-
 use crate::crdt::HLCTimestamp;
-use crate::sync::publisher::{SyncPublisher, PublisherError, SyncMessage, MessagePayload};
+use crate::sync::publisher::{MessagePayload, PublisherError, SyncMessage, SyncPublisher};
 use async_trait::async_trait;
 use rusqlite::{params, Connection, Result as SqliteResult};
 use serde::{Deserialize, Serialize};
@@ -378,7 +377,8 @@ impl OfflineSyncQueue {
     /// Returns `QueueError` if database deletion fails
     pub fn remove(&self, id: u64) -> Result<(), QueueError> {
         let db = self.db.lock();
-        let rows_affected = db.execute("DELETE FROM sync_queue WHERE id = ?1", params![id as i64])?;
+        let rows_affected =
+            db.execute("DELETE FROM sync_queue WHERE id = ?1", params![id as i64])?;
 
         if rows_affected > 0 {
             debug!("Removed operation with id: {}", id);
@@ -487,7 +487,9 @@ impl OfflineSyncQueue {
                         // Operation stays in queue with incremented retry count
                         report.failure_count += 1;
                         report.failed_operation_ids.push(id);
-                        report.errors.push(format!("Operation {} (retry {}): {}", id, retry_count, e));
+                        report
+                            .errors
+                            .push(format!("Operation {} (retry {}): {}", id, retry_count, e));
                     }
                 }
             }
@@ -534,7 +536,11 @@ impl OfflineSyncQueue {
         let device_id = "offline-queue".to_string();
 
         let (payload, operation_type) = match op {
-            SyncOperation::WatchlistAdd { user_id, content_id, timestamp: ts } => {
+            SyncOperation::WatchlistAdd {
+                user_id,
+                content_id,
+                timestamp: ts,
+            } => {
                 // Minimal payload for watchlist operations
                 let payload = MessagePayload::WatchlistUpdate {
                     operation: crate::sync::WatchlistOperation::Add,
@@ -551,7 +557,11 @@ impl OfflineSyncQueue {
                 (payload, "watchlist_add".to_string())
             }
 
-            SyncOperation::WatchlistRemove { user_id, content_id, timestamp: ts } => {
+            SyncOperation::WatchlistRemove {
+                user_id,
+                content_id,
+                timestamp: ts,
+            } => {
                 let payload = MessagePayload::WatchlistUpdate {
                     operation: crate::sync::WatchlistOperation::Remove,
                     content_id: content_id.to_string(),
@@ -567,7 +577,12 @@ impl OfflineSyncQueue {
                 (payload, "watchlist_remove".to_string())
             }
 
-            SyncOperation::ProgressUpdate { user_id, content_id, position, timestamp: ts } => {
+            SyncOperation::ProgressUpdate {
+                user_id,
+                content_id,
+                position,
+                timestamp: ts,
+            } => {
                 // Delta encoding: calculate position diff if enabled
                 let (position_to_send, delta_applied) = if self.delta_config.enabled {
                     self.calculate_position_delta(*content_id, *position, *ts)
@@ -609,7 +624,14 @@ impl OfflineSyncQueue {
                 (payload, "progress_update".to_string())
             }
 
-            SyncOperation::DeviceCommand { command_id, source_device_id, target_device_id, command_type, payload: cmd_payload, timestamp: ts } => {
+            SyncOperation::DeviceCommand {
+                command_id,
+                source_device_id,
+                target_device_id,
+                command_type,
+                payload: cmd_payload,
+                timestamp: ts,
+            } => {
                 // For device commands, we create a generic sync message with the command payload
                 // This would typically be routed through a separate command channel
                 let payload_json = serde_json::json!({
@@ -649,7 +671,12 @@ impl OfflineSyncQueue {
     }
 
     /// Calculate position delta for progress updates
-    fn calculate_position_delta(&self, content_id: Uuid, current_position: f64, timestamp: i64) -> (f64, bool) {
+    fn calculate_position_delta(
+        &self,
+        content_id: Uuid,
+        current_position: f64,
+        timestamp: i64,
+    ) -> (f64, bool) {
         let mut states = self.previous_states.write();
 
         if let Some(prev) = states.get(&content_id) {
@@ -657,20 +684,26 @@ impl OfflineSyncQueue {
             let position_diff = current_position - prev.position;
 
             // Update state
-            states.insert(content_id, PreviousState {
+            states.insert(
                 content_id,
-                position: current_position,
-                timestamp,
-            });
+                PreviousState {
+                    content_id,
+                    position: current_position,
+                    timestamp,
+                },
+            );
 
             (position_diff, true)
         } else {
             // No previous state, send full position
-            states.insert(content_id, PreviousState {
+            states.insert(
                 content_id,
-                position: current_position,
-                timestamp,
-            });
+                PreviousState {
+                    content_id,
+                    position: current_position,
+                    timestamp,
+                },
+            );
 
             (current_position, false)
         }
@@ -723,7 +756,7 @@ pub enum QueueError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sync::publisher::{SyncMessage, MessagePayload};
+    use crate::sync::publisher::{MessagePayload, SyncMessage};
     use parking_lot::Mutex as ParkingMutex;
     use std::sync::Arc;
 
@@ -999,7 +1032,9 @@ mod tests {
     #[tokio::test]
     async fn test_replay_pending_success() {
         let publisher = Arc::new(MockPublisher::new());
-        let queue = OfflineSyncQueue::new_in_memory(Arc::clone(&publisher) as Arc<dyn SyncPublisher>).unwrap();
+        let queue =
+            OfflineSyncQueue::new_in_memory(Arc::clone(&publisher) as Arc<dyn SyncPublisher>)
+                .unwrap();
 
         let user_id = Uuid::new_v4();
 
@@ -1047,7 +1082,9 @@ mod tests {
     #[tokio::test]
     async fn test_replay_pending_with_failures() {
         let publisher = Arc::new(MockPublisher::new());
-        let queue = OfflineSyncQueue::new_in_memory(Arc::clone(&publisher) as Arc<dyn SyncPublisher>).unwrap();
+        let queue =
+            OfflineSyncQueue::new_in_memory(Arc::clone(&publisher) as Arc<dyn SyncPublisher>)
+                .unwrap();
 
         let user_id = Uuid::new_v4();
 
@@ -1193,7 +1230,10 @@ mod tests {
         assert_eq!(message.operation_type, "progress_update");
 
         // Verify payload structure
-        if let MessagePayload::ProgressUpdate { content_id: cid, .. } = message.payload {
+        if let MessagePayload::ProgressUpdate {
+            content_id: cid, ..
+        } = message.payload
+        {
             assert_eq!(cid, content_id.to_string());
         } else {
             panic!("Expected ProgressUpdate payload");
@@ -1273,7 +1313,9 @@ mod tests {
     #[tokio::test]
     async fn test_publish_operation_with_delta_sync() {
         let publisher = Arc::new(MockPublisher::new());
-        let queue = OfflineSyncQueue::new_in_memory(Arc::clone(&publisher) as Arc<dyn SyncPublisher>).unwrap();
+        let queue =
+            OfflineSyncQueue::new_in_memory(Arc::clone(&publisher) as Arc<dyn SyncPublisher>)
+                .unwrap();
 
         let user_id = Uuid::new_v4();
         let content_id = Uuid::new_v4();
@@ -1305,7 +1347,9 @@ mod tests {
     #[tokio::test]
     async fn test_replay_with_device_command() {
         let publisher = Arc::new(MockPublisher::new());
-        let queue = OfflineSyncQueue::new_in_memory(Arc::clone(&publisher) as Arc<dyn SyncPublisher>).unwrap();
+        let queue =
+            OfflineSyncQueue::new_in_memory(Arc::clone(&publisher) as Arc<dyn SyncPublisher>)
+                .unwrap();
 
         let command_id = Uuid::new_v4();
 
@@ -1357,7 +1401,9 @@ mod tests {
     #[tokio::test]
     async fn test_integration_delta_encoding_with_multiple_updates() {
         let publisher = Arc::new(MockPublisher::new());
-        let queue = OfflineSyncQueue::new_in_memory(Arc::clone(&publisher) as Arc<dyn SyncPublisher>).unwrap();
+        let queue =
+            OfflineSyncQueue::new_in_memory(Arc::clone(&publisher) as Arc<dyn SyncPublisher>)
+                .unwrap();
 
         let user_id = Uuid::new_v4();
         let content_id = Uuid::new_v4();

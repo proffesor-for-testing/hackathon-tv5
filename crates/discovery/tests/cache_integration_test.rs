@@ -40,9 +40,9 @@ fn get_test_cache_config() -> Arc<CacheConfig> {
     Arc::new(CacheConfig {
         redis_url: std::env::var("REDIS_URL")
             .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
-        search_ttl_sec: 1800,     // 30 minutes
-        embedding_ttl_sec: 3600,   // 1 hour
-        intent_ttl_sec: 600,       // 10 minutes
+        search_ttl_sec: 1800,    // 30 minutes
+        embedding_ttl_sec: 3600, // 1 hour
+        intent_ttl_sec: 600,     // 10 minutes
     })
 }
 
@@ -115,7 +115,11 @@ async fn test_search_results_caching() {
     // Test cache hit
     let cached: Option<SearchResults> = cache.get_search_results(&query).await.unwrap();
     assert!(cached.is_some(), "Should be cache hit after caching");
-    assert_eq!(cached.unwrap(), results, "Cached results should match original");
+    assert_eq!(
+        cached.unwrap(),
+        results,
+        "Cached results should match original"
+    );
 
     // Test different query produces different cache key
     let query2 = SearchQuery {
@@ -161,7 +165,11 @@ async fn test_intent_caching() {
     // Test cache hit
     let cached: Option<ParsedIntent> = cache.get_intent(&text).await.unwrap();
     assert!(cached.is_some(), "Should be cache hit after caching");
-    assert_eq!(cached.unwrap(), intent, "Cached intent should match original");
+    assert_eq!(
+        cached.unwrap(),
+        intent,
+        "Cached intent should match original"
+    );
 
     // Cleanup
     cache.clear_intent_cache().await.unwrap();
@@ -181,10 +189,7 @@ async fn test_embedding_caching() {
     cache.clear_embedding_cache().await.unwrap();
 
     let text = "The quick brown fox jumps over the lazy dog";
-    let embedding = vec![
-        0.12, 0.34, 0.56, 0.78, 0.90,
-        0.11, 0.22, 0.33, 0.44, 0.55,
-    ];
+    let embedding = vec![0.12, 0.34, 0.56, 0.78, 0.90, 0.11, 0.22, 0.33, 0.44, 0.55];
 
     // Test cache miss
     let cached = cache.get_embedding(&text).await.unwrap();
@@ -227,7 +232,10 @@ async fn test_cache_key_consistency() {
     let key2 = RedisCache::generate_key("search", &query).unwrap();
 
     assert_eq!(key1, key2, "Same query should generate identical keys");
-    assert!(key1.starts_with("search:"), "Key should have correct prefix");
+    assert!(
+        key1.starts_with("search:"),
+        "Key should have correct prefix"
+    );
     assert_eq!(
         key1.len(),
         "search:".len() + 64,
@@ -280,7 +288,10 @@ async fn test_cache_operations() {
 
     // Verify deletion
     let after_delete: Option<String> = cache.get(key).await.unwrap();
-    assert!(after_delete.is_none(), "Key should not exist after deletion");
+    assert!(
+        after_delete.is_none(),
+        "Key should not exist after deletion"
+    );
 }
 
 #[tokio::test]
@@ -362,12 +373,21 @@ async fn test_clear_all_caches() {
     };
 
     cache.cache_search_results(&query, &results).await.unwrap();
-    cache.cache_intent(&"test text", &ParsedIntent {
-        category: "test".to_string(),
-        confidence: 0.9,
-        entities: vec![],
-    }).await.unwrap();
-    cache.cache_embedding(&"test", &vec![0.1, 0.2, 0.3]).await.unwrap();
+    cache
+        .cache_intent(
+            &"test text",
+            &ParsedIntent {
+                category: "test".to_string(),
+                confidence: 0.9,
+                entities: vec![],
+            },
+        )
+        .await
+        .unwrap();
+    cache
+        .cache_embedding(&"test", &vec![0.1, 0.2, 0.3])
+        .await
+        .unwrap();
 
     // Clear all
     let deleted = cache.clear_all().await.unwrap();
@@ -421,12 +441,12 @@ async fn test_complex_serialization() {
         took_ms: 9876543210,
     };
 
-    cache.cache_search_results(&complex_query, &complex_results).await.unwrap();
-
-    let retrieved: Option<SearchResults> = cache
-        .get_search_results(&complex_query)
+    cache
+        .cache_search_results(&complex_query, &complex_results)
         .await
         .unwrap();
+
+    let retrieved: Option<SearchResults> = cache.get_search_results(&complex_query).await.unwrap();
 
     assert_eq!(
         retrieved.unwrap(),

@@ -3,38 +3,38 @@
 //! This module implements the personalization layer for Media Gateway,
 //! providing user embeddings, LoRA adaptation, and hybrid recommendations.
 
-pub mod inference;
-pub mod profile;
-pub mod lora;
-pub mod lora_storage;
-pub mod recommendation;
+pub mod ab_testing;
+pub mod cold_start;
 pub mod collaborative;
-pub mod matrix_factorization;
 pub mod content_based;
 pub mod context;
 pub mod diversity;
-pub mod cold_start;
-pub mod ab_testing;
 pub mod experiment_repository;
 pub mod graph;
+pub mod inference;
+pub mod lora;
+pub mod lora_storage;
+pub mod matrix_factorization;
+pub mod profile;
+pub mod recommendation;
 pub mod types;
 
 // Re-export key types
-pub use inference::ONNXInference;
-pub use profile::{UserProfile, BuildUserPreferenceVector};
-pub use lora::{UserLoRAAdapter, UpdateUserLoRA, ComputeLoRAForward};
-pub use lora_storage::{LoRAStorage, LoRAAdapterMetadata, StorageStats};
-pub use recommendation::GenerateRecommendations;
-pub use collaborative::{CollaborativeFilteringEngine, Interaction, InteractionType};
-pub use matrix_factorization::{ALSConfig, MatrixFactorization, SparseMatrix};
-pub use diversity::ApplyDiversityFilter;
-pub use cold_start::HandleColdStartUser;
-pub use context::ContextAwareFilter;
 pub use ab_testing::{
-    Experiment, ExperimentStatus, Variant, Assignment, ExperimentMetrics,
-    VariantMetrics, ABTestingService,
+    ABTestingService, Assignment, Experiment, ExperimentMetrics, ExperimentStatus, Variant,
+    VariantMetrics,
 };
+pub use cold_start::HandleColdStartUser;
+pub use collaborative::{CollaborativeFilteringEngine, Interaction, InteractionType};
+pub use context::ContextAwareFilter;
+pub use diversity::ApplyDiversityFilter;
 pub use experiment_repository::{ExperimentRepository, PostgresExperimentRepository};
+pub use inference::ONNXInference;
+pub use lora::{ComputeLoRAForward, UpdateUserLoRA, UserLoRAAdapter};
+pub use lora_storage::{LoRAAdapterMetadata, LoRAStorage, StorageStats};
+pub use matrix_factorization::{ALSConfig, MatrixFactorization, SparseMatrix};
+pub use profile::{BuildUserPreferenceVector, UserProfile};
+pub use recommendation::GenerateRecommendations;
 pub use types::*;
 
 use anyhow::Result;

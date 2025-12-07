@@ -14,10 +14,9 @@ mod watch_history_integration {
         use std::sync::Arc;
 
         // Setup test database connection
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| {
-                "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
-            });
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+        });
 
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -26,11 +25,11 @@ mod watch_history_integration {
             .expect("Failed to connect to test database");
 
         // Initialize managers
-        use media_gateway_playback::watch_history::WatchHistoryManager;
-        use media_gateway_playback::session::{
-            SessionManager, CreateSessionRequest, UpdatePositionRequest,
-        };
         use media_gateway_playback::events::NoOpProducer;
+        use media_gateway_playback::session::{
+            CreateSessionRequest, SessionManager, UpdatePositionRequest,
+        };
+        use media_gateway_playback::watch_history::WatchHistoryManager;
 
         let watch_history = Arc::new(WatchHistoryManager::new(pool));
         let event_producer = Arc::new(NoOpProducer);
@@ -126,10 +125,9 @@ mod watch_history_integration {
         use sqlx::postgres::PgPoolOptions;
         use std::sync::Arc;
 
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| {
-                "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
-            });
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+        });
 
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -137,11 +135,11 @@ mod watch_history_integration {
             .await
             .expect("Failed to connect to test database");
 
-        use media_gateway_playback::watch_history::WatchHistoryManager;
-        use media_gateway_playback::session::{
-            SessionManager, CreateSessionRequest, UpdatePositionRequest,
-        };
         use media_gateway_playback::events::NoOpProducer;
+        use media_gateway_playback::session::{
+            CreateSessionRequest, SessionManager, UpdatePositionRequest,
+        };
+        use media_gateway_playback::watch_history::WatchHistoryManager;
 
         let watch_history = Arc::new(WatchHistoryManager::new(pool));
         let event_producer = Arc::new(NoOpProducer);
@@ -202,7 +200,10 @@ mod watch_history_integration {
 
         // Cleanup
         session_manager.delete(response2.session.id).await.unwrap();
-        watch_history.clear_history(user_id, content_id).await.unwrap();
+        watch_history
+            .clear_history(user_id, content_id)
+            .await
+            .unwrap();
     }
 }
 

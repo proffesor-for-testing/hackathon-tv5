@@ -1,9 +1,9 @@
 use crate::error::{AuthError, Result};
 use actix_web::{
+    body::BoxBody,
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
     http::StatusCode,
     Error, HttpResponse,
-    body::BoxBody,
 };
 use futures_util::future::LocalBoxFuture;
 use redis::AsyncCommands;
@@ -41,8 +41,8 @@ impl Default for RateLimitConfig {
             device_endpoint_limit: 5,
             authorize_endpoint_limit: 20,
             revoke_endpoint_limit: 10,
-            register_endpoint_limit: 5,  // 5 registrations per hour per IP
-            login_endpoint_limit: 10,    // 10 login attempts per minute per IP
+            register_endpoint_limit: 5, // 5 registrations per hour per IP
+            login_endpoint_limit: 10,   // 10 login attempts per minute per IP
             internal_service_secret: None,
         }
     }
@@ -162,24 +162,24 @@ impl RateLimitMiddleware {
         let mut conn = redis_client
             .get_multiplexed_async_connection()
             .await
-            .map_err(|e| {
-                AuthError::Internal(format!("Redis connection error: {}", e))
-            })?;
+            .map_err(|e| AuthError::Internal(format!("Redis connection error: {}", e)))?;
 
         let window_start = Self::get_window_start(window_seconds);
         let key = format!("rate_limit:{}:{}:{}", endpoint, client_id, window_start);
 
         // Increment counter
-        let count: u32 = conn.incr(&key, 1).await.map_err(|e| {
-            AuthError::Internal(format!("Redis INCR error: {}", e))
-        })?;
+        let count: u32 = conn
+            .incr(&key, 1)
+            .await
+            .map_err(|e| AuthError::Internal(format!("Redis INCR error: {}", e)))?;
 
         // Set expiration on first increment (2x window to cover current + previous window)
         if count == 1 {
             let ttl = (window_seconds * 2) as i64;
-            let _: () = conn.expire(&key, ttl).await.map_err(|e| {
-                AuthError::Internal(format!("Redis EXPIRE error: {}", e))
-            })?;
+            let _: () = conn
+                .expire(&key, ttl)
+                .await
+                .map_err(|e| AuthError::Internal(format!("Redis EXPIRE error: {}", e)))?;
         }
 
         let allowed = count <= limit;
@@ -187,13 +187,21 @@ impl RateLimitMiddleware {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let retry_after = if allowed { 0 } else { window_seconds - (now % window_seconds) };
+        let retry_after = if allowed {
+            0
+        } else {
+            window_seconds - (now % window_seconds)
+        };
 
         Ok((allowed, count, retry_after))
     }
 
     /// Create 429 Too Many Requests response
-    fn create_rate_limit_response(retry_after: u64, current_count: u32, limit: u32) -> HttpResponse<BoxBody> {
+    fn create_rate_limit_response(
+        retry_after: u64,
+        current_count: u32,
+        limit: u32,
+    ) -> HttpResponse<BoxBody> {
         HttpResponse::build(StatusCode::TOO_MANY_REQUESTS)
             .insert_header(("Retry-After", retry_after.to_string()))
             .insert_header(("X-RateLimit-Limit", limit.to_string()))
@@ -278,10 +286,15 @@ where
             let endpoint = path.to_string();
 
             // Check rate limit
-            let (allowed, current_count, retry_after) =
-                RateLimitMiddleware::check_rate_limit(&redis_client, &endpoint, &client_id, limit, window_seconds)
-                    .await
-                    .map_err(|e| Error::from(e))?;
+            let (allowed, current_count, retry_after) = RateLimitMiddleware::check_rate_limit(
+                &redis_client,
+                &endpoint,
+                &client_id,
+                limit,
+                window_seconds,
+            )
+            .await
+            .map_err(|e| Error::from(e))?;
 
             if !allowed {
                 tracing::warn!(
@@ -309,8 +322,10 @@ where
             );
             headers.insert(
                 actix_web::http::header::HeaderName::from_static("x-ratelimit-remaining"),
-                actix_web::http::header::HeaderValue::from_str(&(limit - current_count).to_string())
-                    .unwrap(),
+                actix_web::http::header::HeaderValue::from_str(
+                    &(limit - current_count).to_string(),
+                )
+                .unwrap(),
             );
 
             Ok(res.map_into_left_body())
@@ -351,9 +366,11 @@ mod tests {
 
     #[actix_web::test]
     async fn test_rate_limit_config_with_secret() {
-        let config = RateLimitConfig::default()
-            .with_internal_secret("test-secret-123".to_string());
-        assert_eq!(config.internal_service_secret, Some("test-secret-123".to_string()));
+        let config = RateLimitConfig::default().with_internal_secret("test-secret-123".to_string());
+        assert_eq!(
+            config.internal_service_secret,
+            Some("test-secret-123".to_string())
+        );
     }
 
     #[actix_web::test]
@@ -382,7 +399,11 @@ mod tests {
         let redis_client = setup_redis_client();
 
         // Check Redis connectivity
-        if redis_client.get_multiplexed_async_connection().await.is_err() {
+        if redis_client
+            .get_multiplexed_async_connection()
+            .await
+            .is_err()
+        {
             println!("Redis not available, skipping integration test");
             return;
         }
@@ -399,7 +420,10 @@ mod tests {
 
         let app = test::init_service(
             App::new()
-                .wrap(RateLimitMiddleware::new(redis_client.clone(), config.clone()))
+                .wrap(RateLimitMiddleware::new(
+                    redis_client.clone(),
+                    config.clone(),
+                ))
                 .route("/auth/token", web::post().to(test_handler)),
         )
         .await;
@@ -436,7 +460,11 @@ mod tests {
     async fn test_internal_service_bypass() {
         let redis_client = setup_redis_client();
 
-        if redis_client.get_multiplexed_async_connection().await.is_err() {
+        if redis_client
+            .get_multiplexed_async_connection()
+            .await
+            .is_err()
+        {
             println!("Redis not available, skipping integration test");
             return;
         }
@@ -453,7 +481,10 @@ mod tests {
 
         let app = test::init_service(
             App::new()
-                .wrap(RateLimitMiddleware::new(redis_client.clone(), config.clone()))
+                .wrap(RateLimitMiddleware::new(
+                    redis_client.clone(),
+                    config.clone(),
+                ))
                 .route("/auth/token", web::post().to(test_handler)),
         )
         .await;
@@ -479,7 +510,11 @@ mod tests {
     async fn test_different_clients_separate_limits() {
         let redis_client = setup_redis_client();
 
-        if redis_client.get_multiplexed_async_connection().await.is_err() {
+        if redis_client
+            .get_multiplexed_async_connection()
+            .await
+            .is_err()
+        {
             println!("Redis not available, skipping integration test");
             return;
         }
@@ -496,7 +531,10 @@ mod tests {
 
         let app = test::init_service(
             App::new()
-                .wrap(RateLimitMiddleware::new(redis_client.clone(), config.clone()))
+                .wrap(RateLimitMiddleware::new(
+                    redis_client.clone(),
+                    config.clone(),
+                ))
                 .route("/auth/token", web::post().to(test_handler)),
         )
         .await;
@@ -524,7 +562,11 @@ mod tests {
     async fn test_no_rate_limit_for_untracked_endpoints() {
         let redis_client = setup_redis_client();
 
-        if redis_client.get_multiplexed_async_connection().await.is_err() {
+        if redis_client
+            .get_multiplexed_async_connection()
+            .await
+            .is_err()
+        {
             println!("Redis not available, skipping integration test");
             return;
         }
@@ -533,7 +575,10 @@ mod tests {
 
         let app = test::init_service(
             App::new()
-                .wrap(RateLimitMiddleware::new(redis_client.clone(), config.clone()))
+                .wrap(RateLimitMiddleware::new(
+                    redis_client.clone(),
+                    config.clone(),
+                ))
                 .route("/health", web::get().to(test_handler)),
         )
         .await;
@@ -573,8 +618,7 @@ mod tests {
 
     #[test]
     fn test_check_internal_bypass_with_correct_secret() {
-        let config = RateLimitConfig::default()
-            .with_internal_secret("my-secret".to_string());
+        let config = RateLimitConfig::default().with_internal_secret("my-secret".to_string());
 
         let req = test::TestRequest::post()
             .uri("/auth/token")
@@ -586,8 +630,7 @@ mod tests {
 
     #[test]
     fn test_check_internal_bypass_with_wrong_secret() {
-        let config = RateLimitConfig::default()
-            .with_internal_secret("my-secret".to_string());
+        let config = RateLimitConfig::default().with_internal_secret("my-secret".to_string());
 
         let req = test::TestRequest::post()
             .uri("/auth/token")
@@ -599,8 +642,7 @@ mod tests {
 
     #[test]
     fn test_check_internal_bypass_no_header() {
-        let config = RateLimitConfig::default()
-            .with_internal_secret("my-secret".to_string());
+        let config = RateLimitConfig::default().with_internal_secret("my-secret".to_string());
 
         let req = test::TestRequest::post()
             .uri("/auth/token")

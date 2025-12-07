@@ -110,8 +110,8 @@ fn test_keyword_search_bm25_concept() {
     let avg_doc_length = 150.0;
     let idf = 2.0; // Simplified IDF
 
-    let bm25_component = (term_freq * (k1 + 1.0)) /
-                        (term_freq + k1 * (1.0 - b + b * (doc_length / avg_doc_length)));
+    let bm25_component =
+        (term_freq * (k1 + 1.0)) / (term_freq + k1 * (1.0 - b + b * (doc_length / avg_doc_length)));
     let bm25_score = idf * bm25_component;
 
     assert!(bm25_score > 0.0);
@@ -154,9 +154,18 @@ fn test_search_result_ranking_order() {
     }
 
     let mut results = vec![
-        RankedResult { id: "1".to_string(), score: 0.75 },
-        RankedResult { id: "2".to_string(), score: 0.95 },
-        RankedResult { id: "3".to_string(), score: 0.80 },
+        RankedResult {
+            id: "1".to_string(),
+            score: 0.75,
+        },
+        RankedResult {
+            id: "2".to_string(),
+            score: 0.95,
+        },
+        RankedResult {
+            id: "3".to_string(),
+            score: 0.80,
+        },
     ];
 
     results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
@@ -176,9 +185,21 @@ fn test_search_filter_combination_logic() {
     }
 
     let content = vec![
-        Content { genre: "action".to_string(), year: 2023, platform: "netflix".to_string() },
-        Content { genre: "action".to_string(), year: 2020, platform: "netflix".to_string() },
-        Content { genre: "action".to_string(), year: 2023, platform: "hulu".to_string() },
+        Content {
+            genre: "action".to_string(),
+            year: 2023,
+            platform: "netflix".to_string(),
+        },
+        Content {
+            genre: "action".to_string(),
+            year: 2020,
+            platform: "netflix".to_string(),
+        },
+        Content {
+            genre: "action".to_string(),
+            year: 2023,
+            platform: "hulu".to_string(),
+        },
     ];
 
     let filtered: Vec<_> = content

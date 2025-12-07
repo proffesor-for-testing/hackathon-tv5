@@ -23,7 +23,9 @@ impl TotpManager {
     }
 
     pub fn generate_secret(&self, user_id: &str) -> Result<(String, String)> {
-        let secret = Secret::default();
+        // Generate 20 random bytes for TOTP secret (160 bits, standard size)
+        let bytes: [u8; 20] = rand::thread_rng().gen();
+        let secret = Secret::Raw(bytes.to_vec());
         let secret_base32 = secret.to_encoded().to_string();
 
         let totp = TOTP::new(

@@ -3,12 +3,12 @@
 //! Rate limit: 40 requests per 10 seconds
 //! Cache: 7 days for metadata enrichment
 
-use super::{AggregatorResponse, AggregatorContent};
-use crate::{Result, IngestionError};
+use super::{AggregatorContent, AggregatorResponse};
+use crate::{IngestionError, Result};
 use chrono::Utc;
+use moka::future::Cache;
 use reqwest::Client;
 use serde_json::Value;
-use moka::future::Cache;
 use std::time::Duration;
 
 /// TMDb API client for metadata enrichment
@@ -47,7 +47,11 @@ impl TMDbClient {
     ///
     /// # Returns
     /// Vector of matching movies
-    pub async fn search_movie(&self, query: &str, year: Option<i32>) -> Result<Vec<AggregatorContent>> {
+    pub async fn search_movie(
+        &self,
+        query: &str,
+        year: Option<i32>,
+    ) -> Result<Vec<AggregatorContent>> {
         let cache_key = format!("search_movie:{}:{:?}", query, year);
 
         // Check cache first
@@ -70,7 +74,7 @@ impl TMDbClient {
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
@@ -95,7 +99,11 @@ impl TMDbClient {
     ///
     /// # Returns
     /// Vector of matching TV shows
-    pub async fn search_tv(&self, query: &str, year: Option<i32>) -> Result<Vec<AggregatorContent>> {
+    pub async fn search_tv(
+        &self,
+        query: &str,
+        year: Option<i32>,
+    ) -> Result<Vec<AggregatorContent>> {
         let cache_key = format!("search_tv:{}:{:?}", query, year);
 
         // Check cache first
@@ -118,7 +126,7 @@ impl TMDbClient {
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
@@ -152,16 +160,14 @@ impl TMDbClient {
 
         let url = format!(
             "{}/movie/{}?api_key={}",
-            self.base_url,
-            movie_id,
-            self.api_key
+            self.base_url, movie_id, self.api_key
         );
 
         let response = self.client.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
@@ -193,18 +199,13 @@ impl TMDbClient {
             return self.parse_tv_details(&cached.data);
         }
 
-        let url = format!(
-            "{}/tv/{}?api_key={}",
-            self.base_url,
-            tv_id,
-            self.api_key
-        );
+        let url = format!("{}/tv/{}?api_key={}", self.base_url, tv_id, self.api_key);
 
         let response = self.client.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
@@ -238,16 +239,14 @@ impl TMDbClient {
 
         let url = format!(
             "{}/movie/{}/external_ids?api_key={}",
-            self.base_url,
-            movie_id,
-            self.api_key
+            self.base_url, movie_id, self.api_key
         );
 
         let response = self.client.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
@@ -266,32 +265,37 @@ impl TMDbClient {
 
     /// Parse search response
     fn parse_search_response(&self, data: &Value) -> Result<Vec<AggregatorContent>> {
-        let results = data.get("results")
+        let results = data
+            .get("results")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| IngestionError::NormalizationFailed(
-                "No results array in response".to_string()
-            ))?;
+            .ok_or_else(|| {
+                IngestionError::NormalizationFailed("No results array in response".to_string())
+            })?;
 
-        Ok(results.iter()
+        Ok(results
+            .iter()
             .filter_map(|item| self.parse_search_item(item).ok())
             .collect())
     }
 
     /// Parse search item
     fn parse_search_item(&self, item: &Value) -> Result<AggregatorContent> {
-        let id = item.get("id")
+        let id = item
+            .get("id")
             .and_then(|v| v.as_i64())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing id".to_string()))?
             .to_string();
 
-        let title = item.get("title")
+        let title = item
+            .get("title")
             .or_else(|| item.get("name"))
             .and_then(|v| v.as_str())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing title".to_string()))?
             .to_string();
 
         // Extract year from release_date or first_air_date
-        let year = item.get("release_date")
+        let year = item
+            .get("release_date")
             .or_else(|| item.get("first_air_date"))
             .and_then(|v| v.as_str())
             .and_then(|s| s.split('-').next())
@@ -300,7 +304,10 @@ impl TMDbClient {
         Ok(AggregatorContent {
             id: id.clone(),
             title,
-            overview: item.get("overview").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            overview: item
+                .get("overview")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             year,
             content_type: if item.get("title").is_some() {
                 "movie".to_string()
@@ -309,7 +316,8 @@ impl TMDbClient {
             },
             imdb_id: None, // Need to fetch external IDs separately
             tmdb_id: Some(id.parse().unwrap_or(0)),
-            genres: item.get("genre_ids")
+            genres: item
+                .get("genre_ids")
                 .and_then(|v| v.as_array())
                 .map(|arr| {
                     arr.iter()
@@ -317,27 +325,34 @@ impl TMDbClient {
                         .collect()
                 })
                 .unwrap_or_default(),
-            poster_url: item.get("poster_path")
+            poster_url: item
+                .get("poster_path")
                 .and_then(|v| v.as_str())
                 .map(|p| format!("https://image.tmdb.org/t/p/w500{}", p)),
-            rating: item.get("vote_average").and_then(|v| v.as_f64()).map(|r| r as f32),
+            rating: item
+                .get("vote_average")
+                .and_then(|v| v.as_f64())
+                .map(|r| r as f32),
             runtime: None, // Need to fetch details for runtime
         })
     }
 
     /// Parse movie details
     fn parse_movie_details(&self, data: &Value) -> Result<AggregatorContent> {
-        let id = data.get("id")
+        let id = data
+            .get("id")
             .and_then(|v| v.as_i64())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing id".to_string()))?
             .to_string();
 
-        let title = data.get("title")
+        let title = data
+            .get("title")
             .and_then(|v| v.as_str())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing title".to_string()))?
             .to_string();
 
-        let year = data.get("release_date")
+        let year = data
+            .get("release_date")
             .and_then(|v| v.as_str())
             .and_then(|s| s.split('-').next())
             .and_then(|y| y.parse::<i32>().ok());
@@ -345,40 +360,61 @@ impl TMDbClient {
         Ok(AggregatorContent {
             id: id.clone(),
             title,
-            overview: data.get("overview").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            overview: data
+                .get("overview")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             year,
             content_type: "movie".to_string(),
-            imdb_id: data.get("imdb_id").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            imdb_id: data
+                .get("imdb_id")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             tmdb_id: Some(id.parse().unwrap_or(0)),
-            genres: data.get("genres")
+            genres: data
+                .get("genres")
                 .and_then(|v| v.as_array())
                 .map(|arr| {
                     arr.iter()
-                        .filter_map(|g| g.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()))
+                        .filter_map(|g| {
+                            g.get("name")
+                                .and_then(|n| n.as_str())
+                                .map(|s| s.to_string())
+                        })
                         .collect()
                 })
                 .unwrap_or_default(),
-            poster_url: data.get("poster_path")
+            poster_url: data
+                .get("poster_path")
                 .and_then(|v| v.as_str())
                 .map(|p| format!("https://image.tmdb.org/t/p/w500{}", p)),
-            rating: data.get("vote_average").and_then(|v| v.as_f64()).map(|r| r as f32),
-            runtime: data.get("runtime").and_then(|v| v.as_i64()).map(|r| r as i32),
+            rating: data
+                .get("vote_average")
+                .and_then(|v| v.as_f64())
+                .map(|r| r as f32),
+            runtime: data
+                .get("runtime")
+                .and_then(|v| v.as_i64())
+                .map(|r| r as i32),
         })
     }
 
     /// Parse TV details
     fn parse_tv_details(&self, data: &Value) -> Result<AggregatorContent> {
-        let id = data.get("id")
+        let id = data
+            .get("id")
             .and_then(|v| v.as_i64())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing id".to_string()))?
             .to_string();
 
-        let title = data.get("name")
+        let title = data
+            .get("name")
             .and_then(|v| v.as_str())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing name".to_string()))?
             .to_string();
 
-        let year = data.get("first_air_date")
+        let year = data
+            .get("first_air_date")
             .and_then(|v| v.as_str())
             .and_then(|s| s.split('-').next())
             .and_then(|y| y.parse::<i32>().ok());
@@ -386,24 +422,37 @@ impl TMDbClient {
         Ok(AggregatorContent {
             id: id.clone(),
             title,
-            overview: data.get("overview").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            overview: data
+                .get("overview")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             year,
             content_type: "series".to_string(),
             imdb_id: None, // Need external_ids endpoint
             tmdb_id: Some(id.parse().unwrap_or(0)),
-            genres: data.get("genres")
+            genres: data
+                .get("genres")
                 .and_then(|v| v.as_array())
                 .map(|arr| {
                     arr.iter()
-                        .filter_map(|g| g.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()))
+                        .filter_map(|g| {
+                            g.get("name")
+                                .and_then(|n| n.as_str())
+                                .map(|s| s.to_string())
+                        })
                         .collect()
                 })
                 .unwrap_or_default(),
-            poster_url: data.get("poster_path")
+            poster_url: data
+                .get("poster_path")
                 .and_then(|v| v.as_str())
                 .map(|p| format!("https://image.tmdb.org/t/p/w500{}", p)),
-            rating: data.get("vote_average").and_then(|v| v.as_f64()).map(|r| r as f32),
-            runtime: data.get("episode_run_time")
+            rating: data
+                .get("vote_average")
+                .and_then(|v| v.as_f64())
+                .map(|r| r as f32),
+            runtime: data
+                .get("episode_run_time")
                 .and_then(|v| v.as_array())
                 .and_then(|arr| arr.first())
                 .and_then(|v| v.as_i64())

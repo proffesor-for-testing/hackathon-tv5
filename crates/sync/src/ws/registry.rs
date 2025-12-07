@@ -1,7 +1,6 @@
 /// WebSocket connection registry for managing per-user connection pools
 ///
 /// Tracks active WebSocket connections and provides efficient broadcast mechanisms
-
 use actix::{Addr, Message as ActixMessage};
 use actix_web_actors::ws;
 use dashmap::DashMap;
@@ -28,10 +27,7 @@ impl SyncMessage {
     }
 
     pub fn watchlist_update(content_id: Uuid, action: String) -> Self {
-        Self::new(SyncMessageType::WatchlistUpdate {
-            content_id,
-            action,
-        })
+        Self::new(SyncMessageType::WatchlistUpdate { content_id, action })
     }
 
     pub fn progress_update(content_id: Uuid, position: u32, duration: u32) -> Self {
@@ -60,10 +56,7 @@ impl SyncMessage {
 #[serde(tag = "type")]
 pub enum SyncMessageType {
     #[serde(rename = "watchlist_update")]
-    WatchlistUpdate {
-        content_id: Uuid,
-        action: String,
-    },
+    WatchlistUpdate { content_id: Uuid, action: String },
 
     #[serde(rename = "progress_update")]
     ProgressUpdate {
@@ -193,13 +186,18 @@ impl ConnectionRegistry {
     }
 
     /// Send message to all connections for a specific user
-    pub async fn send_to_user(&self, user_id: Uuid, message: &SyncMessage) -> Result<usize, BroadcastError> {
+    pub async fn send_to_user(
+        &self,
+        user_id: Uuid,
+        message: &SyncMessage,
+    ) -> Result<usize, BroadcastError> {
         let conns = match self.user_connections.get(&user_id) {
             Some(conns) => conns.clone(),
             None => return Ok(0),
         };
 
-        let json = message.to_json()
+        let json = message
+            .to_json()
             .map_err(|e| BroadcastError::SerializationError(e.to_string()))?;
 
         let mut sent_count = 0;
@@ -223,7 +221,8 @@ impl ConnectionRegistry {
 
     /// Broadcast message to all active connections
     pub async fn broadcast_to_all(&self, message: &SyncMessage) -> Result<usize, BroadcastError> {
-        let json = message.to_json()
+        let json = message
+            .to_json()
             .map_err(|e| BroadcastError::SerializationError(e.to_string()))?;
 
         let mut sent_count = 0;
@@ -353,10 +352,7 @@ mod tests {
 
     #[test]
     fn test_sync_message_serialization() {
-        let msg = SyncMessage::watchlist_update(
-            Uuid::new_v4(),
-            "add".to_string(),
-        );
+        let msg = SyncMessage::watchlist_update(Uuid::new_v4(), "add".to_string());
 
         let json = msg.to_json().unwrap();
         assert!(json.contains("\"type\":\"watchlist_update\""));
@@ -384,10 +380,7 @@ mod tests {
 
     #[test]
     fn test_device_command_message() {
-        let msg = SyncMessage::device_command(
-            "pause".to_string(),
-            Some(Uuid::new_v4()),
-        );
+        let msg = SyncMessage::device_command("pause".to_string(), Some(Uuid::new_v4()));
 
         let json = msg.to_json().unwrap();
         assert!(json.contains("\"type\":\"device_command\""));

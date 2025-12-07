@@ -1,5 +1,5 @@
 use crate::{
-    email::{EmailManager, EmailError},
+    email::{EmailError, EmailManager},
     error::{AuthError, Result},
     jwt::JwtManager,
     middleware::extract_user_context,
@@ -8,9 +8,11 @@ use crate::{
     user::{CreateUserRequest, PostgresUserRepository, UserRepository},
 };
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use media_gateway_core::{
+    ActivityEventType, KafkaActivityProducer, UserActivityEvent, UserActivityProducer,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use media_gateway_core::{ActivityEventType, KafkaActivityProducer, UserActivityEvent, UserActivityProducer};
 
 // ============================================================================
 // Registration Handler
@@ -42,9 +44,10 @@ pub async fn register(
     let password_hash = password_hasher.hash_password(&req.password)?;
 
     // Create user (email_verified defaults to false from migration)
-    let display_name = req.display_name.clone().unwrap_or_else(|| {
-        req.email.split('@').next().unwrap_or("User").to_string()
-    });
+    let display_name = req
+        .display_name
+        .clone()
+        .unwrap_or_else(|| req.email.split('@').next().unwrap_or("User").to_string());
 
     let user = user_repo
         .create_user(&req.email, &password_hash, &display_name)
@@ -69,7 +72,8 @@ pub async fn register(
     Ok(HttpResponse::Created().json(RegisterResponse {
         user_id: user.id.to_string(),
         email: user.email,
-        message: "Registration successful. Please check your email to verify your account.".to_string(),
+        message: "Registration successful. Please check your email to verify your account."
+            .to_string(),
     }))
 }
 
@@ -99,8 +103,12 @@ pub async fn verify_email(
         .verify_token(&req.token)
         .await
         .map_err(|e| match e {
-            EmailError::InvalidToken => AuthError::InvalidToken("Invalid or expired verification token".to_string()),
-            EmailError::TokenExpired => AuthError::InvalidToken("Verification token has expired".to_string()),
+            EmailError::InvalidToken => {
+                AuthError::InvalidToken("Invalid or expired verification token".to_string())
+            }
+            EmailError::TokenExpired => {
+                AuthError::InvalidToken("Verification token has expired".to_string())
+            }
             _ => AuthError::Internal(format!("Failed to verify token: {}", e)),
         })?;
 

@@ -135,7 +135,8 @@ impl HealthAggregator {
             DependencyHealthCheck {
                 name: "qdrant".to_string(),
                 check_type: DependencyCheckType::Qdrant(
-                    std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://qdrant:6333".to_string()),
+                    std::env::var("QDRANT_URL")
+                        .unwrap_or_else(|_| "http://qdrant:6333".to_string()),
                 ),
                 timeout: Duration::from_secs(1),
             },
@@ -164,10 +165,8 @@ impl HealthAggregator {
         // Perform health checks
         let start = Instant::now();
 
-        let (services, dependencies) = tokio::join!(
-            self.check_all_services(),
-            self.check_all_dependencies()
-        );
+        let (services, dependencies) =
+            tokio::join!(self.check_all_services(), self.check_all_dependencies());
 
         let overall_latency_ms = start.elapsed().as_millis() as u64;
 
@@ -207,11 +206,7 @@ impl HealthAggregator {
         let start = Instant::now();
         let last_checked = Utc::now();
 
-        match tokio::time::timeout(
-            service.timeout,
-            self.http_client.get(&service.url).send(),
-        )
-        .await
+        match tokio::time::timeout(service.timeout, self.http_client.get(&service.url).send()).await
         {
             Ok(Ok(response)) => {
                 let latency_ms = start.elapsed().as_millis() as u64;
@@ -309,10 +304,7 @@ impl HealthAggregator {
         }
 
         use sqlx::postgres::PgPoolOptions;
-        let pool = PgPoolOptions::new()
-            .max_connections(1)
-            .connect(url)
-            .await?;
+        let pool = PgPoolOptions::new().max_connections(1).connect(url).await?;
 
         sqlx::query("SELECT 1").execute(&pool).await?;
 
@@ -327,7 +319,9 @@ impl HealthAggregator {
         use redis::AsyncCommands;
         let client = redis::Client::open(url)?;
         let mut conn = client.get_multiplexed_async_connection().await?;
-        redis::cmd("PING").query_async::<_, String>(&mut conn).await?;
+        redis::cmd("PING")
+            .query_async::<_, String>(&mut conn)
+            .await?;
 
         Ok(())
     }
@@ -343,7 +337,10 @@ impl HealthAggregator {
         if response.status().is_success() {
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Qdrant health check failed: {}", response.status()))
+            Err(anyhow::anyhow!(
+                "Qdrant health check failed: {}",
+                response.status()
+            ))
         }
     }
 
@@ -365,9 +362,7 @@ impl HealthAggregator {
             .iter()
             .all(|d| d.status == HealthStatus::Healthy);
 
-        let all_services_healthy = services
-            .iter()
-            .all(|s| s.status == HealthStatus::Healthy);
+        let all_services_healthy = services.iter().all(|s| s.status == HealthStatus::Healthy);
 
         if all_services_healthy && all_deps_healthy {
             HealthStatus::Healthy
@@ -456,15 +451,13 @@ mod tests {
             },
         ];
 
-        let dependencies = vec![
-            DependencyHealth {
-                name: "postgresql".to_string(),
-                status: HealthStatus::Healthy,
-                latency_ms: Some(3),
-                last_checked: Utc::now(),
-                error: None,
-            },
-        ];
+        let dependencies = vec![DependencyHealth {
+            name: "postgresql".to_string(),
+            status: HealthStatus::Healthy,
+            latency_ms: Some(3),
+            last_checked: Utc::now(),
+            error: None,
+        }];
 
         let status = HealthAggregator::calculate_overall_status(&services, &dependencies);
         assert_eq!(status, HealthStatus::Degraded);

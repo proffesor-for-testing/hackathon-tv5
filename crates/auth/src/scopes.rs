@@ -178,7 +178,9 @@ mod tests {
     fn test_scope_parsing() {
         let manager = ScopeManager::new();
 
-        let scopes = manager.parse_scopes("read:content write:watchlist").unwrap();
+        let scopes = manager
+            .parse_scopes("read:content write:watchlist")
+            .unwrap();
         assert_eq!(scopes.len(), 2);
         assert!(scopes.contains(&Scope::ReadContent));
         assert!(scopes.contains(&Scope::WriteWatchlist));

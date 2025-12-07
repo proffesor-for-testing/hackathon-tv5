@@ -1,21 +1,22 @@
 use actix_web::{test, web, App};
 use auth::{
     error::AuthError,
+    jwt::JwtManager,
+    middleware::rate_limit::{RateLimitConfig, RateLimitMiddleware},
     user::{
         handlers::{login, register, LoginRequest, UserHandlerState},
         password::PasswordHasher,
         repository::{CreateUserRequest, PostgresUserRepository},
     },
-    jwt::JwtManager,
-    middleware::rate_limit::{RateLimitConfig, RateLimitMiddleware},
 };
 use sqlx::PgPool;
 use std::sync::Arc;
 
 /// Helper to create test database pool
 async fn setup_test_db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+    });
 
     PgPool::connect(&database_url)
         .await
@@ -41,8 +42,8 @@ fn setup_test_jwt_manager() -> Arc<JwtManager> {
 
 /// Helper to create test Redis client
 fn setup_test_redis() -> redis::Client {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
 
     redis::Client::open(redis_url).expect("Failed to create Redis client")
 }
@@ -115,10 +116,10 @@ async fn test_user_registration_weak_password() {
 
     // Test various weak passwords
     let weak_passwords = vec![
-        "short",          // Too short
-        "nouppercase1",   // No uppercase
-        "NOLOWERCASE1",   // No lowercase
-        "NoNumbers",      // No numbers
+        "short",        // Too short
+        "nouppercase1", // No uppercase
+        "NOLOWERCASE1", // No lowercase
+        "NoNumbers",    // No numbers
     ];
 
     for weak_password in weak_passwords {
@@ -312,7 +313,11 @@ async fn test_registration_rate_limit() {
     let redis_client = setup_test_redis();
 
     // Check Redis connectivity
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping rate limit test");
         return;
     }
@@ -336,7 +341,10 @@ async fn test_registration_rate_limit() {
 
     let app = test::init_service(
         App::new()
-            .wrap(RateLimitMiddleware::new(redis_client.clone(), rate_limit_config))
+            .wrap(RateLimitMiddleware::new(
+                redis_client.clone(),
+                rate_limit_config,
+            ))
             .app_data(state)
             .route("/api/v1/auth/register", web::post().to(register)),
     )

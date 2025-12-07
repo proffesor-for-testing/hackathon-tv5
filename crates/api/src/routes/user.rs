@@ -4,7 +4,9 @@ use crate::rate_limit::RateLimiter;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use std::sync::Arc;
 
-fn convert_headers(actix_headers: &actix_web::http::header::HeaderMap) -> reqwest::header::HeaderMap {
+fn convert_headers(
+    actix_headers: &actix_web::http::header::HeaderMap,
+) -> reqwest::header::HeaderMap {
     let mut reqwest_headers = reqwest::header::HeaderMap::new();
     for (key, value) in actix_headers.iter() {
         if let Ok(name) = reqwest::header::HeaderName::from_bytes(key.as_str().as_bytes()) {
@@ -39,7 +41,10 @@ async fn get_profile(
         Err(err) => return HttpResponse::from_error(err),
     };
 
-    match rate_limiter.check_rate_limit(&user_ctx.user_id, &user_ctx.tier).await {
+    match rate_limiter
+        .check_rate_limit(&user_ctx.user_id, &user_ctx.tier)
+        .await
+    {
         Ok(rate_info) => {
             let proxy_req = ProxyRequest {
                 service: "auth".to_string(),
@@ -54,7 +59,8 @@ async fn get_profile(
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {
@@ -81,7 +87,10 @@ async fn update_preferences(
         Err(err) => return HttpResponse::from_error(err),
     };
 
-    match rate_limiter.check_rate_limit(&user_ctx.user_id, &user_ctx.tier).await {
+    match rate_limiter
+        .check_rate_limit(&user_ctx.user_id, &user_ctx.tier)
+        .await
+    {
         Ok(rate_info) => {
             let proxy_req = ProxyRequest {
                 service: "auth".to_string(),
@@ -96,7 +105,8 @@ async fn update_preferences(
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {
@@ -122,7 +132,10 @@ async fn get_watchlist(
         Err(err) => return HttpResponse::from_error(err),
     };
 
-    match rate_limiter.check_rate_limit(&user_ctx.user_id, &user_ctx.tier).await {
+    match rate_limiter
+        .check_rate_limit(&user_ctx.user_id, &user_ctx.tier)
+        .await
+    {
         Ok(rate_info) => {
             let proxy_req = ProxyRequest {
                 service: "sync".to_string(),
@@ -130,14 +143,18 @@ async fn get_watchlist(
                 method: req.method().clone(),
                 headers: convert_headers(req.headers()),
                 body: None,
-                query: req.query_string().is_empty().then(|| req.query_string().to_string()),
+                query: req
+                    .query_string()
+                    .is_empty()
+                    .then(|| req.query_string().to_string()),
             };
 
             match proxy.forward(proxy_req).await {
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {
@@ -164,7 +181,10 @@ async fn add_to_watchlist(
         Err(err) => return HttpResponse::from_error(err),
     };
 
-    match rate_limiter.check_rate_limit(&user_ctx.user_id, &user_ctx.tier).await {
+    match rate_limiter
+        .check_rate_limit(&user_ctx.user_id, &user_ctx.tier)
+        .await
+    {
         Ok(rate_info) => {
             let proxy_req = ProxyRequest {
                 service: "sync".to_string(),
@@ -179,7 +199,8 @@ async fn add_to_watchlist(
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {
@@ -208,7 +229,10 @@ async fn remove_from_watchlist(
 
     let content_id = path.into_inner();
 
-    match rate_limiter.check_rate_limit(&user_ctx.user_id, &user_ctx.tier).await {
+    match rate_limiter
+        .check_rate_limit(&user_ctx.user_id, &user_ctx.tier)
+        .await
+    {
         Ok(rate_info) => {
             let proxy_req = ProxyRequest {
                 service: "sync".to_string(),
@@ -223,7 +247,8 @@ async fn remove_from_watchlist(
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {
@@ -249,7 +274,10 @@ async fn get_history(
         Err(err) => return HttpResponse::from_error(err),
     };
 
-    match rate_limiter.check_rate_limit(&user_ctx.user_id, &user_ctx.tier).await {
+    match rate_limiter
+        .check_rate_limit(&user_ctx.user_id, &user_ctx.tier)
+        .await
+    {
         Ok(rate_info) => {
             let proxy_req = ProxyRequest {
                 service: "sync".to_string(),
@@ -257,14 +285,18 @@ async fn get_history(
                 method: req.method().clone(),
                 headers: convert_headers(req.headers()),
                 body: None,
-                query: req.query_string().is_empty().then(|| req.query_string().to_string()),
+                query: req
+                    .query_string()
+                    .is_empty()
+                    .then(|| req.query_string().to_string()),
             };
 
             match proxy.forward(proxy_req).await {
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {

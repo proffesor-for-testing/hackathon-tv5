@@ -41,7 +41,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   ✓ Qdrant is healthy: {}\n", healthy);
 
     // 3. Ensure collection exists
-    println!("3. Creating/verifying collection with {} dimensions...", VECTOR_DIM);
+    println!(
+        "3. Creating/verifying collection with {} dimensions...",
+        VECTOR_DIM
+    );
     qdrant_client.ensure_collection(VECTOR_DIM).await?;
     println!("   ✓ Collection ready\n");
 
@@ -88,7 +91,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         content.embedding = Some(embedding);
         content_with_embeddings.push(content);
     }
-    println!("   ✓ Generated {} embeddings\n", content_with_embeddings.len());
+    println!(
+        "   ✓ Generated {} embeddings\n",
+        content_with_embeddings.len()
+    );
 
     // 5. Index content in Qdrant
     println!("5. Indexing content in Qdrant (batch upsert)...");
@@ -111,7 +117,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Query: Find movies similar to 'The Matrix'\n");
 
     let query_embedding = content_with_embeddings[0].embedding.as_ref().unwrap();
-    let results = qdrant_client.search_similar(query_embedding.clone(), 3).await?;
+    let results = qdrant_client
+        .search_similar(query_embedding.clone(), 3)
+        .await?;
 
     println!("   Top 3 similar movies:");
     for (i, (id, score)) in results.iter().enumerate() {

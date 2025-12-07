@@ -129,38 +129,14 @@ fn test_search_filters_combined_parental_controls() {
 
 #[test]
 fn test_content_rating_from_str() {
-    assert_eq!(
-        ContentRating::from_str("G"),
-        Some(ContentRating::G)
-    );
-    assert_eq!(
-        ContentRating::from_str("PG"),
-        Some(ContentRating::PG)
-    );
-    assert_eq!(
-        ContentRating::from_str("PG-13"),
-        Some(ContentRating::PG13)
-    );
-    assert_eq!(
-        ContentRating::from_str("PG13"),
-        Some(ContentRating::PG13)
-    );
-    assert_eq!(
-        ContentRating::from_str("R"),
-        Some(ContentRating::R)
-    );
-    assert_eq!(
-        ContentRating::from_str("NC-17"),
-        Some(ContentRating::NC17)
-    );
-    assert_eq!(
-        ContentRating::from_str("NC17"),
-        Some(ContentRating::NC17)
-    );
-    assert_eq!(
-        ContentRating::from_str("invalid"),
-        None
-    );
+    assert_eq!(ContentRating::from_str("G"), Some(ContentRating::G));
+    assert_eq!(ContentRating::from_str("PG"), Some(ContentRating::PG));
+    assert_eq!(ContentRating::from_str("PG-13"), Some(ContentRating::PG13));
+    assert_eq!(ContentRating::from_str("PG13"), Some(ContentRating::PG13));
+    assert_eq!(ContentRating::from_str("R"), Some(ContentRating::R));
+    assert_eq!(ContentRating::from_str("NC-17"), Some(ContentRating::NC17));
+    assert_eq!(ContentRating::from_str("NC17"), Some(ContentRating::NC17));
+    assert_eq!(ContentRating::from_str("invalid"), None);
 }
 
 #[test]

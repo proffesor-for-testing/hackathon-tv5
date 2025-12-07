@@ -5,7 +5,6 @@
 /// 2. RateLimitConfig is properly exposed and configurable
 /// 3. Middleware integrates with Actix-web App builder
 /// 4. Rate limits are enforced on configured endpoints
-
 use media_gateway_auth::middleware::{RateLimitConfig, RateLimitMiddleware};
 
 #[test]
@@ -48,11 +47,11 @@ fn test_rate_limit_config_path_mapping() {
 
 #[test]
 fn test_rate_limit_middleware_construction() {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
 
-    let redis_client = redis::Client::open(redis_url.as_str())
-        .expect("Failed to create Redis client");
+    let redis_client =
+        redis::Client::open(redis_url.as_str()).expect("Failed to create Redis client");
 
     let config = RateLimitConfig::new(10, 5, 20, 10);
 
@@ -62,10 +61,12 @@ fn test_rate_limit_middleware_construction() {
 
 #[test]
 fn test_internal_service_secret_configuration() {
-    let config = RateLimitConfig::default()
-        .with_internal_secret("test-secret-123".to_string());
+    let config = RateLimitConfig::default().with_internal_secret("test-secret-123".to_string());
 
-    assert_eq!(config.internal_service_secret, Some("test-secret-123".to_string()));
+    assert_eq!(
+        config.internal_service_secret,
+        Some("test-secret-123".to_string())
+    );
 }
 
 #[test]
@@ -76,12 +77,7 @@ fn test_custom_rate_limits_via_env() {
     let authorize_limit: u32 = "25".parse().unwrap();
     let revoke_limit: u32 = "12".parse().unwrap();
 
-    let config = RateLimitConfig::new(
-        token_limit,
-        device_limit,
-        authorize_limit,
-        revoke_limit,
-    );
+    let config = RateLimitConfig::new(token_limit, device_limit, authorize_limit, revoke_limit);
 
     assert_eq!(config.token_endpoint_limit, 15);
     assert_eq!(config.device_endpoint_limit, 3);
@@ -91,17 +87,17 @@ fn test_custom_rate_limits_via_env() {
 
 #[tokio::test]
 async fn test_redis_client_connection() {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
 
-    let redis_client = redis::Client::open(redis_url.as_str())
-        .expect("Failed to create Redis client");
+    let redis_client =
+        redis::Client::open(redis_url.as_str()).expect("Failed to create Redis client");
 
     // Attempt to get connection (will skip if Redis not available)
     match redis_client.get_multiplexed_async_connection().await {
         Ok(_) => {
             println!("Redis connection successful - rate limiting will be active");
-        },
+        }
         Err(_) => {
             println!("Redis not available - rate limiting tests will be skipped");
         }
@@ -110,16 +106,21 @@ async fn test_redis_client_connection() {
 
 #[test]
 fn test_rate_limit_config_clone() {
-    let config1 = RateLimitConfig::new(10, 5, 20, 10)
-        .with_internal_secret("secret".to_string());
+    let config1 = RateLimitConfig::new(10, 5, 20, 10).with_internal_secret("secret".to_string());
 
     let config2 = config1.clone();
 
     assert_eq!(config1.token_endpoint_limit, config2.token_endpoint_limit);
     assert_eq!(config1.device_endpoint_limit, config2.device_endpoint_limit);
-    assert_eq!(config1.authorize_endpoint_limit, config2.authorize_endpoint_limit);
+    assert_eq!(
+        config1.authorize_endpoint_limit,
+        config2.authorize_endpoint_limit
+    );
     assert_eq!(config1.revoke_endpoint_limit, config2.revoke_endpoint_limit);
-    assert_eq!(config1.internal_service_secret, config2.internal_service_secret);
+    assert_eq!(
+        config1.internal_service_secret,
+        config2.internal_service_secret
+    );
 }
 
 /// Integration verification: Ensure middleware can wrap Actix App
@@ -131,11 +132,11 @@ async fn test_middleware_wraps_actix_app() {
         Ok(HttpResponse::Ok().finish())
     }
 
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
 
-    let redis_client = redis::Client::open(redis_url.as_str())
-        .expect("Failed to create Redis client");
+    let redis_client =
+        redis::Client::open(redis_url.as_str()).expect("Failed to create Redis client");
 
     let config = RateLimitConfig::default();
 
@@ -143,6 +144,7 @@ async fn test_middleware_wraps_actix_app() {
     let _app = test::init_service(
         App::new()
             .wrap(RateLimitMiddleware::new(redis_client, config))
-            .route("/test", web::get().to(handler))
-    ).await;
+            .route("/test", web::get().to(handler)),
+    )
+    .await;
 }

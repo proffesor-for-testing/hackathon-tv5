@@ -6,7 +6,7 @@ use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 /// Playback progress record
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::FromRow)]
 pub struct ProgressRecord {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -67,7 +67,7 @@ impl ProgressRepository {
                 id, user_id, content_id, platform_id, progress_seconds,
                 duration_seconds, progress_percentage, last_position_ms,
                 is_completed, device_id, created_at, updated_at
-            "#
+            "#,
         )
         .bind(request.user_id)
         .bind(request.content_id)
@@ -97,7 +97,7 @@ impl ProgressRepository {
                 is_completed, device_id, created_at, updated_at
             FROM playback_progress
             WHERE user_id = $1 AND content_id = $2 AND platform_id = $3
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(content_id)
@@ -125,7 +125,7 @@ impl ProgressRepository {
             WHERE user_id = $1 AND is_completed = false
             ORDER BY updated_at DESC
             LIMIT $2
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(limit)
@@ -152,7 +152,7 @@ impl ProgressRepository {
             WHERE user_id = $1
             ORDER BY updated_at DESC
             LIMIT $2
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(limit)
@@ -170,7 +170,7 @@ impl ProgressRepository {
             DELETE FROM playback_progress
             WHERE updated_at < NOW() - INTERVAL '1 day' * $1
             AND is_completed = true
-            "#
+            "#,
         )
         .bind(days)
         .execute(&self.pool)
@@ -192,7 +192,7 @@ impl ProgressRepository {
             UPDATE playback_progress
             SET is_completed = true, updated_at = NOW()
             WHERE user_id = $1 AND content_id = $2 AND platform_id = $3
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(content_id)
@@ -215,7 +215,7 @@ impl ProgressRepository {
             r#"
             DELETE FROM playback_progress
             WHERE user_id = $1 AND content_id = $2 AND platform_id = $3
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(content_id)
@@ -252,8 +252,9 @@ mod tests {
     use sqlx::postgres::PgPoolOptions;
 
     async fn setup_test_db() -> PgPool {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+        });
 
         PgPoolOptions::new()
             .max_connections(5)
@@ -263,7 +264,8 @@ mod tests {
     }
 
     async fn cleanup_test_data(pool: &PgPool, user_id: Uuid) {
-        sqlx::query("DELETE FROM playback_progress WHERE user_id = $1").bind(user_id)
+        sqlx::query("DELETE FROM playback_progress WHERE user_id = $1")
+            .bind(user_id)
             .execute(pool)
             .await
             .ok();
@@ -469,7 +471,11 @@ mod tests {
         let result = repo.mark_completed(user_id, content_id, "netflix").await;
         assert!(result.is_ok());
 
-        let record = repo.get_progress(user_id, content_id, "netflix").await.unwrap().unwrap();
+        let record = repo
+            .get_progress(user_id, content_id, "netflix")
+            .await
+            .unwrap()
+            .unwrap();
         assert!(record.is_completed);
 
         cleanup_test_data(&pool, user_id).await;
@@ -496,7 +502,10 @@ mod tests {
         let result = repo.delete_progress(user_id, content_id, "netflix").await;
         assert!(result.is_ok());
 
-        let record = repo.get_progress(user_id, content_id, "netflix").await.unwrap();
+        let record = repo
+            .get_progress(user_id, content_id, "netflix")
+            .await
+            .unwrap();
         assert!(record.is_none());
     }
 }

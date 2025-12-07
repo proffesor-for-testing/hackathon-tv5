@@ -116,9 +116,7 @@ impl AuthorizationCode {
 
     fn generate_code() -> String {
         let mut rng = rand::thread_rng();
-        (0..32)
-            .map(|_| rng.sample(Alphanumeric) as char)
-            .collect()
+        (0..32).map(|_| rng.sample(Alphanumeric) as char).collect()
     }
 
     pub fn is_expired(&self) -> bool {

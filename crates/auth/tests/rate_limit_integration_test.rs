@@ -1,17 +1,17 @@
+use actix_web::http::StatusCode;
 use actix_web::{test, web, App, HttpResponse};
 use media_gateway_auth::{
-    middleware::{RateLimitConfig, RateLimitMiddleware},
     jwt::JwtManager,
+    middleware::{RateLimitConfig, RateLimitMiddleware},
     oauth::OAuthConfig,
+    oauth::OAuthManager,
+    rbac::RbacManager,
+    scopes::ScopeManager,
     server::AppState,
     session::SessionManager,
     storage::AuthStorage,
     token_family::TokenFamilyManager,
-    rbac::RbacManager,
-    scopes::ScopeManager,
-    oauth::OAuthManager,
 };
-use actix_web::http::StatusCode;
 use std::sync::Arc;
 
 async fn test_handler() -> actix_web::Result<HttpResponse> {
@@ -19,14 +19,14 @@ async fn test_handler() -> actix_web::Result<HttpResponse> {
 }
 
 fn setup_redis_client() -> redis::Client {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
     redis::Client::open(redis_url).expect("Failed to create Redis client")
 }
 
 fn setup_app_state() -> web::Data<AppState> {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
 
     // Use test JWT keys (RSA 2048-bit for testing)
     let private_key = b"-----BEGIN RSA PRIVATE KEY-----
@@ -77,17 +77,14 @@ uwIDAQAB
         .expect("Failed to create JWT manager"),
     );
 
-    let session_manager = Arc::new(
-        SessionManager::new(&redis_url).expect("Failed to create session manager"),
-    );
+    let session_manager =
+        Arc::new(SessionManager::new(&redis_url).expect("Failed to create session manager"));
 
     let token_family_manager = Arc::new(
         TokenFamilyManager::new(&redis_url).expect("Failed to create token family manager"),
     );
 
-    let storage = Arc::new(
-        AuthStorage::new(&redis_url).expect("Failed to create auth storage"),
-    );
+    let storage = Arc::new(AuthStorage::new(&redis_url).expect("Failed to create auth storage"));
 
     let oauth_config = OAuthConfig {
         providers: std::collections::HashMap::new(),
@@ -109,7 +106,11 @@ async fn test_rate_limit_token_endpoint() {
     let redis_client = setup_redis_client();
 
     // Check Redis connectivity
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping integration test");
         return;
     }
@@ -119,7 +120,10 @@ async fn test_rate_limit_token_endpoint() {
 
     let app = test::init_service(
         App::new()
-            .wrap(RateLimitMiddleware::new(redis_client.clone(), config.clone()))
+            .wrap(RateLimitMiddleware::new(
+                redis_client.clone(),
+                config.clone(),
+            ))
             .app_data(app_state.clone())
             .route("/auth/token", web::post().to(test_handler)),
     )
@@ -156,7 +160,11 @@ async fn test_rate_limit_token_endpoint() {
     assert!(resp.headers().get("Retry-After").is_some());
     assert!(resp.headers().get("X-RateLimit-Limit").is_some());
     assert_eq!(
-        resp.headers().get("X-RateLimit-Limit").unwrap().to_str().unwrap(),
+        resp.headers()
+            .get("X-RateLimit-Limit")
+            .unwrap()
+            .to_str()
+            .unwrap(),
         "3"
     );
 }
@@ -165,7 +173,11 @@ async fn test_rate_limit_token_endpoint() {
 async fn test_rate_limit_device_endpoint() {
     let redis_client = setup_redis_client();
 
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping integration test");
         return;
     }
@@ -175,7 +187,10 @@ async fn test_rate_limit_device_endpoint() {
 
     let app = test::init_service(
         App::new()
-            .wrap(RateLimitMiddleware::new(redis_client.clone(), config.clone()))
+            .wrap(RateLimitMiddleware::new(
+                redis_client.clone(),
+                config.clone(),
+            ))
             .app_data(app_state.clone())
             .route("/auth/device", web::post().to(test_handler)),
     )
@@ -209,7 +224,11 @@ async fn test_rate_limit_device_endpoint() {
 async fn test_rate_limit_authorize_endpoint() {
     let redis_client = setup_redis_client();
 
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping integration test");
         return;
     }
@@ -219,7 +238,10 @@ async fn test_rate_limit_authorize_endpoint() {
 
     let app = test::init_service(
         App::new()
-            .wrap(RateLimitMiddleware::new(redis_client.clone(), config.clone()))
+            .wrap(RateLimitMiddleware::new(
+                redis_client.clone(),
+                config.clone(),
+            ))
             .app_data(app_state.clone())
             .route("/auth/authorize", web::get().to(test_handler)),
     )
@@ -253,7 +275,11 @@ async fn test_rate_limit_authorize_endpoint() {
 async fn test_rate_limit_different_clients_isolated() {
     let redis_client = setup_redis_client();
 
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping integration test");
         return;
     }
@@ -263,7 +289,10 @@ async fn test_rate_limit_different_clients_isolated() {
 
     let app = test::init_service(
         App::new()
-            .wrap(RateLimitMiddleware::new(redis_client.clone(), config.clone()))
+            .wrap(RateLimitMiddleware::new(
+                redis_client.clone(),
+                config.clone(),
+            ))
             .app_data(app_state.clone())
             .route("/auth/token", web::post().to(test_handler)),
     )
@@ -310,18 +339,25 @@ async fn test_rate_limit_different_clients_isolated() {
 async fn test_rate_limit_internal_bypass() {
     let redis_client = setup_redis_client();
 
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping integration test");
         return;
     }
 
-    let config = RateLimitConfig::new(2, 5, 20, 10)
-        .with_internal_secret("test-secret-key".to_string());
+    let config =
+        RateLimitConfig::new(2, 5, 20, 10).with_internal_secret("test-secret-key".to_string());
     let app_state = setup_app_state();
 
     let app = test::init_service(
         App::new()
-            .wrap(RateLimitMiddleware::new(redis_client.clone(), config.clone()))
+            .wrap(RateLimitMiddleware::new(
+                redis_client.clone(),
+                config.clone(),
+            ))
             .app_data(app_state.clone())
             .route("/auth/token", web::post().to(test_handler)),
     )
@@ -348,7 +384,11 @@ async fn test_rate_limit_internal_bypass() {
 async fn test_rate_limit_retry_after_header() {
     let redis_client = setup_redis_client();
 
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping integration test");
         return;
     }
@@ -358,7 +398,10 @@ async fn test_rate_limit_retry_after_header() {
 
     let app = test::init_service(
         App::new()
-            .wrap(RateLimitMiddleware::new(redis_client.clone(), config.clone()))
+            .wrap(RateLimitMiddleware::new(
+                redis_client.clone(),
+                config.clone(),
+            ))
             .app_data(app_state.clone())
             .route("/auth/token", web::post().to(test_handler)),
     )
@@ -382,7 +425,10 @@ async fn test_rate_limit_retry_after_header() {
     assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
 
     // Verify Retry-After header is present and is a positive integer
-    let retry_after = resp.headers().get("Retry-After").expect("Retry-After header missing");
+    let retry_after = resp
+        .headers()
+        .get("Retry-After")
+        .expect("Retry-After header missing");
     let retry_after_value: u64 = retry_after
         .to_str()
         .expect("Invalid Retry-After header")
@@ -395,7 +441,11 @@ async fn test_rate_limit_retry_after_header() {
 async fn test_rate_limit_health_endpoint_no_limit() {
     let redis_client = setup_redis_client();
 
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping integration test");
         return;
     }
@@ -405,7 +455,10 @@ async fn test_rate_limit_health_endpoint_no_limit() {
 
     let app = test::init_service(
         App::new()
-            .wrap(RateLimitMiddleware::new(redis_client.clone(), config.clone()))
+            .wrap(RateLimitMiddleware::new(
+                redis_client.clone(),
+                config.clone(),
+            ))
             .app_data(app_state.clone())
             .route("/health", web::get().to(test_handler)),
     )

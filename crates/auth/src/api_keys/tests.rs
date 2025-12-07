@@ -5,8 +5,9 @@ use uuid::Uuid;
 
 #[tokio::test]
 async fn test_api_key_lifecycle() {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+    });
 
     let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -76,8 +77,9 @@ async fn test_api_key_lifecycle() {
 
 #[tokio::test]
 async fn test_multiple_keys_per_user() {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+    });
 
     let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -115,10 +117,7 @@ async fn test_multiple_keys_per_user() {
 
     let request2 = CreateApiKeyRequest {
         name: "Read-Write Key".to_string(),
-        scopes: vec![
-            "read:content".to_string(),
-            "write:watchlist".to_string(),
-        ],
+        scopes: vec!["read:content".to_string(), "write:watchlist".to_string()],
         rate_limit_per_minute: Some(120),
         expires_in_days: None,
     };
@@ -158,8 +157,9 @@ async fn test_multiple_keys_per_user() {
 
 #[tokio::test]
 async fn test_scope_validation() {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+    });
 
     let pool = PgPool::connect(&database_url).await.unwrap();
 
@@ -179,8 +179,9 @@ async fn test_scope_validation() {
 
 #[tokio::test]
 async fn test_update_last_used() {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+    });
 
     let pool = PgPool::connect(&database_url).await.unwrap();
 

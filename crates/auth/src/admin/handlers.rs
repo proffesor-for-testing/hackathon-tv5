@@ -208,17 +208,21 @@ impl AuditLogsQuery {
 
     pub fn to_audit_filter(&self) -> Result<AuditFilter> {
         let start_date = if let Some(ref date_str) = self.start_date {
-            Some(DateTime::parse_from_rfc3339(date_str)
-                .map_err(|_| AuthError::Internal("Invalid start_date format".to_string()))?
-                .with_timezone(&Utc))
+            Some(
+                DateTime::parse_from_rfc3339(date_str)
+                    .map_err(|_| AuthError::Internal("Invalid start_date format".to_string()))?
+                    .with_timezone(&Utc),
+            )
         } else {
             None
         };
 
         let end_date = if let Some(ref date_str) = self.end_date {
-            Some(DateTime::parse_from_rfc3339(date_str)
-                .map_err(|_| AuthError::Internal("Invalid end_date format".to_string()))?
-                .with_timezone(&Utc))
+            Some(
+                DateTime::parse_from_rfc3339(date_str)
+                    .map_err(|_| AuthError::Internal("Invalid end_date format".to_string()))?
+                    .with_timezone(&Utc),
+            )
         } else {
             None
         };
@@ -388,9 +392,7 @@ pub async fn list_users(
                 .fetch_one(db.as_ref())
                 .await?
         } else {
-            sqlx::query_as(count_query)
-                .fetch_one(db.as_ref())
-                .await?
+            sqlx::query_as(count_query).fetch_one(db.as_ref()).await?
         };
 
         (users, total.0)
@@ -446,12 +448,11 @@ pub async fn get_user_detail(
     .await
     .unwrap_or_default();
 
-    let session_count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM sessions WHERE user_id = $1 AND expires_at > NOW()",
-    )
-    .bind(user_id.to_string())
-    .fetch_one(db.as_ref())
-    .await?;
+    let session_count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM sessions WHERE user_id = $1 AND expires_at > NOW()")
+            .bind(user_id.to_string())
+            .fetch_one(db.as_ref())
+            .await?;
 
     Ok(HttpResponse::Ok().json(UserDetailResponse {
         user,
@@ -524,9 +525,7 @@ pub async fn update_user(
         query_builder = query_builder.bind(email_verified);
     }
 
-    let updated_user = query_builder
-        .fetch_one(db.as_ref())
-        .await?;
+    let updated_user = query_builder.fetch_one(db.as_ref()).await?;
 
     Ok(HttpResponse::Ok().json(updated_user))
 }
@@ -602,15 +601,14 @@ pub async fn impersonate_user(
     .await?;
 
     // Get user details
-    let user: (String, String) = sqlx::query_as(
-        "SELECT email, role FROM users WHERE id = $1 AND NOT suspended",
-    )
-    .bind(user_id)
-    .fetch_optional(db.as_ref())
-    .await?
-    .ok_or(AuthError::Internal(
-        "User not found or suspended".to_string(),
-    ))?;
+    let user: (String, String) =
+        sqlx::query_as("SELECT email, role FROM users WHERE id = $1 AND NOT suspended")
+            .bind(user_id)
+            .fetch_optional(db.as_ref())
+            .await?
+            .ok_or(AuthError::Internal(
+                "User not found or suspended".to_string(),
+            ))?;
 
     // Create short-lived impersonation token (15 minutes)
     let access_token = jwt_manager.create_access_token(
@@ -645,7 +643,9 @@ pub async fn get_audit_logs(
     let filter = query.to_audit_filter()?;
 
     // Query audit logs
-    let logs = audit_logger.query(filter).await
+    let logs = audit_logger
+        .query(filter)
+        .await
         .map_err(|e| AuthError::Internal(format!("Failed to query audit logs: {}", e)))?;
 
     let total = logs.len();
@@ -695,8 +695,10 @@ async fn log_audit_action(
         .map_err(|e| AuthError::Internal(format!("Invalid admin UUID: {}", e)))?;
 
     let target_uuid = if let Some(target) = target_user_id {
-        Some(Uuid::parse_str(target)
-            .map_err(|e| AuthError::Internal(format!("Invalid target UUID: {}", e)))?)
+        Some(
+            Uuid::parse_str(target)
+                .map_err(|e| AuthError::Internal(format!("Invalid target UUID: {}", e)))?,
+        )
     } else {
         None
     };

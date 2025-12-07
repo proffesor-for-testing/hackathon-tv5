@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
 use uuid::Uuid;
 
-use media_gateway_core::audit::{AuditAction, AuditLogger, PostgresAuditLogger};
+use media_gateway_core::audit::{AuditAction, AuditEvent, AuditLogger, PostgresAuditLogger};
 
 /// Ranking configuration with adjustable weights
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -51,17 +51,12 @@ impl RankingConfig {
 
     /// Validate that weights sum to 1.0 (with small tolerance for floating point)
     pub fn validate(&self) -> Result<()> {
-        let sum = self.vector_weight
-            + self.keyword_weight
-            + self.quality_weight
-            + self.freshness_weight;
+        let sum =
+            self.vector_weight + self.keyword_weight + self.quality_weight + self.freshness_weight;
 
         const EPSILON: f64 = 0.0001;
         if (sum - 1.0).abs() > EPSILON {
-            return Err(anyhow::anyhow!(
-                "Weights must sum to 1.0, got {:.4}",
-                sum
-            ));
+            return Err(anyhow::anyhow!("Weights must sum to 1.0, got {:.4}", sum));
         }
 
         if self.vector_weight < 0.0
@@ -117,17 +112,12 @@ pub struct UpdateRankingConfigRequest {
 
 impl UpdateRankingConfigRequest {
     pub fn validate(&self) -> Result<()> {
-        let sum = self.vector_weight
-            + self.keyword_weight
-            + self.quality_weight
-            + self.freshness_weight;
+        let sum =
+            self.vector_weight + self.keyword_weight + self.quality_weight + self.freshness_weight;
 
         const EPSILON: f64 = 0.0001;
         if (sum - 1.0).abs() > EPSILON {
-            return Err(anyhow::anyhow!(
-                "Weights must sum to 1.0, got {:.4}",
-                sum
-            ));
+            return Err(anyhow::anyhow!("Weights must sum to 1.0, got {:.4}", sum));
         }
 
         if self.vector_weight < 0.0
@@ -250,17 +240,12 @@ impl RankingConfigStore {
                 "description": versioned_config.description,
             });
 
-            if let Err(e) = self
-                .audit_logger
-                .log_event(
-                    admin_id,
-                    AuditAction::Update,
-                    "RankingConfig".to_string(),
-                    Some(format!("default:v{}", version)),
-                    Some(metadata),
-                )
-                .await
-            {
+            let event = AuditEvent::new(AuditAction::Update, "RankingConfig".to_string())
+                .with_user_id(admin_id)
+                .with_resource_id(format!("default:v{}", version))
+                .with_details(metadata);
+
+            if let Err(e) = self.audit_logger.log(event).await {
                 warn!(error = %e, "Failed to log audit event for ranking config update");
             }
         }
@@ -350,17 +335,12 @@ impl RankingConfigStore {
                 "freshness_weight": config.freshness_weight,
             });
 
-            if let Err(e) = self
-                .audit_logger
-                .log_event(
-                    admin_id,
-                    AuditAction::Update,
-                    "NamedRankingConfig".to_string(),
-                    Some(name.to_string()),
-                    Some(metadata),
-                )
-                .await
-            {
+            let event = AuditEvent::new(AuditAction::Update, "NamedRankingConfig".to_string())
+                .with_user_id(admin_id)
+                .with_resource_id(name.to_string())
+                .with_details(metadata);
+
+            if let Err(e) = self.audit_logger.log(event).await {
                 warn!(error = %e, "Failed to log audit event for named ranking config update");
             }
         }
@@ -417,17 +397,12 @@ impl RankingConfigStore {
                     "name": name,
                 });
 
-                if let Err(e) = self
-                    .audit_logger
-                    .log_event(
-                        admin_id,
-                        AuditAction::Delete,
-                        "NamedRankingConfig".to_string(),
-                        Some(name.to_string()),
-                        Some(metadata),
-                    )
-                    .await
-                {
+                let event = AuditEvent::new(AuditAction::Delete, "NamedRankingConfig".to_string())
+                    .with_user_id(admin_id)
+                    .with_resource_id(name.to_string())
+                    .with_details(metadata);
+
+                if let Err(e) = self.audit_logger.log(event).await {
                     warn!(error = %e, "Failed to log audit event for named ranking config deletion");
                 }
             }
@@ -441,10 +416,7 @@ impl RankingConfigStore {
 
     /// Get ranking config for A/B test variant
     #[instrument(skip(self))]
-    pub async fn get_config_for_variant(
-        &self,
-        variant: Option<&str>,
-    ) -> Result<RankingConfig> {
+    pub async fn get_config_for_variant(&self, variant: Option<&str>) -> Result<RankingConfig> {
         match variant {
             Some(name) => {
                 if let Some(named_config) = self.get_named_config(name).await? {
@@ -452,7 +424,10 @@ impl RankingConfigStore {
                         debug!(variant = name, "Using named ranking config for A/B test");
                         return Ok(named_config.config);
                     } else {
-                        warn!(variant = name, "Requested variant is not active, using default");
+                        warn!(
+                            variant = name,
+                            "Requested variant is not active, using default"
+                        );
                     }
                 } else {
                     warn!(variant = name, "Requested variant not found, using default");
@@ -538,8 +513,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_config_store_lifecycle() {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
         let db_url = std::env::var("DATABASE_URL")
             .unwrap_or_else(|_| "postgresql://localhost/media_gateway".to_string());
@@ -576,8 +551,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_named_config() {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
         let db_url = std::env::var("DATABASE_URL")
             .unwrap_or_else(|_| "postgresql://localhost/media_gateway".to_string());
@@ -620,7 +595,10 @@ mod tests {
         let configs = store.list_named_configs().await.unwrap();
         assert!(!configs.is_empty());
 
-        let deleted = store.delete_named_config("high_vector", None).await.unwrap();
+        let deleted = store
+            .delete_named_config("high_vector", None)
+            .await
+            .unwrap();
         assert!(deleted);
     }
 }

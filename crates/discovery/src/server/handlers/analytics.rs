@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{error, info};
 
-use crate::analytics::{SearchAnalytics, AnalyticsDashboard};
+use crate::analytics::{AnalyticsDashboard, SearchAnalytics};
 
 /// Query parameters for analytics endpoint
 #[derive(Debug, Deserialize)]
@@ -134,17 +134,20 @@ mod tests {
 
     // Test helpers
     async fn setup_test_db() -> PgPool {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url)
             .await
             .expect("Failed to connect to test database");
 
-        sqlx::query(include_str!("../../../migrations/20251206_search_analytics.sql"))
-            .execute(&pool)
-            .await
-            .expect("Failed to run migrations");
+        sqlx::query(include_str!(
+            "../../../migrations/20251206_search_analytics.sql"
+        ))
+        .execute(&pool)
+        .await
+        .expect("Failed to run migrations");
 
         pool
     }

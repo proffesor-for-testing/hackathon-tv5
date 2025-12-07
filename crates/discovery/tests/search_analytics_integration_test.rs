@@ -1,7 +1,7 @@
-use discovery::analytics::{SearchAnalytics, PeriodType};
+use chrono::Utc;
+use discovery::analytics::{PeriodType, SearchAnalytics};
 use sqlx::PgPool;
 use std::collections::HashMap;
-use chrono::Utc;
 
 #[tokio::test]
 #[ignore] // Integration test - requires PostgreSQL database
@@ -22,7 +22,11 @@ async fn test_complete_analytics_workflow() {
             "nonexistent content xyz"
         };
 
-        let result_count = if query.contains("nonexistent") { 0 } else { 10 + i };
+        let result_count = if query.contains("nonexistent") {
+            0
+        } else {
+            10 + i
+        };
         let latency_ms = 100 + (i % 10) * 20;
 
         let mut filters = HashMap::new();
@@ -32,7 +36,13 @@ async fn test_complete_analytics_workflow() {
 
         let event_id = analytics
             .query_log()
-            .log_search(query, Some(&format!("user{}", i % 10)), result_count, latency_ms, filters)
+            .log_search(
+                query,
+                Some(&format!("user{}", i % 10)),
+                result_count,
+                latency_ms,
+                filters,
+            )
             .await
             .expect("Failed to log search");
 
@@ -59,10 +69,22 @@ async fn test_complete_analytics_workflow() {
         .await
         .expect("Failed to calculate latency stats");
 
-    assert!(latency_stats.p50 >= 100, "P50 latency should be at least 100ms");
-    assert!(latency_stats.p95 > latency_stats.p50, "P95 should be higher than P50");
-    assert!(latency_stats.p99 > latency_stats.p95, "P99 should be higher than P95");
-    assert!(latency_stats.avg > 0.0, "Average latency should be positive");
+    assert!(
+        latency_stats.p50 >= 100,
+        "P50 latency should be at least 100ms"
+    );
+    assert!(
+        latency_stats.p95 > latency_stats.p50,
+        "P95 should be higher than P50"
+    );
+    assert!(
+        latency_stats.p99 > latency_stats.p95,
+        "P99 should be higher than P95"
+    );
+    assert!(
+        latency_stats.avg > 0.0,
+        "Average latency should be positive"
+    );
 
     // Step 4: Get top queries
     let top_queries = analytics
@@ -71,8 +93,14 @@ async fn test_complete_analytics_workflow() {
         .expect("Failed to get top queries");
 
     assert_eq!(top_queries.len(), 4, "Should have 4 unique queries");
-    assert_eq!(top_queries[0].query, "action movies", "Most popular query should be first");
-    assert_eq!(top_queries[0].count, 20, "Action movies should have 20 searches");
+    assert_eq!(
+        top_queries[0].query, "action movies",
+        "Most popular query should be first"
+    );
+    assert_eq!(
+        top_queries[0].count, 20,
+        "Action movies should have 20 searches"
+    );
     assert!(top_queries[0].ctr > 0.0, "CTR should be calculated");
 
     // Step 5: Get zero-result queries
@@ -83,7 +111,10 @@ async fn test_complete_analytics_workflow() {
 
     assert!(!zero_results.is_empty(), "Should have zero-result queries");
     assert_eq!(zero_results[0].query, "nonexistent content xyz");
-    assert_eq!(zero_results[0].count, 5, "Should have 5 zero-result searches");
+    assert_eq!(
+        zero_results[0].count, 5,
+        "Should have 5 zero-result searches"
+    );
 
     // Step 6: Calculate CTR
     let ctr = analytics
@@ -91,10 +122,17 @@ async fn test_complete_analytics_workflow() {
         .await
         .expect("Failed to calculate CTR");
 
-    assert!(ctr >= 0.55 && ctr <= 0.65, "CTR should be around 0.6 (30/50)");
+    assert!(
+        ctr >= 0.55 && ctr <= 0.65,
+        "CTR should be around 0.6 (30/50)"
+    );
 
     // Step 7: Aggregate popular searches
-    let period_start = Utc::now().date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let period_start = Utc::now()
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc();
     analytics
         .aggregate_popular_searches(PeriodType::Hourly, period_start)
         .await
@@ -115,8 +153,14 @@ async fn test_complete_analytics_workflow() {
     .expect("Failed to fetch aggregated data");
 
     assert_eq!(aggregated.search_count, 20, "Aggregated count should match");
-    assert!(aggregated.avg_results.is_some(), "Should have average results");
-    assert!(aggregated.avg_latency_ms.is_some(), "Should have average latency");
+    assert!(
+        aggregated.avg_results.is_some(),
+        "Should have average results"
+    );
+    assert!(
+        aggregated.avg_latency_ms.is_some(),
+        "Should have average latency"
+    );
     assert!(aggregated.ctr.is_some(), "Should have CTR");
 
     // Step 8: Get dashboard
@@ -150,7 +194,13 @@ async fn test_query_anonymization() {
     // Log search with real user ID
     analytics
         .query_log()
-        .log_search(original_query, Some(original_user_id), 10, 100, HashMap::new())
+        .log_search(
+            original_query,
+            Some(original_user_id),
+            10,
+            100,
+            HashMap::new(),
+        )
         .await
         .expect("Failed to log search");
 
@@ -215,8 +265,15 @@ async fn test_time_series_optimization() {
         .expect("Failed to get recent events");
     let elapsed = start.elapsed();
 
-    assert_eq!(recent_events.len(), 50, "Should fetch 50 most recent events");
-    assert!(elapsed.as_millis() < 1000, "Query should complete in under 1 second");
+    assert_eq!(
+        recent_events.len(),
+        50,
+        "Should fetch 50 most recent events"
+    );
+    assert!(
+        elapsed.as_millis() < 1000,
+        "Query should complete in under 1 second"
+    );
 
     // Verify events are in descending order by time
     for i in 1..recent_events.len() {
@@ -245,7 +302,13 @@ async fn test_concurrent_analytics_operations() {
                 let query = format!("query {} {}", i, j);
                 analytics_clone
                     .query_log()
-                    .log_search(&query, Some(&format!("user{}", i)), 10 + j, 100 + j * 10, HashMap::new())
+                    .log_search(
+                        &query,
+                        Some(&format!("user{}", i)),
+                        10 + j,
+                        100 + j * 10,
+                        HashMap::new(),
+                    )
                     .await
                     .expect("Failed to log search");
             }
@@ -269,7 +332,10 @@ async fn test_concurrent_analytics_operations() {
     .await
     .expect("Failed to count events");
 
-    assert_eq!(total, 50, "Should have 50 events from concurrent operations");
+    assert_eq!(
+        total, 50,
+        "Should have 50 events from concurrent operations"
+    );
 
     cleanup_test_db(&pool).await;
 }
@@ -342,8 +408,9 @@ async fn test_click_tracking_and_ctr() {
 
 // Test helpers
 async fn setup_test_db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+    });
 
     let pool = PgPool::connect(&database_url)
         .await

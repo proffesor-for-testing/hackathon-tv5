@@ -3,12 +3,12 @@ use auth::{
     error::AuthError,
     jwt::JwtManager,
     oauth::OAuthConfig,
+    oauth::OAuthManager,
+    rbac::RbacManager,
+    scopes::ScopeManager,
     server::{start_server, AppState},
     session::SessionManager,
     storage::AuthStorage,
-    rbac::RbacManager,
-    scopes::ScopeManager,
-    oauth::OAuthManager,
 };
 use serde_json::json;
 use std::sync::Arc;
@@ -29,10 +29,8 @@ async fn create_test_app_state() -> web::Data<AppState> {
         .expect("Failed to create JWT manager"),
     );
 
-    let storage = Arc::new(
-        AuthStorage::new("redis://127.0.0.1:6379")
-            .expect("Failed to connect to Redis"),
-    );
+    let storage =
+        Arc::new(AuthStorage::new("redis://127.0.0.1:6379").expect("Failed to connect to Redis"));
 
     let session_manager = Arc::new(
         SessionManager::new(storage.clone())
@@ -68,9 +66,18 @@ async fn test_full_device_authorization_flow() {
     let app = test::init_service(
         App::new()
             .app_data(app_state.clone())
-            .route("/auth/device", web::post().to(auth::server::device_authorization))
-            .route("/auth/device/approve", web::post().to(auth::server::approve_device))
-            .route("/auth/device/poll", web::get().to(auth::server::device_poll)),
+            .route(
+                "/auth/device",
+                web::post().to(auth::server::device_authorization),
+            )
+            .route(
+                "/auth/device/approve",
+                web::post().to(auth::server::approve_device),
+            )
+            .route(
+                "/auth/device/poll",
+                web::get().to(auth::server::device_poll),
+            ),
     )
     .await;
 
@@ -112,7 +119,10 @@ async fn test_full_device_authorization_flow() {
     assert!(resp.status().is_success());
 
     let approval_response: serde_json::Value = test::read_body_json(resp).await;
-    assert_eq!(approval_response["message"], "Device authorization approved");
+    assert_eq!(
+        approval_response["message"],
+        "Device authorization approved"
+    );
 
     // Step 4: Device polls and receives tokens
     let req = test::TestRequest::get()
@@ -145,11 +155,10 @@ async fn test_device_approval_invalid_user_code() {
         )
         .unwrap();
 
-    let app = test::init_service(
-        App::new()
-            .app_data(app_state.clone())
-            .route("/auth/device/approve", web::post().to(auth::server::approve_device)),
-    )
+    let app = test::init_service(App::new().app_data(app_state.clone()).route(
+        "/auth/device/approve",
+        web::post().to(auth::server::approve_device),
+    ))
     .await;
 
     // Try to approve with invalid user code
@@ -172,11 +181,10 @@ async fn test_device_approval_invalid_user_code() {
 async fn test_device_approval_missing_authorization() {
     let app_state = create_test_app_state().await;
 
-    let app = test::init_service(
-        App::new()
-            .app_data(app_state.clone())
-            .route("/auth/device/approve", web::post().to(auth::server::approve_device)),
-    )
+    let app = test::init_service(App::new().app_data(app_state.clone()).route(
+        "/auth/device/approve",
+        web::post().to(auth::server::approve_device),
+    ))
     .await;
 
     // Try to approve without authorization header
@@ -207,8 +215,14 @@ async fn test_device_approval_already_approved() {
     let app = test::init_service(
         App::new()
             .app_data(app_state.clone())
-            .route("/auth/device", web::post().to(auth::server::device_authorization))
-            .route("/auth/device/approve", web::post().to(auth::server::approve_device)),
+            .route(
+                "/auth/device",
+                web::post().to(auth::server::device_authorization),
+            )
+            .route(
+                "/auth/device/approve",
+                web::post().to(auth::server::approve_device),
+            ),
     )
     .await;
 
@@ -271,8 +285,14 @@ async fn test_device_poll_authorization_pending() {
     let app = test::init_service(
         App::new()
             .app_data(app_state.clone())
-            .route("/auth/device", web::post().to(auth::server::device_authorization))
-            .route("/auth/device/poll", web::get().to(auth::server::device_poll)),
+            .route(
+                "/auth/device",
+                web::post().to(auth::server::device_authorization),
+            )
+            .route(
+                "/auth/device/poll",
+                web::get().to(auth::server::device_poll),
+            ),
     )
     .await;
 
@@ -299,11 +319,10 @@ async fn test_device_poll_authorization_pending() {
 async fn test_device_poll_invalid_device_code() {
     let app_state = create_test_app_state().await;
 
-    let app = test::init_service(
-        App::new()
-            .app_data(app_state.clone())
-            .route("/auth/device/poll", web::get().to(auth::server::device_poll)),
-    )
+    let app = test::init_service(App::new().app_data(app_state.clone()).route(
+        "/auth/device/poll",
+        web::get().to(auth::server::device_poll),
+    ))
     .await;
 
     // Poll with invalid device code

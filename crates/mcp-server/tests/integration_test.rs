@@ -120,10 +120,7 @@ async fn test_tools_list(pool: PgPool) {
     assert!(tools.len() >= 5);
 
     // Verify expected tools are present
-    let tool_names: Vec<&str> = tools
-        .iter()
-        .filter_map(|t| t["name"].as_str())
-        .collect();
+    let tool_names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
 
     assert!(tool_names.contains(&"semantic_search"));
     assert!(tool_names.contains(&"get_recommendations"));
@@ -147,14 +144,15 @@ async fn test_resources_list(pool: PgPool) {
     assert!(resources.len() >= 3);
 
     // Verify expected resources are present
-    let resource_uris: Vec<&str> = resources
-        .iter()
-        .filter_map(|r| r["uri"].as_str())
-        .collect();
+    let resource_uris: Vec<&str> = resources.iter().filter_map(|r| r["uri"].as_str()).collect();
 
     assert!(resource_uris.contains(&"content://catalog"));
-    assert!(resource_uris.iter().any(|&uri| uri.starts_with("user://preferences/")));
-    assert!(resource_uris.iter().any(|&uri| uri.starts_with("content://item/")));
+    assert!(resource_uris
+        .iter()
+        .any(|&uri| uri.starts_with("user://preferences/")));
+    assert!(resource_uris
+        .iter()
+        .any(|&uri| uri.starts_with("content://item/")));
 }
 
 #[sqlx::test]
@@ -171,10 +169,7 @@ async fn test_prompts_list(pool: PgPool) {
     assert!(prompts.len() >= 3);
 
     // Verify expected prompts are present
-    let prompt_names: Vec<&str> = prompts
-        .iter()
-        .filter_map(|p| p["name"].as_str())
-        .collect();
+    let prompt_names: Vec<&str> = prompts.iter().filter_map(|p| p["name"].as_str()).collect();
 
     assert!(prompt_names.contains(&"discover_content"));
     assert!(prompt_names.contains(&"find_similar"));

@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 use thiserror::Error;
-use tracing::{Span, span, Level};
+use tracing::{span, Level, Span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// Telemetry configuration errors
@@ -56,8 +56,8 @@ impl TracingConfig {
     /// - OTEL_SAMPLING_RATE: Sampling rate (0.0-1.0)
     /// - RUST_ENV: If "production", defaults to 10% sampling
     pub fn from_env() -> Self {
-        let service_name = std::env::var("SERVICE_NAME")
-            .unwrap_or_else(|_| "media-gateway".to_string());
+        let service_name =
+            std::env::var("SERVICE_NAME").unwrap_or_else(|_| "media-gateway".to_string());
 
         let otlp_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
             .unwrap_or_else(|_| "http://localhost:4317".to_string());
@@ -110,8 +110,7 @@ pub async fn init_tracing(config: TracingConfig) -> Result<(), TelemetryError> {
 
     // For testing/development without actual OTLP infrastructure
     // We'll set up basic tracing subscriber with optional console output
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     let subscriber = tracing_subscriber::registry().with(env_filter);
 
@@ -337,10 +336,7 @@ mod tests {
 
     #[test]
     fn test_create_span() {
-        let span = create_span(
-            "test_operation",
-            &[("key1", "value1"), ("key2", "value2")],
-        );
+        let span = create_span("test_operation", &[("key1", "value1"), ("key2", "value2")]);
 
         assert_eq!(span.metadata().unwrap().name(), "operation");
         assert_eq!(span.metadata().unwrap().level(), &Level::INFO);
@@ -348,10 +344,7 @@ mod tests {
 
     #[test]
     fn test_db_query_span() {
-        let span = db_query_span(
-            "SELECT * FROM users WHERE id = $1",
-            "users",
-        );
+        let span = db_query_span("SELECT * FROM users WHERE id = $1", "users");
 
         assert_eq!(span.metadata().unwrap().name(), "db.query");
         assert_eq!(span.metadata().unwrap().level(), &Level::DEBUG);
@@ -376,11 +369,7 @@ mod tests {
 
     #[test]
     fn test_external_api_span() {
-        let span = external_api_span(
-            "POST",
-            "https://api.example.com/v1/users",
-            "user-service",
-        );
+        let span = external_api_span("POST", "https://api.example.com/v1/users", "user-service");
 
         assert_eq!(span.metadata().unwrap().name(), "http.client");
         assert_eq!(span.metadata().unwrap().level(), &Level::INFO);
@@ -413,7 +402,10 @@ mod tests {
 
         let result = init_tracing(config).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), TelemetryError::InvalidSamplingRate(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            TelemetryError::InvalidSamplingRate(_)
+        ));
     }
 
     #[tokio::test]

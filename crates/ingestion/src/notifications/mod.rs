@@ -6,6 +6,6 @@
 pub mod expiration;
 
 pub use expiration::{
-    ExpirationNotificationJob, ExpirationNotificationConfig,
-    ContentExpiringEvent, NotificationWindow, NotificationStatus,
+    ContentExpiringEvent, ExpirationNotificationConfig, ExpirationNotificationJob,
+    NotificationStatus, NotificationWindow,
 };

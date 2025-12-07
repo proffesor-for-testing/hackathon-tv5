@@ -62,7 +62,10 @@ mod tests {
 
         // Verify structure
         assert!(request_payload["viewing_events"].is_array());
-        assert_eq!(request_payload["viewing_events"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            request_payload["viewing_events"].as_array().unwrap().len(),
+            1
+        );
     }
 
     #[actix_web::test]

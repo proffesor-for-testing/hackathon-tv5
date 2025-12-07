@@ -113,16 +113,18 @@ impl ToolExecutor for SemanticSearchTool {
 
         let content = results
             .into_iter()
-            .map(|(id, title, description, content_type, metadata, quality_score)| {
-                json!({
-                    "id": id,
-                    "title": title,
-                    "description": description,
-                    "content_type": content_type,
-                    "metadata": metadata,
-                    "quality_score": quality_score
-                })
-            })
+            .map(
+                |(id, title, description, content_type, metadata, quality_score)| {
+                    json!({
+                        "id": id,
+                        "title": title,
+                        "description": description,
+                        "content_type": content_type,
+                        "metadata": metadata,
+                        "quality_score": quality_score
+                    })
+                },
+            )
             .collect::<Vec<_>>();
 
         let text = serde_json::to_string_pretty(&json!({
@@ -367,14 +369,17 @@ impl ToolExecutor for GetContentDetailsTool {
 
         info!(content_id = %args.content_id, "Getting content details");
 
-        let result = sqlx::query_as::<_, (
-            String,
-            Option<String>,
-            String,
-            serde_json::Value,
-            f64,
-            chrono::NaiveDateTime,
-        )>(
+        let result = sqlx::query_as::<
+            _,
+            (
+                String,
+                Option<String>,
+                String,
+                serde_json::Value,
+                f64,
+                chrono::NaiveDateTime,
+            ),
+        >(
             r#"
             SELECT title, description, content_type, metadata, quality_score, created_at
             FROM content
@@ -390,24 +395,27 @@ impl ToolExecutor for GetContentDetailsTool {
         })?;
 
         let is_error = result.is_none();
-        let text = if let Some((title, description, content_type, metadata, quality_score, created_at)) = result {
-            serde_json::to_string_pretty(&json!({
-                "id": args.content_id,
-                "title": title,
-                "description": description,
-                "content_type": content_type,
-                "metadata": metadata,
-                "quality_score": quality_score,
-                "created_at": created_at
-            }))
-            .unwrap_or_else(|_| "Error formatting results".to_string())
-        } else {
-            json!({
-                "error": "Content not found",
-                "content_id": args.content_id
-            })
-            .to_string()
-        };
+        let text =
+            if let Some((title, description, content_type, metadata, quality_score, created_at)) =
+                result
+            {
+                serde_json::to_string_pretty(&json!({
+                    "id": args.content_id,
+                    "title": title,
+                    "description": description,
+                    "content_type": content_type,
+                    "metadata": metadata,
+                    "quality_score": quality_score,
+                    "created_at": created_at
+                }))
+                .unwrap_or_else(|_| "Error formatting results".to_string())
+            } else {
+                json!({
+                    "error": "Content not found",
+                    "content_id": args.content_id
+                })
+                .to_string()
+            };
 
         Ok(ToolCallResult {
             content: vec![ToolContent::Text { text }],
@@ -496,7 +504,9 @@ impl ListDevicesTool {
     pub fn definition() -> Tool {
         Tool {
             name: "list_devices".to_string(),
-            description: "List all registered devices for a user with their capabilities and status".to_string(),
+            description:
+                "List all registered devices for a user with their capabilities and status"
+                    .to_string(),
             input_schema: Some(json!({
                 "type": "object",
                 "properties": {
@@ -547,7 +557,7 @@ impl ToolExecutor for ListDevicesTool {
             FROM user_devices
             WHERE user_id = $1
             ORDER BY last_seen DESC
-            "#
+            "#,
         )
         .bind(args.user_id)
         .fetch_all(&self.db_pool)

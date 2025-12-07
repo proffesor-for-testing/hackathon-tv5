@@ -13,7 +13,10 @@ pub struct TemplateEngine {
 
 impl TemplateEngine {
     pub fn new(base_url: String, from_name: String) -> Self {
-        Self { base_url, from_name }
+        Self {
+            base_url,
+            from_name,
+        }
     }
 
     pub fn render_verification(&self, email: &str, token: &str) -> Result<EmailTemplate> {
@@ -141,10 +144,7 @@ If you didn't create an account with {}, please ignore this email.
 This is an automated message, please do not reply.
 (c) 2024 {}. All rights reserved.
 "#,
-            self.from_name,
-            verification_url,
-            self.from_name,
-            self.from_name
+            self.from_name, verification_url, self.from_name, self.from_name
         );
 
         Ok(EmailTemplate {
@@ -255,11 +255,7 @@ This is an automated message, please do not reply.
     </div>
 </body>
 </html>"#,
-            self.from_name,
-            reset_url,
-            reset_url,
-            reset_url,
-            self.from_name
+            self.from_name, reset_url, reset_url, reset_url, self.from_name
         );
 
         let text_body = format!(
@@ -278,9 +274,7 @@ If you didn't request a password reset, please ignore this email and your passwo
 This is an automated message, please do not reply.
 (c) 2024 {}. All rights reserved.
 "#,
-            self.from_name,
-            reset_url,
-            self.from_name
+            self.from_name, reset_url, self.from_name
         );
 
         Ok(EmailTemplate {
@@ -367,8 +361,7 @@ This is an automated message, please do not reply.
     </div>
 </body>
 </html>"#,
-            self.from_name,
-            self.from_name
+            self.from_name, self.from_name
         );
 
         let text_body = format!(
@@ -382,8 +375,7 @@ Security Notice: If you didn't make this change, please contact our support team
 This is an automated message, please do not reply.
 (c) 2024 {}. All rights reserved.
 "#,
-            self.from_name,
-            self.from_name
+            self.from_name, self.from_name
         );
 
         Ok(EmailTemplate {
@@ -405,14 +397,17 @@ mod tests {
             "Media Gateway".to_string(),
         );
 
-        let template = engine.render_verification(
-            "test@example.com",
-            "abc123def456",
-        ).unwrap();
+        let template = engine
+            .render_verification("test@example.com", "abc123def456")
+            .unwrap();
 
         assert_eq!(template.subject, "Verify your Media Gateway account");
-        assert!(template.html_body.contains("https://example.com/verify?token=abc123def456"));
-        assert!(template.text_body.contains("https://example.com/verify?token=abc123def456"));
+        assert!(template
+            .html_body
+            .contains("https://example.com/verify?token=abc123def456"));
+        assert!(template
+            .text_body
+            .contains("https://example.com/verify?token=abc123def456"));
         assert!(template.html_body.contains("Welcome!"));
         assert!(template.text_body.contains("Welcome to Media Gateway!"));
     }
@@ -424,14 +419,17 @@ mod tests {
             "Media Gateway".to_string(),
         );
 
-        let template = engine.render_password_reset(
-            "test@example.com",
-            "xyz789uvw012",
-        ).unwrap();
+        let template = engine
+            .render_password_reset("test@example.com", "xyz789uvw012")
+            .unwrap();
 
         assert_eq!(template.subject, "Reset your Media Gateway password");
-        assert!(template.html_body.contains("https://example.com/reset-password?token=xyz789uvw012"));
-        assert!(template.text_body.contains("https://example.com/reset-password?token=xyz789uvw012"));
+        assert!(template
+            .html_body
+            .contains("https://example.com/reset-password?token=xyz789uvw012"));
+        assert!(template
+            .text_body
+            .contains("https://example.com/reset-password?token=xyz789uvw012"));
         assert!(template.html_body.contains("Password Reset Request"));
     }
 

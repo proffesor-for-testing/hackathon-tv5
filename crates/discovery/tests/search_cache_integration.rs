@@ -97,9 +97,9 @@ async fn test_cache_hit_performance() {
     // Generate cache key and pre-populate cache
     let cache_key = format!(
         "search:{}",
-        hex::encode(
-            sha2::Sha256::digest(serde_json::to_string(&request).unwrap().as_bytes())
-        )
+        hex::encode(sha2::Sha256::digest(
+            serde_json::to_string(&request).unwrap().as_bytes()
+        ))
     );
 
     cache
@@ -117,10 +117,7 @@ async fn test_cache_hit_performance() {
 
     // Verify cache hit
     assert!(cached.is_some(), "Cache should have returned a value");
-    assert_eq!(
-        cached.unwrap().query_parsed.fallback_query,
-        "action movies"
-    );
+    assert_eq!(cached.unwrap().query_parsed.fallback_query, "action movies");
 
     // Verify performance: cache hit should be <10ms
     assert!(
@@ -156,21 +153,21 @@ async fn test_cache_key_consistency() {
     // Generate cache keys
     let key1 = format!(
         "search:{}",
-        hex::encode(
-            sha2::Sha256::digest(serde_json::to_string(&request1).unwrap().as_bytes())
-        )
+        hex::encode(sha2::Sha256::digest(
+            serde_json::to_string(&request1).unwrap().as_bytes()
+        ))
     );
     let key2 = format!(
         "search:{}",
-        hex::encode(
-            sha2::Sha256::digest(serde_json::to_string(&request2).unwrap().as_bytes())
-        )
+        hex::encode(sha2::Sha256::digest(
+            serde_json::to_string(&request2).unwrap().as_bytes()
+        ))
     );
     let key3 = format!(
         "search:{}",
-        hex::encode(
-            sha2::Sha256::digest(serde_json::to_string(&request3).unwrap().as_bytes())
-        )
+        hex::encode(sha2::Sha256::digest(
+            serde_json::to_string(&request3).unwrap().as_bytes()
+        ))
     );
 
     // Same request should generate same key
@@ -199,9 +196,9 @@ async fn test_cache_miss_then_hit() {
     let request = create_test_request("drama series", 1);
     let cache_key = format!(
         "search:{}",
-        hex::encode(
-            sha2::Sha256::digest(serde_json::to_string(&request).unwrap().as_bytes())
-        )
+        hex::encode(sha2::Sha256::digest(
+            serde_json::to_string(&request).unwrap().as_bytes()
+        ))
     );
 
     // Ensure cache is empty
@@ -229,10 +226,7 @@ async fn test_cache_miss_then_hit() {
         .await
         .expect("Failed to get from cache");
     assert!(result2.is_some(), "Second request should be a cache hit");
-    assert_eq!(
-        result2.unwrap().query_parsed.fallback_query,
-        "drama series"
-    );
+    assert_eq!(result2.unwrap().query_parsed.fallback_query, "drama series");
 
     println!("✓ Cache hit after cache miss works correctly");
 
@@ -256,9 +250,9 @@ async fn test_cache_ttl_expiration() {
     let response = create_mock_response("comedy movies", 1);
     let cache_key = format!(
         "search:{}",
-        hex::encode(
-            sha2::Sha256::digest(serde_json::to_string(&request).unwrap().as_bytes())
-        )
+        hex::encode(sha2::Sha256::digest(
+            serde_json::to_string(&request).unwrap().as_bytes()
+        ))
     );
 
     // Set cache with 2-second TTL for testing
@@ -331,15 +325,15 @@ async fn test_cache_different_filters() {
 
     let key1 = format!(
         "search:{}",
-        hex::encode(
-            sha2::Sha256::digest(serde_json::to_string(&request1).unwrap().as_bytes())
-        )
+        hex::encode(sha2::Sha256::digest(
+            serde_json::to_string(&request1).unwrap().as_bytes()
+        ))
     );
     let key2 = format!(
         "search:{}",
-        hex::encode(
-            sha2::Sha256::digest(serde_json::to_string(&request2).unwrap().as_bytes())
-        )
+        hex::encode(sha2::Sha256::digest(
+            serde_json::to_string(&request2).unwrap().as_bytes()
+        ))
     );
 
     // Different filters should generate different keys
@@ -388,15 +382,15 @@ async fn test_cache_different_users() {
 
     let key1 = format!(
         "search:{}",
-        hex::encode(
-            sha2::Sha256::digest(serde_json::to_string(&request1).unwrap().as_bytes())
-        )
+        hex::encode(sha2::Sha256::digest(
+            serde_json::to_string(&request1).unwrap().as_bytes()
+        ))
     );
     let key2 = format!(
         "search:{}",
-        hex::encode(
-            sha2::Sha256::digest(serde_json::to_string(&request2).unwrap().as_bytes())
-        )
+        hex::encode(sha2::Sha256::digest(
+            serde_json::to_string(&request2).unwrap().as_bytes()
+        ))
     );
 
     // Different users should generate different keys (for personalized results)

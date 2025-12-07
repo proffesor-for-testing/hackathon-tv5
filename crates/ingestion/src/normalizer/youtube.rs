@@ -1,13 +1,12 @@
 //! YouTube platform normalizer using YouTube Data API v3
 
 use super::{
-    PlatformNormalizer, RawContent, CanonicalContent, ContentType,
-    AvailabilityInfo, ImageSet, RateLimitConfig,
-    extract_string, extract_i64, extract_array,
+    extract_array, extract_i64, extract_string, AvailabilityInfo, CanonicalContent, ContentType,
+    ImageSet, PlatformNormalizer, RateLimitConfig, RawContent,
 };
-use crate::{Result, IngestionError, deep_link::DeepLinkResult};
+use crate::{deep_link::DeepLinkResult, IngestionError, Result};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc, Datelike};
+use chrono::{DateTime, Datelike, Utc};
 use reqwest::Client;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -39,7 +38,9 @@ impl YouTubeNormalizer {
 
     /// Get next API key in rotation
     fn get_next_api_key(&self) -> String {
-        let index = self.current_key_index.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let index = self
+            .current_key_index
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.api_keys[index % self.api_keys.len()].clone()
     }
 
@@ -74,7 +75,9 @@ impl YouTubeNormalizer {
         let mut minutes = 0;
         let mut seconds = 0;
 
-        let parts: Vec<&str> = duration_str.split(|c| c == 'H' || c == 'M' || c == 'S').collect();
+        let parts: Vec<&str> = duration_str
+            .split(|c| c == 'H' || c == 'M' || c == 'S')
+            .collect();
         let mut part_index = 0;
 
         if duration_str.contains('H') {
@@ -118,19 +121,21 @@ impl PlatformNormalizer for YouTubeNormalizer {
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
         let data: serde_json::Value = response.json().await?;
-        let items = data.get("items")
+        let items = data
+            .get("items")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| IngestionError::NormalizationFailed(
-                "No items array in response".to_string()
-            ))?;
+            .ok_or_else(|| {
+                IngestionError::NormalizationFailed("No items array in response".to_string())
+            })?;
 
         // Fetch video details for each item (includes duration, stats, etc.)
-        let video_ids: Vec<String> = items.iter()
+        let video_ids: Vec<String> = items
+            .iter()
             .filter_map(|item| {
                 item.get("id")
                     .and_then(|id| id.get("videoId"))
@@ -146,15 +151,14 @@ impl PlatformNormalizer for YouTubeNormalizer {
         let video_ids_str = video_ids.join(",");
         let details_url = format!(
             "{}/videos?part=snippet,contentDetails,statistics&id={}&key={}",
-            self.base_url,
-            video_ids_str,
-            api_key
+            self.base_url, video_ids_str, api_key
         );
 
         let details_response = self.client.get(&details_url).send().await?;
         let details_data: serde_json::Value = details_response.json().await?;
 
-        let raw_items = details_data.get("items")
+        let raw_items = details_data
+            .get("items")
             .and_then(|v| v.as_array())
             .unwrap_or(&vec![])
             .iter()
@@ -175,7 +179,8 @@ impl PlatformNormalizer for YouTubeNormalizer {
     fn normalize(&self, raw: RawContent) -> Result<CanonicalContent> {
         let data = &raw.data;
 
-        let snippet = data.get("snippet")
+        let snippet = data
+            .get("snippet")
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing snippet".to_string()))?;
 
         let title = extract_string(snippet, "title")
@@ -202,8 +207,7 @@ impl PlatformNormalizer for YouTubeNormalizer {
         };
 
         // Extract genres from category
-        let category_id = extract_string(snippet, "categoryId")
-            .unwrap_or_else(|| "24".to_string());
+        let category_id = extract_string(snippet, "categoryId").unwrap_or_else(|| "24".to_string());
         let genres = self.map_youtube_category(&category_id);
 
         // Extract thumbnails
@@ -230,7 +234,8 @@ impl PlatformNormalizer for YouTubeNormalizer {
             purchase_price: None,
             rental_price: None,
             currency: None,
-            available_from: snippet.get("publishedAt")
+            available_from: snippet
+                .get("publishedAt")
                 .and_then(|v| v.as_str())
                 .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
                 .map(|dt| dt.with_timezone(&Utc)),
@@ -248,7 +253,8 @@ impl PlatformNormalizer for YouTubeNormalizer {
             title,
             overview: extract_string(snippet, "description"),
             content_type,
-            release_year: snippet.get("publishedAt")
+            release_year: snippet
+                .get("publishedAt")
                 .and_then(|v| v.as_str())
                 .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
                 .map(|dt| dt.year()),
@@ -258,7 +264,8 @@ impl PlatformNormalizer for YouTubeNormalizer {
             availability,
             images,
             rating: None, // YouTube doesn't have content ratings in the same way
-            user_rating: data.get("statistics")
+            user_rating: data
+                .get("statistics")
                 .and_then(|s| extract_i64(s, "likeCount"))
                 .and_then(|likes| {
                     data.get("statistics")
@@ -324,9 +331,18 @@ mod tests {
         let normalizer = YouTubeNormalizer::new(vec!["test_key".to_string()]);
         let deep_link = normalizer.generate_deep_link("dQw4w9WgXcQ");
 
-        assert_eq!(deep_link.mobile_url, Some("vnd.youtube://watch?v=dQw4w9WgXcQ".to_string()));
-        assert_eq!(deep_link.web_url, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-        assert_eq!(deep_link.tv_url, Some("vnd.youtube://watch?v=dQw4w9WgXcQ".to_string()));
+        assert_eq!(
+            deep_link.mobile_url,
+            Some("vnd.youtube://watch?v=dQw4w9WgXcQ".to_string())
+        );
+        assert_eq!(
+            deep_link.web_url,
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        );
+        assert_eq!(
+            deep_link.tv_url,
+            Some("vnd.youtube://watch?v=dQw4w9WgXcQ".to_string())
+        );
     }
 
     #[test]

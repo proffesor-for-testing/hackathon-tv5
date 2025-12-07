@@ -117,13 +117,17 @@ async fn test_openai_error_handling() {
 
     let result = client.generate("test").await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("invalid_request_error"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("invalid_request_error"));
 }
 
 /// Test Redis caching integration
 #[tokio::test]
 async fn test_embedding_redis_cache() {
-    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     let cache_config = Arc::new(CacheConfig {
         redis_url,
@@ -285,7 +289,8 @@ async fn test_retry_with_exponential_backoff() {
 /// Test batch with mixed cache hits and misses
 #[tokio::test]
 async fn test_batch_with_partial_cache() {
-    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     let cache_config = Arc::new(CacheConfig {
         redis_url,
@@ -306,7 +311,9 @@ async fn test_batch_with_partial_cache() {
     let _ = cache.clear_embedding_cache().await;
 
     // Pre-cache one embedding
-    let _ = cache.cache_embedding(&"cached".to_string(), &vec![1.0, 1.0, 1.0]).await;
+    let _ = cache
+        .cache_embedding(&"cached".to_string(), &vec![1.0, 1.0, 1.0])
+        .await;
 
     let mock_server = MockServer::start().await;
 
@@ -367,7 +374,8 @@ async fn test_empty_batch() {
 /// Test cache clearing
 #[tokio::test]
 async fn test_cache_clearing() {
-    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     let cache_config = Arc::new(CacheConfig {
         redis_url,
@@ -392,8 +400,12 @@ async fn test_cache_clearing() {
     );
 
     // Add some cache entries
-    let _ = cache.cache_embedding(&"test1".to_string(), &vec![1.0]).await;
-    let _ = cache.cache_embedding(&"test2".to_string(), &vec![2.0]).await;
+    let _ = cache
+        .cache_embedding(&"test1".to_string(), &vec![1.0])
+        .await;
+    let _ = cache
+        .cache_embedding(&"test2".to_string(), &vec![2.0])
+        .await;
 
     // Clear cache
     let result = client.clear_cache().await;

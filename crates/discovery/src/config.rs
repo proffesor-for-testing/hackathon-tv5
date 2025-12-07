@@ -233,9 +233,9 @@ impl Default for DiscoveryConfig {
             },
             cache: CacheConfig {
                 redis_url: "redis://localhost:6379".to_string(),
-                search_ttl_sec: 1800,      // 30 minutes
-                embedding_ttl_sec: 3600,    // 1 hour
-                intent_ttl_sec: 600,        // 10 minutes
+                search_ttl_sec: 1800,    // 30 minutes
+                embedding_ttl_sec: 3600, // 1 hour
+                intent_ttl_sec: 600,     // 10 minutes
             },
             embedding: EmbeddingConfig {
                 model: "text-embedding-3-small".to_string(),

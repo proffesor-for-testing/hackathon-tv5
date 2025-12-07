@@ -8,15 +8,18 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 async fn setup_test_db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:password@localhost:5432/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:password@localhost:5432/media_gateway_test".to_string()
+    });
 
-    PgPool::connect(&database_url).await.expect("Failed to connect to database")
+    PgPool::connect(&database_url)
+        .await
+        .expect("Failed to connect to database")
 }
 
 async fn setup_test_redis() -> RedisClient {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     RedisClient::open(redis_url).expect("Failed to connect to Redis")
 }
@@ -74,7 +77,11 @@ async fn test_email_verification_flow() {
     user_repo.mark_email_verified(user.id).await.unwrap();
 
     // Verify user is now verified
-    let updated_user = user_repo.get_user_by_email(&user.email).await.unwrap().unwrap();
+    let updated_user = user_repo
+        .get_user_by_email(&user.email)
+        .await
+        .unwrap()
+        .unwrap();
     assert!(updated_user.email_verified);
 }
 
@@ -174,7 +181,9 @@ async fn test_password_verification() {
     assert_eq!(verified_user.id, user.id);
 
     // Wrong password fails
-    let result = user_repo.verify_password(&user.email, "wrong_password").await;
+    let result = user_repo
+        .verify_password(&user.email, "wrong_password")
+        .await;
     assert!(result.is_err());
 
     // Non-existent user fails

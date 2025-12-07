@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::json;
-use sqlx::{PgPool, Postgres, Transaction};
+use sqlx::{PgPool, Postgres, Row, Transaction};
 use uuid::Uuid;
 
 use crate::crdt::{HLCTimestamp, ORSet, ORSetEntry, PlaybackPosition, PlaybackState};
@@ -32,7 +32,11 @@ pub trait SyncRepository: Send + Sync {
     // Progress operations
     async fn load_progress(&self, user_id: &str) -> Result<Vec<PlaybackPosition>>;
     async fn save_progress(&self, user_id: &str, position: &PlaybackPosition) -> Result<()>;
-    async fn get_progress(&self, user_id: &str, content_id: &str) -> Result<Option<PlaybackPosition>>;
+    async fn get_progress(
+        &self,
+        user_id: &str,
+        content_id: &str,
+    ) -> Result<Option<PlaybackPosition>>;
     async fn delete_progress(&self, user_id: &str, content_id: &str) -> Result<()>;
 
     // Device operations
@@ -185,7 +189,7 @@ impl PostgresSyncRepository {
         let logical = value["logical"].as_u64().unwrap_or(0);
         HLCTimestamp::from_components(
             physical.try_into().expect("physical timestamp overflow"),
-            logical.try_into().expect("logical counter overflow")
+            logical.try_into().expect("logical counter overflow"),
         )
     }
 }
@@ -193,31 +197,30 @@ impl PostgresSyncRepository {
 #[async_trait]
 impl SyncRepository for PostgresSyncRepository {
     async fn load_watchlist(&self, user_id: &str) -> Result<ORSet> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
         // Load additions
-        let additions = sqlx::query!(
+        let additions = sqlx::query(
             r#"
             SELECT content_id, unique_tag, timestamp_physical, timestamp_logical, device_id
             FROM user_watchlists
             WHERE user_id = $1 AND is_removed = false
             "#,
-            user_uuid
         )
+        .bind(user_uuid)
         .fetch_all(&self.pool)
         .await
         .context("Failed to load watchlist additions")?;
 
         // Load removals
-        let removals = sqlx::query!(
+        let removals = sqlx::query(
             r#"
             SELECT unique_tag
             FROM user_watchlists
             WHERE user_id = $1 AND is_removed = true
             "#,
-            user_uuid
         )
+        .bind(user_uuid)
         .fetch_all(&self.pool)
         .await
         .context("Failed to load watchlist removals")?;
@@ -226,15 +229,19 @@ impl SyncRepository for PostgresSyncRepository {
 
         // Reconstruct OR-Set from database
         for add in additions {
-            let timestamp = HLCTimestamp::from_components(
-                add.timestamp_physical as u64,
-                add.timestamp_logical as u32,
-            );
+            let content_id: String = add.try_get("content_id")?;
+            let unique_tag: String = add.try_get("unique_tag")?;
+            let timestamp_physical: i64 = add.try_get("timestamp_physical")?;
+            let timestamp_logical: i32 = add.try_get("timestamp_logical")?;
+            let device_id: String = add.try_get("device_id")?;
+
+            let timestamp =
+                HLCTimestamp::from_components(timestamp_physical, timestamp_logical as u16);
             let entry = ORSetEntry {
-                content_id: add.content_id,
-                unique_tag: add.unique_tag.clone(),
+                content_id: content_id.clone(),
+                unique_tag: unique_tag.clone(),
                 timestamp,
-                device_id: add.device_id,
+                device_id,
             };
             // Direct insertion to bypass add() which generates new tags
             use crate::crdt::{ORSetDelta, ORSetOperation};
@@ -248,30 +255,32 @@ impl SyncRepository for PostgresSyncRepository {
         }
 
         for rem in removals {
-            or_set.remove_by_tag(&rem.unique_tag);
+            let unique_tag: String = rem.try_get("unique_tag")?;
+            or_set.remove_by_tag(&unique_tag);
         }
 
         Ok(or_set)
     }
 
     async fn save_watchlist(&self, user_id: &str, or_set: &ORSet) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
-        let mut tx = self.pool.begin().await.context("Failed to begin transaction")?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .context("Failed to begin transaction")?;
 
         // Clear existing watchlist
-        sqlx::query!(
-            "DELETE FROM user_watchlists WHERE user_id = $1",
-            user_uuid
-        )
-        .execute(&mut *tx)
-        .await
-        .context("Failed to clear watchlist")?;
+        sqlx::query("DELETE FROM user_watchlists WHERE user_id = $1")
+            .bind(user_uuid)
+            .execute(&mut *tx)
+            .await
+            .context("Failed to clear watchlist")?;
 
         // Insert effective entries
         for entry in or_set.effective_entries() {
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO user_watchlists (
                     user_id, content_id, unique_tag,
@@ -280,14 +289,14 @@ impl SyncRepository for PostgresSyncRepository {
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                 "#,
-                user_uuid,
-                entry.content_id,
-                entry.unique_tag,
-                entry.timestamp.physical_time() as i64,
-                entry.timestamp.logical_counter() as i32,
-                entry.device_id,
-                false
             )
+            .bind(user_uuid)
+            .bind(&entry.content_id)
+            .bind(&entry.unique_tag)
+            .bind(entry.timestamp.physical_time() as i64)
+            .bind(entry.timestamp.logical_counter() as i32)
+            .bind(&entry.device_id)
+            .bind(false)
             .execute(&mut *tx)
             .await
             .context("Failed to insert watchlist entry")?;
@@ -303,10 +312,9 @@ impl SyncRepository for PostgresSyncRepository {
         content_id: &str,
         entry: &ORSetEntry,
     ) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO user_watchlists (
                 user_id, content_id, unique_tag,
@@ -321,14 +329,14 @@ impl SyncRepository for PostgresSyncRepository {
                 device_id = EXCLUDED.device_id,
                 is_removed = EXCLUDED.is_removed
             "#,
-            user_uuid,
-            content_id,
-            entry.unique_tag,
-            entry.timestamp.physical_time() as i64,
-            entry.timestamp.logical_counter() as i32,
-            entry.device_id,
-            false
         )
+        .bind(user_uuid)
+        .bind(content_id)
+        .bind(&entry.unique_tag)
+        .bind(entry.timestamp.physical_time() as i64)
+        .bind(entry.timestamp.logical_counter() as i32)
+        .bind(&entry.device_id)
+        .bind(false)
         .execute(&self.pool)
         .await
         .context("Failed to add watchlist item")?;
@@ -337,18 +345,17 @@ impl SyncRepository for PostgresSyncRepository {
     }
 
     async fn remove_watchlist_item(&self, user_id: &str, unique_tag: &str) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE user_watchlists
             SET is_removed = true
             WHERE user_id = $1 AND unique_tag = $2
             "#,
-            user_uuid,
-            unique_tag
         )
+        .bind(user_uuid)
+        .bind(unique_tag)
         .execute(&self.pool)
         .await
         .context("Failed to remove watchlist item")?;
@@ -357,18 +364,17 @@ impl SyncRepository for PostgresSyncRepository {
     }
 
     async fn load_progress(&self, user_id: &str) -> Result<Vec<PlaybackPosition>> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             SELECT content_id, position_seconds, duration_seconds, state,
                    timestamp_physical, timestamp_logical, device_id
             FROM user_progress
             WHERE user_id = $1
             "#,
-            user_uuid
         )
+        .bind(user_uuid)
         .fetch_all(&self.pool)
         .await
         .context("Failed to load progress")?;
@@ -376,29 +382,34 @@ impl SyncRepository for PostgresSyncRepository {
         let positions = rows
             .into_iter()
             .map(|row| {
-                let timestamp = HLCTimestamp::from_components(
-                    row.timestamp_physical as u64,
-                    row.timestamp_logical as u32,
-                );
-                PlaybackPosition::new(
-                    row.content_id,
-                    row.position_seconds as u32,
-                    row.duration_seconds as u32,
-                    Self::string_to_playback_state(&row.state),
+                let content_id: String = row.try_get("content_id")?;
+                let position_seconds: i32 = row.try_get("position_seconds")?;
+                let duration_seconds: i32 = row.try_get("duration_seconds")?;
+                let state: String = row.try_get("state")?;
+                let timestamp_physical: i64 = row.try_get("timestamp_physical")?;
+                let timestamp_logical: i32 = row.try_get("timestamp_logical")?;
+                let device_id: String = row.try_get("device_id")?;
+
+                let timestamp =
+                    HLCTimestamp::from_components(timestamp_physical, timestamp_logical as u16);
+                Ok(PlaybackPosition::new(
+                    content_id,
+                    position_seconds as u32,
+                    duration_seconds as u32,
+                    Self::string_to_playback_state(&state),
                     timestamp,
-                    row.device_id,
-                )
+                    device_id,
+                ))
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(positions)
     }
 
     async fn save_progress(&self, user_id: &str, position: &PlaybackPosition) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO user_progress (
                 user_id, content_id, position_seconds, duration_seconds,
@@ -418,16 +429,16 @@ impl SyncRepository for PostgresSyncRepository {
                 OR (user_progress.timestamp_physical = EXCLUDED.timestamp_physical
                     AND user_progress.timestamp_logical < EXCLUDED.timestamp_logical)
             "#,
-            user_uuid,
-            position.content_id,
-            position.position_seconds as i32,
-            position.duration_seconds as i32,
-            Self::playback_state_to_string(position.state),
-            position.timestamp.physical_time() as i64,
-            position.timestamp.logical_counter() as i32,
-            position.device_id,
-            Utc::now()
         )
+        .bind(user_uuid)
+        .bind(&position.content_id)
+        .bind(position.position_seconds as i32)
+        .bind(position.duration_seconds as i32)
+        .bind(Self::playback_state_to_string(position.state))
+        .bind(position.timestamp.physical_time() as i64)
+        .bind(position.timestamp.logical_counter() as i32)
+        .bind(&position.device_id)
+        .bind(Utc::now())
         .execute(&self.pool)
         .await
         .context("Failed to save progress")?;
@@ -435,69 +446,76 @@ impl SyncRepository for PostgresSyncRepository {
         Ok(())
     }
 
-    async fn get_progress(&self, user_id: &str, content_id: &str) -> Result<Option<PlaybackPosition>> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+    async fn get_progress(
+        &self,
+        user_id: &str,
+        content_id: &str,
+    ) -> Result<Option<PlaybackPosition>> {
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
-        let row = sqlx::query!(
+        let row = sqlx::query(
             r#"
             SELECT content_id, position_seconds, duration_seconds, state,
                    timestamp_physical, timestamp_logical, device_id
             FROM user_progress
             WHERE user_id = $1 AND content_id = $2
             "#,
-            user_uuid,
-            content_id
         )
+        .bind(user_uuid)
+        .bind(content_id)
         .fetch_optional(&self.pool)
         .await
         .context("Failed to get progress")?;
 
-        Ok(row.map(|r| {
-            let timestamp = HLCTimestamp::from_components(
-                r.timestamp_physical as u64,
-                r.timestamp_logical as u32,
-            );
-            PlaybackPosition::new(
-                r.content_id,
-                r.position_seconds as u32,
-                r.duration_seconds as u32,
-                Self::string_to_playback_state(&r.state),
-                timestamp,
-                r.device_id,
-            )
-        }))
+        Ok(row
+            .map(|r| -> Result<PlaybackPosition> {
+                let content_id: String = r.try_get("content_id")?;
+                let position_seconds: i32 = r.try_get("position_seconds")?;
+                let duration_seconds: i32 = r.try_get("duration_seconds")?;
+                let state: String = r.try_get("state")?;
+                let timestamp_physical: i64 = r.try_get("timestamp_physical")?;
+                let timestamp_logical: i32 = r.try_get("timestamp_logical")?;
+                let device_id: String = r.try_get("device_id")?;
+
+                let timestamp =
+                    HLCTimestamp::from_components(timestamp_physical, timestamp_logical as u16);
+                Ok(PlaybackPosition::new(
+                    content_id,
+                    position_seconds as u32,
+                    duration_seconds as u32,
+                    Self::string_to_playback_state(&state),
+                    timestamp,
+                    device_id,
+                ))
+            })
+            .transpose()?)
     }
 
     async fn delete_progress(&self, user_id: &str, content_id: &str) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
-        sqlx::query!(
-            "DELETE FROM user_progress WHERE user_id = $1 AND content_id = $2",
-            user_uuid,
-            content_id
-        )
-        .execute(&self.pool)
-        .await
-        .context("Failed to delete progress")?;
+        sqlx::query("DELETE FROM user_progress WHERE user_id = $1 AND content_id = $2")
+            .bind(user_uuid)
+            .bind(content_id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to delete progress")?;
 
         Ok(())
     }
 
     async fn load_devices(&self, user_id: &str) -> Result<Vec<DeviceInfo>> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
-        let rows = sqlx::query!(
+        let rows = sqlx::query(
             r#"
             SELECT device_id, device_type, platform, capabilities, app_version,
                    last_seen, is_online, device_name
             FROM user_devices
             WHERE user_id = $1
             "#,
-            user_uuid
         )
+        .bind(user_uuid)
         .fetch_all(&self.pool)
         .await
         .context("Failed to load devices")?;
@@ -505,18 +523,28 @@ impl SyncRepository for PostgresSyncRepository {
         let devices = rows
             .into_iter()
             .filter_map(|row| {
-                let capabilities = Self::deserialize_capabilities(row.capabilities).ok()?;
-                let platform: DevicePlatform = serde_json::from_str(&format!("\"{}\"", row.platform)).ok()?;
+                let device_id: String = row.try_get("device_id").ok()?;
+                let device_type: String = row.try_get("device_type").ok()?;
+                let platform: String = row.try_get("platform").ok()?;
+                let capabilities: serde_json::Value = row.try_get("capabilities").ok()?;
+                let app_version: String = row.try_get("app_version").ok()?;
+                let last_seen: DateTime<Utc> = row.try_get("last_seen").ok()?;
+                let is_online: bool = row.try_get("is_online").ok()?;
+                let device_name: Option<String> = row.try_get("device_name").ok()?;
+
+                let capabilities = Self::deserialize_capabilities(capabilities).ok()?;
+                let platform: DevicePlatform =
+                    serde_json::from_str(&format!("\"{}\"", platform)).ok()?;
 
                 Some(DeviceInfo {
-                    device_id: row.device_id,
-                    device_type: Self::string_to_device_type(&row.device_type),
+                    device_id,
+                    device_type: Self::string_to_device_type(&device_type),
                     platform,
                     capabilities,
-                    app_version: row.app_version,
-                    last_seen: row.last_seen,
-                    is_online: row.is_online,
-                    device_name: row.device_name,
+                    app_version,
+                    last_seen,
+                    is_online,
+                    device_name,
                 })
             })
             .collect();
@@ -525,13 +553,12 @@ impl SyncRepository for PostgresSyncRepository {
     }
 
     async fn save_device(&self, user_id: &str, device: &DeviceInfo) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
         let platform_str = format!("{:?}", device.platform);
         let capabilities = Self::serialize_capabilities(&device.capabilities);
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO user_devices (
                 user_id, device_id, device_type, platform, capabilities,
@@ -547,16 +574,16 @@ impl SyncRepository for PostgresSyncRepository {
                 is_online = EXCLUDED.is_online,
                 device_name = EXCLUDED.device_name
             "#,
-            user_uuid,
-            device.device_id,
-            Self::device_type_to_string(device.device_type),
-            platform_str,
-            capabilities,
-            device.app_version,
-            device.last_seen,
-            device.is_online,
-            device.device_name
         )
+        .bind(user_uuid)
+        .bind(&device.device_id)
+        .bind(Self::device_type_to_string(device.device_type))
+        .bind(platform_str)
+        .bind(capabilities)
+        .bind(&device.app_version)
+        .bind(device.last_seen)
+        .bind(device.is_online)
+        .bind(&device.device_name)
         .execute(&self.pool)
         .await
         .context("Failed to save device")?;
@@ -565,70 +592,75 @@ impl SyncRepository for PostgresSyncRepository {
     }
 
     async fn get_device(&self, user_id: &str, device_id: &str) -> Result<Option<DeviceInfo>> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
-        let row = sqlx::query!(
+        let row = sqlx::query(
             r#"
             SELECT device_id, device_type, platform, capabilities, app_version,
                    last_seen, is_online, device_name
             FROM user_devices
             WHERE user_id = $1 AND device_id = $2
             "#,
-            user_uuid,
-            device_id
         )
+        .bind(user_uuid)
+        .bind(device_id)
         .fetch_optional(&self.pool)
         .await
         .context("Failed to get device")?;
 
         Ok(row.and_then(|r| {
-            let capabilities = Self::deserialize_capabilities(r.capabilities).ok()?;
-            let platform: DevicePlatform = serde_json::from_str(&format!("\"{}\"", r.platform)).ok()?;
+            let device_id: String = r.try_get("device_id").ok()?;
+            let device_type: String = r.try_get("device_type").ok()?;
+            let platform: String = r.try_get("platform").ok()?;
+            let capabilities: serde_json::Value = r.try_get("capabilities").ok()?;
+            let app_version: String = r.try_get("app_version").ok()?;
+            let last_seen: DateTime<Utc> = r.try_get("last_seen").ok()?;
+            let is_online: bool = r.try_get("is_online").ok()?;
+            let device_name: Option<String> = r.try_get("device_name").ok()?;
+
+            let capabilities = Self::deserialize_capabilities(capabilities).ok()?;
+            let platform: DevicePlatform =
+                serde_json::from_str(&format!("\"{}\"", platform)).ok()?;
 
             Some(DeviceInfo {
-                device_id: r.device_id,
-                device_type: Self::string_to_device_type(&r.device_type),
+                device_id,
+                device_type: Self::string_to_device_type(&device_type),
                 platform,
                 capabilities,
-                app_version: r.app_version,
-                last_seen: r.last_seen,
-                is_online: r.is_online,
-                device_name: r.device_name,
+                app_version,
+                last_seen,
+                is_online,
+                device_name,
             })
         }))
     }
 
     async fn delete_device(&self, user_id: &str, device_id: &str) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
-        sqlx::query!(
-            "DELETE FROM user_devices WHERE user_id = $1 AND device_id = $2",
-            user_uuid,
-            device_id
-        )
-        .execute(&self.pool)
-        .await
-        .context("Failed to delete device")?;
+        sqlx::query("DELETE FROM user_devices WHERE user_id = $1 AND device_id = $2")
+            .bind(user_uuid)
+            .bind(device_id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to delete device")?;
 
         Ok(())
     }
 
     async fn update_device_heartbeat(&self, user_id: &str, device_id: &str) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .context("Invalid user ID format")?;
+        let user_uuid = Uuid::parse_str(user_id).context("Invalid user ID format")?;
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE user_devices
             SET last_seen = $1, is_online = true
             WHERE user_id = $2 AND device_id = $3
             "#,
-            Utc::now(),
-            user_uuid,
-            device_id
         )
+        .bind(Utc::now())
+        .bind(user_uuid)
+        .bind(device_id)
         .execute(&self.pool)
         .await
         .context("Failed to update device heartbeat")?;

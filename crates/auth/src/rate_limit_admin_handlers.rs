@@ -52,7 +52,9 @@ impl UpdateRateLimitConfigRequest {
         }
 
         if self.burst_size == 0 {
-            return Err(AuthError::Internal("Burst size must be non-zero".to_string()));
+            return Err(AuthError::Internal(
+                "Burst size must be non-zero".to_string(),
+            ));
         }
 
         if self.burst_size < self.requests_per_minute {
@@ -160,11 +162,17 @@ pub async fn update_rate_limit(
         .map_err(|e| AuthError::Internal(format!("Invalid admin UUID: {}", e)))?;
 
     let existing = store.get_config(&config.endpoint, config.tier).await?;
-    let action = if existing.is_some() { "update" } else { "create" };
+    let action = if existing.is_some() {
+        "update"
+    } else {
+        "create"
+    };
 
     store.set_config(&config).await?;
 
-    store.log_config_change(admin_user_id, action, &config).await?;
+    store
+        .log_config_change(admin_user_id, action, &config)
+        .await?;
 
     let response: RateLimitConfigResponse = config.into();
     Ok(HttpResponse::Ok().json(response))
@@ -194,11 +202,15 @@ pub async fn delete_rate_limit(
     let deleted = store.delete_config(&endpoint, tier).await?;
 
     if !deleted {
-        return Err(AuthError::Internal("Rate limit config not found".to_string()));
+        return Err(AuthError::Internal(
+            "Rate limit config not found".to_string(),
+        ));
     }
 
     if let Some(config) = config_before {
-        store.log_config_change(admin_user_id, "delete", &config).await?;
+        store
+            .log_config_change(admin_user_id, "delete", &config)
+            .await?;
     }
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
@@ -266,13 +278,7 @@ mod tests {
 
     #[test]
     fn test_rate_limit_config_response_from() {
-        let config = RateLimitConfig::new(
-            "/api/v1/test".to_string(),
-            UserTier::Free,
-            30,
-            1000,
-            50,
-        );
+        let config = RateLimitConfig::new("/api/v1/test".to_string(), UserTier::Free, 30, 1000, 50);
 
         let response: RateLimitConfigResponse = config.into();
         assert_eq!(response.endpoint, "/api/v1/test");

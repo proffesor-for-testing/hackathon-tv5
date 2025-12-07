@@ -102,22 +102,17 @@ where
             let since_clone = since;
 
             self.circuit_breaker
-                .call_with_fallback(
-                    self.inner.fetch_catalog_delta(since, region),
-                    move || {
-                        debug!(
-                            platform = platform_id,
-                            region = %region_owned,
-                            "Circuit open, using cached catalog"
-                        );
-                        cache_clone.get_catalog(&region_owned, since_clone)
-                    },
-                )
+                .call_with_fallback(self.inner.fetch_catalog_delta(since, region), move || {
+                    debug!(
+                        platform = platform_id,
+                        region = %region_owned,
+                        "Circuit open, using cached catalog"
+                    );
+                    cache_clone.get_catalog(&region_owned, since_clone)
+                })
                 .await
                 .map_err(|e| match e {
-                    media_gateway_core::resilience::CircuitBreakerError::CircuitOpen {
-                        ..
-                    } => {
+                    media_gateway_core::resilience::CircuitBreakerError::CircuitOpen { .. } => {
                         crate::Error::ServiceUnavailable(format!(
                             "Platform {} is unavailable",
                             platform_id
@@ -261,9 +256,7 @@ mod tests {
 
         let normalizer = CircuitBreakerNormalizer::new(mock, config);
 
-        let result = normalizer
-            .fetch_catalog_delta(Utc::now(), "US")
-            .await;
+        let result = normalizer.fetch_catalog_delta(Utc::now(), "US").await;
 
         assert!(result.is_ok());
     }

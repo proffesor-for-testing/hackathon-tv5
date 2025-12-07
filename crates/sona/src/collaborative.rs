@@ -8,8 +8,10 @@ use anyhow::{Context, Result};
 use qdrant_client::prelude::*;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
-    CreateCollection, Distance, PointStruct, SearchPoints, VectorParams, VectorsConfig,
+    CreateCollection, Distance, PointStruct, SearchPoints, Value as QdrantValue, VectorParams,
+    VectorsConfig,
 };
+use qdrant_client::Payload;
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -184,10 +186,7 @@ impl CollaborativeFilteringEngine {
     }
 
     /// Build user-item matrix from interactions
-    pub fn build_user_item_matrix(
-        &self,
-        interactions: &[Interaction],
-    ) -> Vec<(Uuid, Uuid, f32)> {
+    pub fn build_user_item_matrix(&self, interactions: &[Interaction]) -> Vec<(Uuid, Uuid, f32)> {
         let mut aggregated: HashMap<(Uuid, Uuid), f32> = HashMap::new();
 
         for interaction in interactions {
@@ -230,11 +229,13 @@ impl CollaborativeFilteringEngine {
         let mut user_points = Vec::new();
         for (user_id, &user_idx) in &model.user_id_map {
             let embedding = model.get_user_embedding(*user_id)?;
-            user_points.push(PointStruct::new(
-                user_idx as u64,
-                embedding,
-                [("user_id", user_id.to_string())].into(),
-            ));
+            let mut payload_map = HashMap::new();
+            payload_map.insert(
+                "user_id".to_string(),
+                QdrantValue::from(user_id.to_string()),
+            );
+            let payload: Payload = payload_map.into();
+            user_points.push(PointStruct::new(user_idx as u64, embedding, payload));
         }
 
         if !user_points.is_empty() {
@@ -247,11 +248,13 @@ impl CollaborativeFilteringEngine {
         let mut item_points = Vec::new();
         for (item_id, &item_idx) in &model.item_id_map {
             let embedding = model.get_item_embedding(*item_id)?;
-            item_points.push(PointStruct::new(
-                item_idx as u64,
-                embedding,
-                [("content_id", item_id.to_string())].into(),
-            ));
+            let mut payload_map = HashMap::new();
+            payload_map.insert(
+                "content_id".to_string(),
+                QdrantValue::from(item_id.to_string()),
+            );
+            let payload: Payload = payload_map.into();
+            item_points.push(PointStruct::new(item_idx as u64, embedding, payload));
         }
 
         if !item_points.is_empty() {
@@ -447,11 +450,7 @@ impl CollaborativeFilteringEngine {
     }
 
     /// Get "users who watched X also watched Y" recommendations
-    pub async fn get_also_watched(
-        &self,
-        item_id: Uuid,
-        limit: usize,
-    ) -> Result<Vec<(Uuid, f32)>> {
+    pub async fn get_also_watched(&self, item_id: Uuid, limit: usize) -> Result<Vec<(Uuid, f32)>> {
         self.compute_item_similarity(item_id, limit).await
     }
 }
@@ -474,7 +473,9 @@ mod tests {
     #[test]
     fn test_build_user_item_matrix() {
         let pool = unsafe { std::mem::zeroed() };
-        let qdrant = QdrantClient::from_url("http://localhost:6334").build().unwrap();
+        let qdrant = QdrantClient::from_url("http://localhost:6334")
+            .build()
+            .unwrap();
         let engine = CollaborativeFilteringEngine::new(pool, qdrant);
 
         let user1 = Uuid::new_v4();
@@ -518,7 +519,9 @@ mod tests {
     #[test]
     fn test_incremental_buffer() {
         let pool = unsafe { std::mem::zeroed() };
-        let qdrant = QdrantClient::from_url("http://localhost:6334").build().unwrap();
+        let qdrant = QdrantClient::from_url("http://localhost:6334")
+            .build()
+            .unwrap();
         let mut engine = CollaborativeFilteringEngine::new(pool, qdrant);
 
         let interaction = Interaction {

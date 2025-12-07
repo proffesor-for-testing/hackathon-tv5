@@ -3,9 +3,12 @@
 //! Provides real embedding generation using ONNX Runtime.
 //! Replaces dummy vec![0.0; 512] vectors with actual model inference.
 
-use anyhow::{Result, anyhow};
-use ort::{Session, Value, GraphOptimizationLevel, SessionBuilder};
-use ndarray::{Array1, Array2, Axis};
+use anyhow::{anyhow, Result};
+use ndarray::{Array2, Axis};
+use ort::{
+    session::{builder::GraphOptimizationLevel, Session},
+    value::Tensor,
+};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -26,7 +29,8 @@ impl ONNXInference {
     pub fn new(model_path: impl AsRef<Path>, embedding_dim: usize) -> Result<Self> {
         let start = std::time::Instant::now();
 
-        let session = SessionBuilder::new()?
+        // ORT 2.x API: Session::builder() returns a SessionBuilder
+        let session = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level3)?
             .with_intra_threads(4)?
             .commit_from_file(model_path)?;
@@ -39,7 +43,10 @@ impl ONNXInference {
         );
 
         if load_time.as_millis() > 2000 {
-            tracing::warn!("Model loading time {}ms exceeds 2s target", load_time.as_millis());
+            tracing::warn!(
+                "Model loading time {}ms exceeds 2s target",
+                load_time.as_millis()
+            );
         }
 
         Ok(Self {
@@ -81,33 +88,34 @@ impl ONNXInference {
         let tokens = self.tokenize(text)?;
 
         // Prepare input tensor
-        let input_ids = Array2::from_shape_vec(
-            (1, tokens.len()),
-            tokens.clone(),
-        )?;
+        let input_ids = Array2::from_shape_vec((1, tokens.len()), tokens.clone())?;
 
-        let session = self.session.read().await;
+        let mut session = self.session.write().await;
 
         // Run inference
-        let input_tensor = Value::from_array(input_ids)?;
-        let outputs = session.run(ort::inputs!["input_ids" => input_tensor]?)?;
+        let input_tensor = Tensor::from_array(input_ids)?;
+        let outputs = session.run(ort::inputs!["input_ids" => input_tensor])?;
 
         // Extract embedding from output
-        let output_tensor = outputs["embeddings"]
-            .extract_tensor::<f32>()?
-            .view()
-            .to_owned();
+        let output_tensor = outputs["embeddings"].try_extract_array::<f32>()?.to_owned();
 
-        let embedding = if output_tensor.ndim() == 2 {
+        let embedding: Vec<f32> = if output_tensor.ndim() == 2 {
             // Shape: [batch_size, embedding_dim]
-            output_tensor.index_axis(Axis(0), 0).to_vec()
+            output_tensor
+                .index_axis(Axis(0), 0)
+                .iter()
+                .copied()
+                .collect()
         } else if output_tensor.ndim() == 3 {
             // Shape: [batch_size, seq_len, embedding_dim] - take mean pooling
             let batch = output_tensor.index_axis(Axis(0), 0);
             let mean = batch.mean_axis(Axis(0)).unwrap();
-            mean.to_vec()
+            mean.iter().copied().collect()
         } else {
-            return Err(anyhow!("Unexpected output tensor shape: {:?}", output_tensor.shape()));
+            return Err(anyhow!(
+                "Unexpected output tensor shape: {:?}",
+                output_tensor.shape()
+            ));
         };
 
         if embedding.len() != self.embedding_dim {
@@ -195,34 +203,35 @@ impl ONNXInference {
         }
 
         // Create input tensor
-        let input_ids = Array2::from_shape_vec(
-            (batch_size, max_len),
-            padded_tokens,
-        )?;
+        let input_ids = Array2::from_shape_vec((batch_size, max_len), padded_tokens)?;
 
-        let session = self.session.read().await;
+        let mut session = self.session.write().await;
 
         // Run inference
-        let input_tensor = Value::from_array(input_ids)?;
-        let outputs = session.run(ort::inputs!["input_ids" => input_tensor]?)?;
+        let input_tensor = Tensor::from_array(input_ids)?;
+        let outputs = session.run(ort::inputs!["input_ids" => input_tensor])?;
 
         // Extract embeddings
-        let output_tensor = outputs["embeddings"]
-            .extract_tensor::<f32>()?
-            .view()
-            .to_owned();
+        let output_tensor = outputs["embeddings"].try_extract_array::<f32>()?.to_owned();
 
         let mut embeddings = Vec::with_capacity(batch_size);
 
         for i in 0..batch_size {
-            let embedding = if output_tensor.ndim() == 2 {
-                output_tensor.index_axis(Axis(0), i).to_vec()
+            let embedding: Vec<f32> = if output_tensor.ndim() == 2 {
+                output_tensor
+                    .index_axis(Axis(0), i)
+                    .iter()
+                    .copied()
+                    .collect()
             } else if output_tensor.ndim() == 3 {
                 let batch = output_tensor.index_axis(Axis(0), i);
                 let mean = batch.mean_axis(Axis(0)).unwrap();
-                mean.to_vec()
+                mean.iter().copied().collect()
             } else {
-                return Err(anyhow!("Unexpected output tensor shape: {:?}", output_tensor.shape()));
+                return Err(anyhow!(
+                    "Unexpected output tensor shape: {:?}",
+                    output_tensor.shape()
+                ));
             };
 
             if embedding.len() != self.embedding_dim {

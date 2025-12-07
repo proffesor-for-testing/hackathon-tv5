@@ -1,8 +1,8 @@
+use super::service::{EmailError, EmailService, Result};
+use super::templates::{EmailTemplate, TemplateEngine};
 use async_trait::async_trait;
 use reqwest;
 use serde_json::json;
-use super::service::{EmailService, EmailError, Result};
-use super::templates::{TemplateEngine, EmailTemplate};
 
 pub struct SendGridProvider {
     api_key: String,
@@ -45,7 +45,8 @@ impl SendGridProvider {
             ]
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post("https://api.sendgrid.com/v3/mail/send")
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -57,9 +58,14 @@ impl SendGridProvider {
         if response.status().is_success() {
             Ok(())
         } else {
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            Err(EmailError::SendFailed(format!("SendGrid API error: {}", error_text)))
+            Err(EmailError::SendFailed(format!(
+                "SendGrid API error: {}",
+                error_text
+            )))
         }
     }
 }
@@ -137,7 +143,9 @@ mod tests {
             "Media Gateway".to_string(),
         );
 
-        let result = provider.send_verification("test@example.com", "abc123").await;
+        let result = provider
+            .send_verification("test@example.com", "abc123")
+            .await;
         assert!(result.is_ok());
     }
 
@@ -148,7 +156,9 @@ mod tests {
             "Media Gateway".to_string(),
         );
 
-        let result = provider.send_password_reset("test@example.com", "xyz789").await;
+        let result = provider
+            .send_password_reset("test@example.com", "xyz789")
+            .await;
         assert!(result.is_ok());
     }
 

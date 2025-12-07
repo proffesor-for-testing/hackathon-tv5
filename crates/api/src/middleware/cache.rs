@@ -35,18 +35,15 @@ pub struct CacheConfig {
 impl Default for CacheConfig {
     fn default() -> Self {
         Self {
-            default_ttl: 60,           // 1 minute default
-            content_ttl: 300,          // 5 minutes for content
+            default_ttl: 60,            // 1 minute default
+            content_ttl: 300,           // 5 minutes for content
             cache_authenticated: false, // Don't cache user-specific data by default
             skip_paths: vec![
                 "/api/user/".to_string(),
                 "/api/sync/".to_string(),
                 "/api/admin/".to_string(),
             ],
-            skip_query_params: vec![
-                "nocache".to_string(),
-                "timestamp".to_string(),
-            ],
+            skip_query_params: vec!["nocache".to_string(), "timestamp".to_string()],
         }
     }
 }
@@ -92,7 +89,10 @@ impl CacheMiddleware {
         // Delete all matching keys
         let count: u64 = conn.del(&keys).await?;
 
-        info!("Invalidated {} cache entries matching pattern: {}", count, pattern);
+        info!(
+            "Invalidated {} cache entries matching pattern: {}",
+            count, pattern
+        );
 
         Ok(count)
     }
@@ -157,8 +157,8 @@ where
             });
         }
 
-        // Check if this path should be skipped
-        let path = req.path();
+        // Check if this path should be skipped (clone to avoid borrowing)
+        let path = req.path().to_string();
         for skip_path in &self.config.skip_paths {
             if path.starts_with(skip_path) {
                 debug!("Skipping cache for path: {}", path);
@@ -213,10 +213,7 @@ where
 
         Box::pin(async move {
             // Try to get cached response
-            match redis
-                .get::<_, Option<String>>(&cache_key)
-                .await
-            {
+            match redis.get::<_, Option<String>>(&cache_key).await {
                 Ok(Some(cached_data)) => {
                     // Parse cached response
                     match serde_json::from_str::<CachedResponse>(&cached_data) {
@@ -228,13 +225,13 @@ where
 
                                     let response = HttpResponse::NotModified()
                                         .insert_header((header::ETAG, cached.etag.clone()))
-                                        .insert_header((header::CACHE_CONTROL, format!("max-age={}", config.default_ttl)))
+                                        .insert_header((
+                                            header::CACHE_CONTROL,
+                                            format!("max-age={}", config.default_ttl),
+                                        ))
                                         .finish();
 
-                                    return Ok(ServiceResponse::new(
-                                        req.into_parts().0,
-                                        response,
-                                    ));
+                                    return Ok(ServiceResponse::new(req.into_parts().0, response));
                                 }
                             }
 
@@ -242,13 +239,14 @@ where
 
                             // Return cached response
                             let mut response = HttpResponse::build(
-                                StatusCode::from_u16(cached.status_code)
-                                    .unwrap_or(StatusCode::OK),
+                                StatusCode::from_u16(cached.status_code).unwrap_or(StatusCode::OK),
                             );
 
                             // Add cached headers
                             for (name, value) in &cached.headers {
-                                if let Ok(header_name) = header::HeaderName::from_bytes(name.as_bytes()) {
+                                if let Ok(header_name) =
+                                    header::HeaderName::from_bytes(name.as_bytes())
+                                {
                                     if let Ok(header_value) = header::HeaderValue::from_str(value) {
                                         response.insert_header((header_name, header_value));
                                     }
@@ -257,7 +255,10 @@ where
 
                             // Add cache headers
                             response.insert_header((header::ETAG, cached.etag.clone()));
-                            response.insert_header((header::CACHE_CONTROL, format!("max-age={}", config.default_ttl)));
+                            response.insert_header((
+                                header::CACHE_CONTROL,
+                                format!("max-age={}", config.default_ttl),
+                            ));
                             response.insert_header(("X-Cache", "HIT"));
 
                             let response = response.body(cached.body);
@@ -314,12 +315,15 @@ where
 
             // Create cached response
             let cached = CachedResponse {
-                status_code: res_parts.status.as_u16(),
+                status_code: res_parts.status().as_u16(),
                 headers: res_parts
-                    .headers
+                    .headers()
                     .iter()
                     .filter_map(|(name, value)| {
-                        value.to_str().ok().map(|v| (name.to_string(), v.to_string()))
+                        value
+                            .to_str()
+                            .ok()
+                            .map(|v| (name.to_string(), v.to_string()))
                     })
                     .collect(),
                 body: body_bytes.to_vec(),
@@ -333,8 +337,12 @@ where
                     error!("Failed to serialize response for caching: {}", e);
                     // Still return the response
                     let mut response = HttpResponse::from(res_parts);
-                    response.headers_mut().insert(header::ETAG, etag.parse().unwrap());
-                    response.headers_mut().insert("X-Cache".parse().unwrap(), "MISS".parse().unwrap());
+                    response
+                        .headers_mut()
+                        .insert(header::ETAG, etag.parse().unwrap());
+                    response
+                        .headers_mut()
+                        .insert("X-Cache".parse().unwrap(), "MISS".parse().unwrap());
                     let res = response.set_body(body_bytes);
                     return Ok(ServiceResponse::new(req, res).map_into_boxed_body());
                 }
@@ -353,12 +361,16 @@ where
 
             // Build response with cache headers
             let mut response = HttpResponse::from(res_parts);
-            response.headers_mut().insert(header::ETAG, etag.parse().unwrap());
+            response
+                .headers_mut()
+                .insert(header::ETAG, etag.parse().unwrap());
             response.headers_mut().insert(
                 header::CACHE_CONTROL,
                 format!("max-age={}", ttl).parse().unwrap(),
             );
-            response.headers_mut().insert("X-Cache".parse().unwrap(), "MISS".parse().unwrap());
+            response
+                .headers_mut()
+                .insert("X-Cache".parse().unwrap(), "MISS".parse().unwrap());
 
             let res = response.set_body(body_bytes);
 
@@ -414,12 +426,7 @@ fn generate_cache_key(
         String::new()
     };
 
-    let key = format!("cache:{}:{}{}{}",
-        method,
-        path,
-        filtered_query,
-        user_suffix
-    );
+    let key = format!("cache:{}:{}{}{}", method, path, filtered_query, user_suffix);
 
     Ok(key)
 }

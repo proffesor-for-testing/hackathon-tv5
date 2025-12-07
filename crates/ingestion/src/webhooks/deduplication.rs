@@ -1,9 +1,9 @@
 //! Webhook deduplication using content hash and Redis
 
-use sha2::{Sha256, Digest};
-use chrono::{DateTime, Utc, Duration};
-use redis::{Client, AsyncCommands};
-use crate::webhooks::{WebhookError, WebhookResult, WebhookPayload, WebhookEventType};
+use crate::webhooks::{WebhookError, WebhookEventType, WebhookPayload, WebhookResult};
+use chrono::{DateTime, Duration, Utc};
+use redis::{AsyncCommands, Client};
+use sha2::{Digest, Sha256};
 
 /// Webhook deduplicator
 pub struct WebhookDeduplicator {
@@ -66,10 +66,15 @@ impl WebhookDeduplicator {
         let hash = Self::compute_hash(webhook);
         let key = format!("webhook:hash:{}", hash);
 
-        let mut conn = self.client.get_async_connection().await
+        let mut conn = self
+            .client
+            .get_async_connection()
+            .await
             .map_err(|e| WebhookError::RedisError(format!("Connection failed: {}", e)))?;
 
-        let exists: bool = conn.exists(&key).await
+        let exists: bool = conn
+            .exists(&key)
+            .await
             .map_err(|e| WebhookError::DeduplicationError(format!("Redis exists failed: {}", e)))?;
 
         Ok(exists)
@@ -86,11 +91,20 @@ impl WebhookDeduplicator {
         let hash = Self::compute_hash(webhook);
         let key = format!("webhook:hash:{}", hash);
 
-        let mut conn = self.client.get_async_connection().await
+        let mut conn = self
+            .client
+            .get_async_connection()
+            .await
             .map_err(|e| WebhookError::RedisError(format!("Connection failed: {}", e)))?;
 
         // Store hash with TTL
-        let _: () = conn.set_ex(&key, webhook.timestamp.to_rfc3339(), self.ttl_seconds as u64).await
+        let _: () = conn
+            .set_ex(
+                &key,
+                webhook.timestamp.to_rfc3339(),
+                self.ttl_seconds as u64,
+            )
+            .await
             .map_err(|e| WebhookError::DeduplicationError(format!("Redis set failed: {}", e)))?;
 
         Ok(hash)
@@ -103,10 +117,15 @@ impl WebhookDeduplicator {
     pub async fn get_stats(&self) -> WebhookResult<u64> {
         let pattern = "webhook:hash:*";
 
-        let mut conn = self.client.get_async_connection().await
+        let mut conn = self
+            .client
+            .get_async_connection()
+            .await
             .map_err(|e| WebhookError::RedisError(format!("Connection failed: {}", e)))?;
 
-        let keys: Vec<String> = conn.keys(pattern).await
+        let keys: Vec<String> = conn
+            .keys(pattern)
+            .await
             .map_err(|e| WebhookError::RedisError(format!("Redis keys failed: {}", e)))?;
 
         Ok(keys.len() as u64)
@@ -186,8 +205,8 @@ mod tests {
     #[tokio::test]
     async fn test_deduplication_with_redis() {
         // Skip if Redis not available
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
         let deduplicator = match WebhookDeduplicator::new(&redis_url, Some(1)) {
             Ok(d) => d,
@@ -220,6 +239,10 @@ mod tests {
         // Clean up
         let mut conn = deduplicator.client.get_async_connection().await.unwrap();
         let key = format!("webhook:hash:{}", hash);
-        let _: () = redis::cmd("DEL").arg(&key).query_async(&mut conn).await.unwrap();
+        let _: () = redis::cmd("DEL")
+            .arg(&key)
+            .query_async(&mut conn)
+            .await
+            .unwrap();
     }
 }

@@ -4,11 +4,10 @@
 //! availability handling, and deep link generation.
 
 use super::{
-    PlatformNormalizer, RawContent, CanonicalContent, ContentType,
-    AvailabilityInfo, ImageSet, RateLimitConfig,
-    extract_string, extract_i64, extract_f64, extract_array,
+    extract_array, extract_f64, extract_i64, extract_string, AvailabilityInfo, CanonicalContent,
+    ContentType, ImageSet, PlatformNormalizer, RateLimitConfig, RawContent,
 };
-use crate::{Result, IngestionError, deep_link::DeepLinkResult};
+use crate::{deep_link::DeepLinkResult, IngestionError, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
@@ -36,7 +35,9 @@ impl AppleTvPlusNormalizer {
     fn map_apple_genre(&self, apple_genre: &str) -> Vec<String> {
         match apple_genre.to_lowercase().as_str() {
             // Apple TV+-specific genres
-            "apple originals" | "apple original" | "apple tv+ original" => vec!["Drama".to_string()],
+            "apple originals" | "apple original" | "apple tv+ original" => {
+                vec!["Drama".to_string()]
+            }
             "masterclass" | "documentary series" => vec!["Documentary".to_string()],
             "nature" | "wildlife" => vec!["Documentary".to_string()],
 
@@ -137,7 +138,8 @@ impl PlatformNormalizer for AppleTvPlusNormalizer {
             since.format("%Y-%m-%d")
         );
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("X-RapidAPI-Key", &self.api_key)
             .header("X-RapidAPI-Host", "streaming-availability.p.rapidapi.com")
@@ -146,18 +148,22 @@ impl PlatformNormalizer for AppleTvPlusNormalizer {
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
         let data: serde_json::Value = response.json().await?;
-        let changes = data.get("changes")
+        let changes = data
+            .get("changes")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| IngestionError::NormalizationFailed(
-                "No changes array in Apple TV+ response".to_string()
-            ))?;
+            .ok_or_else(|| {
+                IngestionError::NormalizationFailed(
+                    "No changes array in Apple TV+ response".to_string(),
+                )
+            })?;
 
-        let raw_items = changes.iter()
+        let raw_items = changes
+            .iter()
             .filter_map(|item| {
                 let id = extract_string(item, "id")?;
                 Some(RawContent {
@@ -210,11 +216,14 @@ impl PlatformNormalizer for AppleTvPlusNormalizer {
 
         // Extract availability with tier information
         let subscription_tier = self.get_subscription_tier(data);
-        let region = raw.data.get("country")
+        let region = raw
+            .data
+            .get("country")
             .and_then(|c| c.as_str())
             .unwrap_or("us");
 
-        let availability = if let Some(streaming_info) = data.get("streamingInfo")
+        let availability = if let Some(streaming_info) = data
+            .get("streamingInfo")
             .and_then(|si| si.get("apple"))
             .and_then(|n| n.get(region))
         {
@@ -224,10 +233,12 @@ impl PlatformNormalizer for AppleTvPlusNormalizer {
                 purchase_price: None,
                 rental_price: None,
                 currency: None,
-                available_from: streaming_info.get("addedOn")
+                available_from: streaming_info
+                    .get("addedOn")
                     .and_then(|v| v.as_i64())
                     .and_then(|ts| DateTime::from_timestamp(ts, 0)),
-                available_until: streaming_info.get("leaving")
+                available_until: streaming_info
+                    .get("leaving")
                     .and_then(|v| v.as_i64())
                     .and_then(|ts| DateTime::from_timestamp(ts, 0)),
             }
@@ -296,8 +307,14 @@ mod tests {
         let normalizer = AppleTvPlusNormalizer::new("test_key".to_string());
 
         assert_eq!(normalizer.map_apple_genre("apple originals"), vec!["Drama"]);
-        assert_eq!(normalizer.map_apple_genre("apple tv+ original"), vec!["Drama"]);
-        assert_eq!(normalizer.map_apple_genre("documentary series"), vec!["Documentary"]);
+        assert_eq!(
+            normalizer.map_apple_genre("apple tv+ original"),
+            vec!["Drama"]
+        );
+        assert_eq!(
+            normalizer.map_apple_genre("documentary series"),
+            vec!["Documentary"]
+        );
         assert_eq!(normalizer.map_apple_genre("nature"), vec!["Documentary"]);
         assert_eq!(normalizer.map_apple_genre("comedy"), vec!["Comedy"]);
     }

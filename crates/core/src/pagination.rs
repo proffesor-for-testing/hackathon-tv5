@@ -232,17 +232,30 @@ impl<T> PaginatedResponse<T> {
 
         let links = PaginationLinks {
             next: if has_more {
-                Some(format!("{}?page={}&per_page={}", base_url, current_page + 1, limit))
+                Some(format!(
+                    "{}?page={}&per_page={}",
+                    base_url,
+                    current_page + 1,
+                    limit
+                ))
             } else {
                 None
             },
             prev: if current_page > 1 {
-                Some(format!("{}?page={}&per_page={}", base_url, current_page - 1, limit))
+                Some(format!(
+                    "{}?page={}&per_page={}",
+                    base_url,
+                    current_page - 1,
+                    limit
+                ))
             } else {
                 None
             },
             first: Some(format!("{}?page=1&per_page={}", base_url, limit)),
-            last: Some(format!("{}?page={}&per_page={}", base_url, total_pages, limit)),
+            last: Some(format!(
+                "{}?page={}&per_page={}",
+                base_url, total_pages, limit
+            )),
         };
 
         Self {
@@ -271,9 +284,9 @@ impl<T> PaginatedResponse<T> {
         base_url: &str,
     ) -> Self {
         let links = PaginationLinks {
-            next: next_cursor.as_ref().map(|cursor| {
-                format!("{}?cursor={}&limit={}", base_url, cursor, limit)
-            }),
+            next: next_cursor
+                .as_ref()
+                .map(|cursor| format!("{}?cursor={}&limit={}", base_url, cursor, limit)),
             prev: None,
             first: None,
             last: None,
@@ -402,8 +415,8 @@ pub fn decode_cursor(cursor: &str) -> Result<(i64, String), String> {
         .decode(cursor.as_bytes())
         .map_err(|e| format!("Invalid cursor encoding: {}", e))?;
 
-    let cursor_str = String::from_utf8(decoded)
-        .map_err(|e| format!("Invalid cursor format: {}", e))?;
+    let cursor_str =
+        String::from_utf8(decoded).map_err(|e| format!("Invalid cursor format: {}", e))?;
 
     let parts: Vec<&str> = cursor_str.split(':').collect();
     if parts.len() != 2 {
@@ -558,13 +571,8 @@ mod tests {
     #[test]
     fn test_paginated_response_offset() {
         let items = vec![1, 2, 3, 4, 5];
-        let response = PaginatedResponse::offset(
-            items.clone(),
-            100,
-            0,
-            20,
-            "https://api.example.com/items",
-        );
+        let response =
+            PaginatedResponse::offset(items.clone(), 100, 0, 20, "https://api.example.com/items");
 
         assert_eq!(response.items, items);
         assert_eq!(response.total, Some(100));
@@ -579,13 +587,8 @@ mod tests {
     #[test]
     fn test_paginated_response_offset_last_page() {
         let items = vec![1, 2, 3];
-        let response = PaginatedResponse::offset(
-            items.clone(),
-            100,
-            97,
-            20,
-            "https://api.example.com/items",
-        );
+        let response =
+            PaginatedResponse::offset(items.clone(), 100, 97, 20, "https://api.example.com/items");
 
         assert_eq!(response.items, items);
         assert_eq!(response.total, Some(100));

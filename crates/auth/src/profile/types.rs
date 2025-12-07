@@ -48,7 +48,7 @@ pub struct AvatarUploadResponse {
     pub avatar_url: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct AuditLogEntry {
     pub id: Uuid,
     pub user_id: Uuid,

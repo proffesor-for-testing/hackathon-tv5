@@ -1,3 +1,4 @@
+use media_gateway_sync::crdt::HLCTimestamp;
 /// WebSocket Broadcaster Demo
 ///
 /// Demonstrates the complete WebSocket broadcasting flow:
@@ -7,10 +8,8 @@
 /// 4. Relay messages to connected WebSocket clients
 ///
 /// Run with: cargo run --example websocket_broadcaster_demo
-
 use media_gateway_sync::pubnub::{PubNubClient, PubNubConfig, SyncMessage as PubNubSyncMessage};
 use media_gateway_sync::ws::{ConnectionRegistry, WebSocketBroadcaster};
-use media_gateway_sync::crdt::HLCTimestamp;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -34,10 +33,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Step 2: Initialize PubNub client
     println!("2. Initializing PubNub client...");
     let config = PubNubConfig {
-        publish_key: std::env::var("PUBNUB_PUBLISH_KEY")
-            .unwrap_or_else(|_| "demo".to_string()),
-        subscribe_key: std::env::var("PUBNUB_SUBSCRIBE_KEY")
-            .unwrap_or_else(|_| "demo".to_string()),
+        publish_key: std::env::var("PUBNUB_PUBLISH_KEY").unwrap_or_else(|_| "demo".to_string()),
+        subscribe_key: std::env::var("PUBNUB_SUBSCRIBE_KEY").unwrap_or_else(|_| "demo".to_string()),
         origin: "ps.pndsn.com".to_string(),
     };
 
@@ -91,7 +88,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         device_id: device_id.clone(),
     };
 
-    broadcaster.relay_pubnub_message(user_uuid, watchlist_msg).await;
+    broadcaster
+        .relay_pubnub_message(user_uuid, watchlist_msg)
+        .await;
     println!("   ✓ Watchlist update relayed");
     println!("     - Content ID: {}", content_id);
     println!("     - Action: add\n");
@@ -106,7 +105,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         device_id: device_id.clone(),
     };
 
-    broadcaster.relay_pubnub_message(user_uuid, progress_msg).await;
+    broadcaster
+        .relay_pubnub_message(user_uuid, progress_msg)
+        .await;
     println!("   ✓ Progress update relayed");
     println!("     - Position: 1234s / 7200s (17.1%)");
     println!("     - Content ID: {}\n", content_id);
@@ -121,7 +122,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         timestamp: HLCTimestamp::new(3000, 0, device_id.clone()),
     };
 
-    broadcaster.relay_pubnub_message(user_uuid, handoff_msg).await;
+    broadcaster
+        .relay_pubnub_message(user_uuid, handoff_msg)
+        .await;
     println!("   ✓ Device handoff relayed");
     println!("     - Target device: {}", target_device);
     println!("     - Resume position: 1234s\n");
@@ -129,12 +132,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Step 6: Display metrics
     println!("6. Broadcaster Metrics:");
     let metrics = broadcaster.metrics();
-    println!("   - Messages relayed: {}", metrics.total_messages_relayed());
-    println!("   - Average latency: {:.2}ms", metrics.average_latency_ms());
+    println!(
+        "   - Messages relayed: {}",
+        metrics.total_messages_relayed()
+    );
+    println!(
+        "   - Average latency: {:.2}ms",
+        metrics.average_latency_ms()
+    );
     println!("   - P50 latency: {:.2}ms", metrics.p50_latency_ms());
     println!("   - P95 latency: {:.2}ms", metrics.p95_latency_ms());
     println!("   - P99 latency: {:.2}ms", metrics.p99_latency_ms());
-    println!("   - Active connections: {}\n", broadcaster.active_connections());
+    println!(
+        "   - Active connections: {}\n",
+        broadcaster.active_connections()
+    );
 
     // Step 7: Registry metrics
     println!("7. Registry Metrics:");

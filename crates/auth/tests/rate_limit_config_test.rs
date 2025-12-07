@@ -1,11 +1,11 @@
 use actix_web::{test, web, App, HttpResponse};
 use media_gateway_auth::{
+    middleware::AuthMiddleware,
     rate_limit_admin_handlers::{
         delete_rate_limit, get_rate_limit, list_rate_limits, update_rate_limit,
         UpdateRateLimitConfigRequest,
     },
     rate_limit_config::{RateLimitConfigStore, UserTier},
-    middleware::AuthMiddleware,
 };
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -16,8 +16,9 @@ fn setup_redis_client() -> redis::Client {
 }
 
 async fn setup_db_pool() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgresql://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+    });
     PgPool::connect(&database_url)
         .await
         .expect("Failed to connect to database")
@@ -52,7 +53,11 @@ fn create_test_jwt() -> String {
 #[actix_web::test]
 async fn test_rate_limit_config_store_set_and_get() {
     let redis_client = setup_redis_client();
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping test");
         return;
     }
@@ -92,7 +97,11 @@ async fn test_rate_limit_config_store_set_and_get() {
 #[actix_web::test]
 async fn test_rate_limit_config_store_get_all() {
     let redis_client = setup_redis_client();
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping test");
         return;
     }
@@ -135,7 +144,11 @@ async fn test_rate_limit_config_store_get_all() {
 #[actix_web::test]
 async fn test_rate_limit_config_wildcard_matching() {
     let redis_client = setup_redis_client();
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping test");
         return;
     }
@@ -172,7 +185,11 @@ async fn test_rate_limit_config_wildcard_matching() {
 #[actix_web::test]
 async fn test_rate_limit_config_default_fallback() {
     let redis_client = setup_redis_client();
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping test");
         return;
     }
@@ -194,7 +211,11 @@ async fn test_rate_limit_config_default_fallback() {
 #[actix_web::test]
 async fn test_list_rate_limits_endpoint() {
     let redis_client = setup_redis_client();
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping test");
         return;
     }
@@ -237,7 +258,11 @@ async fn test_list_rate_limits_endpoint() {
 #[actix_web::test]
 async fn test_update_rate_limit_endpoint() {
     let redis_client = setup_redis_client();
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping test");
         return;
     }
@@ -290,7 +315,11 @@ async fn test_update_rate_limit_endpoint() {
 #[actix_web::test]
 async fn test_delete_rate_limit_endpoint() {
     let redis_client = setup_redis_client();
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping test");
         return;
     }
@@ -361,7 +390,11 @@ async fn test_rate_limit_config_validation() {
 #[actix_web::test]
 async fn test_get_rate_limit_endpoint_with_default() {
     let redis_client = setup_redis_client();
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping test");
         return;
     }
@@ -390,7 +423,11 @@ async fn test_get_rate_limit_endpoint_with_default() {
 #[tokio::test]
 async fn test_user_tier_defaults() {
     let redis_client = setup_redis_client();
-    if redis_client.get_multiplexed_async_connection().await.is_err() {
+    if redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .is_err()
+    {
         println!("Redis not available, skipping test");
         return;
     }

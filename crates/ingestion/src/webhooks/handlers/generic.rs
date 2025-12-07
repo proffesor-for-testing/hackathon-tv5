@@ -1,12 +1,11 @@
 //! Generic webhook handler for platforms without specific implementations
 
+use crate::webhooks::{
+    verify_hmac_signature, ProcessedWebhook, ProcessingStatus, WebhookDeduplicator, WebhookError,
+    WebhookEventType, WebhookHandler, WebhookPayload, WebhookResult,
+};
 use async_trait::async_trait;
 use chrono::Utc;
-use crate::webhooks::{
-    WebhookHandler, WebhookPayload, ProcessedWebhook, ProcessingStatus,
-    WebhookError, WebhookResult, WebhookEventType,
-    verify_hmac_signature, WebhookDeduplicator,
-};
 
 /// Generic webhook handler
 pub struct GenericWebhookHandler {
@@ -28,7 +27,12 @@ impl WebhookHandler for GenericWebhookHandler {
         "generic"
     }
 
-    fn verify_signature(&self, payload: &[u8], signature: &str, secret: &str) -> WebhookResult<bool> {
+    fn verify_signature(
+        &self,
+        payload: &[u8],
+        signature: &str,
+        secret: &str,
+    ) -> WebhookResult<bool> {
         verify_hmac_signature(payload, signature, secret)
     }
 
@@ -45,7 +49,9 @@ impl WebhookHandler for GenericWebhookHandler {
 
         // Validate payload structure
         if !payload.payload.is_object() {
-            return Err(WebhookError::InvalidPayload("Payload must be an object".to_string()));
+            return Err(WebhookError::InvalidPayload(
+                "Payload must be an object".to_string(),
+            ));
         }
 
         Ok(payload)
@@ -112,7 +118,10 @@ mod tests {
         let result = handler.parse_payload(body);
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), WebhookError::InvalidPayload(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            WebhookError::InvalidPayload(_)
+        ));
     }
 
     #[tokio::test]

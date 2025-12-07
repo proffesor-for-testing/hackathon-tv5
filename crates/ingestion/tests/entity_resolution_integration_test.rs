@@ -1,14 +1,15 @@
-use media_gateway_ingestion::{
-    entity_resolution::{EntityResolver, EntityMatch, MatchMethod},
-    normalizer::{CanonicalContent, ContentType, AvailabilityInfo, ImageSet},
-};
-use sqlx::postgres::{PgPoolOptions, PgPool};
-use std::collections::HashMap;
 use chrono::Utc;
+use media_gateway_ingestion::{
+    entity_resolution::{EntityMatch, EntityResolver, MatchMethod},
+    normalizer::{AvailabilityInfo, CanonicalContent, ContentType, ImageSet},
+};
+use sqlx::postgres::{PgPool, PgPoolOptions};
+use std::collections::HashMap;
 
 async fn setup_test_pool() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgresql://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+    });
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -33,7 +34,7 @@ async fn setup_test_pool() -> PgPool {
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             UNIQUE(external_id, id_type)
         )
-        "#
+        "#,
     )
     .execute(&pool)
     .await
@@ -58,17 +59,18 @@ async fn test_eidr_exact_match_with_persistence() {
         .await
         .expect("Failed to create resolver");
 
-    resolver.add_entity(
-        "entity_1".to_string(),
-        "The Matrix".to_string(),
-        Some(1999),
-        Some("10.5240/ABCD-1234".to_string()),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Failed to add entity");
+    resolver
+        .add_entity(
+            "entity_1".to_string(),
+            "The Matrix".to_string(),
+            Some(1999),
+            Some("10.5240/ABCD-1234".to_string()),
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to add entity");
 
     let mut content = CanonicalContent {
         platform_content_id: "test".to_string(),
@@ -97,17 +99,20 @@ async fn test_eidr_exact_match_with_persistence() {
         updated_at: Utc::now(),
     };
 
-    content.external_ids.insert("eidr".to_string(), "10.5240/ABCD-1234".to_string());
+    content
+        .external_ids
+        .insert("eidr".to_string(), "10.5240/ABCD-1234".to_string());
 
     let result = resolver.resolve(&content).await.unwrap();
     assert_eq!(result.entity_id, Some("entity_1".to_string()));
     assert_eq!(result.confidence, 1.0);
     assert_eq!(result.method, MatchMethod::EidrExact);
 
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM entity_mappings WHERE id_type = 'eidr'")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM entity_mappings WHERE id_type = 'eidr'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(count, 1);
 
     cleanup_test_data(&pool).await;
@@ -122,17 +127,18 @@ async fn test_imdb_match_with_persistence() {
         .await
         .expect("Failed to create resolver");
 
-    resolver.add_entity(
-        "entity_2".to_string(),
-        "Inception".to_string(),
-        Some(2010),
-        None,
-        Some("tt1375666".to_string()),
-        None,
-        None,
-    )
-    .await
-    .expect("Failed to add entity");
+    resolver
+        .add_entity(
+            "entity_2".to_string(),
+            "Inception".to_string(),
+            Some(2010),
+            None,
+            Some("tt1375666".to_string()),
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to add entity");
 
     let mut content = CanonicalContent {
         platform_content_id: "test2".to_string(),
@@ -161,7 +167,9 @@ async fn test_imdb_match_with_persistence() {
         updated_at: Utc::now(),
     };
 
-    content.external_ids.insert("imdb".to_string(), "tt1375666".to_string());
+    content
+        .external_ids
+        .insert("imdb".to_string(), "tt1375666".to_string());
 
     let result = resolver.resolve(&content).await.unwrap();
     assert_eq!(result.entity_id, Some("entity_2".to_string()));
@@ -186,17 +194,18 @@ async fn test_persistence_across_restarts() {
             .await
             .expect("Failed to create resolver");
 
-        resolver.add_entity(
-            "entity_3".to_string(),
-            "Interstellar".to_string(),
-            Some(2014),
-            None,
-            Some("tt0816692".to_string()),
-            Some("157336".to_string()),
-            None,
-        )
-        .await
-        .expect("Failed to add entity");
+        resolver
+            .add_entity(
+                "entity_3".to_string(),
+                "Interstellar".to_string(),
+                Some(2014),
+                None,
+                Some("tt0816692".to_string()),
+                Some("157336".to_string()),
+                None,
+            )
+            .await
+            .expect("Failed to add entity");
     }
 
     {
@@ -231,7 +240,9 @@ async fn test_persistence_across_restarts() {
             updated_at: Utc::now(),
         };
 
-        content.external_ids.insert("imdb".to_string(), "tt0816692".to_string());
+        content
+            .external_ids
+            .insert("imdb".to_string(), "tt0816692".to_string());
 
         let result = resolver.resolve(&content).await.unwrap();
         assert_eq!(result.entity_id, Some("entity_3".to_string()));
@@ -250,17 +261,18 @@ async fn test_cache_performance() {
         .await
         .expect("Failed to create resolver");
 
-    resolver.add_entity(
-        "entity_4".to_string(),
-        "The Dark Knight".to_string(),
-        Some(2008),
-        Some("10.5240/DARK-KNIGHT".to_string()),
-        Some("tt0468569".to_string()),
-        None,
-        None,
-    )
-    .await
-    .expect("Failed to add entity");
+    resolver
+        .add_entity(
+            "entity_4".to_string(),
+            "The Dark Knight".to_string(),
+            Some(2008),
+            Some("10.5240/DARK-KNIGHT".to_string()),
+            Some("tt0468569".to_string()),
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to add entity");
 
     let mut content = CanonicalContent {
         platform_content_id: "test4".to_string(),
@@ -289,7 +301,9 @@ async fn test_cache_performance() {
         updated_at: Utc::now(),
     };
 
-    content.external_ids.insert("eidr".to_string(), "10.5240/DARK-KNIGHT".to_string());
+    content
+        .external_ids
+        .insert("eidr".to_string(), "10.5240/DARK-KNIGHT".to_string());
 
     let start = std::time::Instant::now();
     let result1 = resolver.resolve(&content).await.unwrap();
@@ -314,36 +328,37 @@ async fn test_upsert_semantics() {
         .await
         .expect("Failed to create resolver");
 
-    resolver.add_entity(
-        "entity_5".to_string(),
-        "Blade Runner".to_string(),
-        Some(1982),
-        None,
-        Some("tt0083658".to_string()),
-        None,
-        None,
-    )
-    .await
-    .expect("Failed to add entity");
+    resolver
+        .add_entity(
+            "entity_5".to_string(),
+            "Blade Runner".to_string(),
+            Some(1982),
+            None,
+            Some("tt0083658".to_string()),
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to add entity");
 
-    resolver.add_entity(
-        "entity_5_updated".to_string(),
-        "Blade Runner".to_string(),
-        Some(1982),
-        None,
-        Some("tt0083658".to_string()),
-        None,
-        None,
-    )
-    .await
-    .expect("Failed to update entity");
+    resolver
+        .add_entity(
+            "entity_5_updated".to_string(),
+            "Blade Runner".to_string(),
+            Some(1982),
+            None,
+            Some("tt0083658".to_string()),
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to update entity");
 
-    let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM entity_mappings WHERE external_id = 'tt0083658'"
-    )
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM entity_mappings WHERE external_id = 'tt0083658'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
 
     assert_eq!(count, 1);
 

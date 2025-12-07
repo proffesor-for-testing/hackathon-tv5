@@ -37,8 +37,9 @@ fn create_test_jwt_manager() -> Arc<JwtManager> {
 }
 
 async fn create_test_db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+    });
 
     PgPool::connect(&database_url).await.unwrap()
 }
@@ -623,7 +624,7 @@ async fn test_get_audit_logs_pagination() {
         events.push(
             AuditEvent::new(AuditAction::AuthLogin, "user".to_string())
                 .with_user_id(user_id)
-                .with_resource_id(format!("login-{}", i))
+                .with_resource_id(format!("login-{}", i)),
         );
     }
 
@@ -664,12 +665,9 @@ async fn test_get_audit_logs_action_filter() {
     let audit_logger = PostgresAuditLogger::new(pool.clone());
 
     let events = vec![
-        AuditEvent::new(AuditAction::AuthLogin, "user".to_string())
-            .with_user_id(user_id),
-        AuditEvent::new(AuditAction::UserCreated, "user".to_string())
-            .with_user_id(admin_id),
-        AuditEvent::new(AuditAction::AuthLogin, "user".to_string())
-            .with_user_id(admin_id),
+        AuditEvent::new(AuditAction::AuthLogin, "user".to_string()).with_user_id(user_id),
+        AuditEvent::new(AuditAction::UserCreated, "user".to_string()).with_user_id(admin_id),
+        AuditEvent::new(AuditAction::AuthLogin, "user".to_string()).with_user_id(admin_id),
     ];
 
     audit_logger.log_batch(events).await.unwrap();

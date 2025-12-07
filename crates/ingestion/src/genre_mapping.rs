@@ -169,9 +169,15 @@ impl GenreMapper {
         let mut mappings = HashMap::new();
 
         mappings.insert("action-adventure".to_string(), vec![CanonicalGenre::Action]);
-        mappings.insert("action & adventure".to_string(), vec![CanonicalGenre::Action]);
+        mappings.insert(
+            "action & adventure".to_string(),
+            vec![CanonicalGenre::Action],
+        );
         mappings.insert("sci-fi".to_string(), vec![CanonicalGenre::ScienceFiction]);
-        mappings.insert("science fiction".to_string(), vec![CanonicalGenre::ScienceFiction]);
+        mappings.insert(
+            "science fiction".to_string(),
+            vec![CanonicalGenre::ScienceFiction],
+        );
         mappings.insert("thriller".to_string(), vec![CanonicalGenre::Thriller]);
         mappings.insert("suspense".to_string(), vec![CanonicalGenre::Thriller]);
         mappings.insert("comedy".to_string(), vec![CanonicalGenre::Comedy]);
@@ -194,7 +200,8 @@ impl GenreMapper {
         mappings.insert("history".to_string(), vec![CanonicalGenre::History]);
         mappings.insert("historical".to_string(), vec![CanonicalGenre::History]);
 
-        self.platform_mappings.insert("netflix".to_string(), mappings);
+        self.platform_mappings
+            .insert("netflix".to_string(), mappings);
     }
 
     /// Initialize Prime Video genre mappings
@@ -202,10 +209,16 @@ impl GenreMapper {
         let mut mappings = HashMap::new();
 
         mappings.insert("action".to_string(), vec![CanonicalGenre::Action]);
-        mappings.insert("action & adventure".to_string(), vec![CanonicalGenre::Action]);
+        mappings.insert(
+            "action & adventure".to_string(),
+            vec![CanonicalGenre::Action],
+        );
         mappings.insert("adventure".to_string(), vec![CanonicalGenre::Adventure]);
         mappings.insert("sci-fi".to_string(), vec![CanonicalGenre::ScienceFiction]);
-        mappings.insert("science fiction".to_string(), vec![CanonicalGenre::ScienceFiction]);
+        mappings.insert(
+            "science fiction".to_string(),
+            vec![CanonicalGenre::ScienceFiction],
+        );
         mappings.insert("thriller".to_string(), vec![CanonicalGenre::Thriller]);
         mappings.insert("comedy".to_string(), vec![CanonicalGenre::Comedy]);
         mappings.insert("drama".to_string(), vec![CanonicalGenre::Drama]);
@@ -222,7 +235,8 @@ impl GenreMapper {
         mappings.insert("music".to_string(), vec![CanonicalGenre::Music]);
         mappings.insert("history".to_string(), vec![CanonicalGenre::History]);
 
-        self.platform_mappings.insert("prime_video".to_string(), mappings);
+        self.platform_mappings
+            .insert("prime_video".to_string(), mappings);
     }
 
     /// Initialize Disney+ genre mappings
@@ -232,7 +246,10 @@ impl GenreMapper {
         mappings.insert("action".to_string(), vec![CanonicalGenre::Action]);
         mappings.insert("action-adventure".to_string(), vec![CanonicalGenre::Action]);
         mappings.insert("adventure".to_string(), vec![CanonicalGenre::Adventure]);
-        mappings.insert("science fiction".to_string(), vec![CanonicalGenre::ScienceFiction]);
+        mappings.insert(
+            "science fiction".to_string(),
+            vec![CanonicalGenre::ScienceFiction],
+        );
         mappings.insert("sci-fi".to_string(), vec![CanonicalGenre::ScienceFiction]);
         mappings.insert("comedy".to_string(), vec![CanonicalGenre::Comedy]);
         mappings.insert("drama".to_string(), vec![CanonicalGenre::Drama]);
@@ -245,9 +262,13 @@ impl GenreMapper {
         mappings.insert("fantasy".to_string(), vec![CanonicalGenre::Fantasy]);
         mappings.insert("musical".to_string(), vec![CanonicalGenre::Music]);
         mappings.insert("music".to_string(), vec![CanonicalGenre::Music]);
-        mappings.insert("superhero".to_string(), vec![CanonicalGenre::Action, CanonicalGenre::Fantasy]);
+        mappings.insert(
+            "superhero".to_string(),
+            vec![CanonicalGenre::Action, CanonicalGenre::Fantasy],
+        );
 
-        self.platform_mappings.insert("disney_plus".to_string(), mappings);
+        self.platform_mappings
+            .insert("disney_plus".to_string(), mappings);
     }
 
     /// Initialize YouTube genre mappings
@@ -262,7 +283,8 @@ impl GenreMapper {
         mappings.insert("science".to_string(), vec![CanonicalGenre::Documentary]);
         mappings.insert("documentary".to_string(), vec![CanonicalGenre::Documentary]);
 
-        self.platform_mappings.insert("youtube".to_string(), mappings);
+        self.platform_mappings
+            .insert("youtube".to_string(), mappings);
     }
 
     /// Initialize TMDb genre mappings (for enrichment)
@@ -283,7 +305,10 @@ impl GenreMapper {
         mappings.insert("music".to_string(), vec![CanonicalGenre::Music]);
         mappings.insert("mystery".to_string(), vec![CanonicalGenre::Mystery]);
         mappings.insert("romance".to_string(), vec![CanonicalGenre::Romance]);
-        mappings.insert("science fiction".to_string(), vec![CanonicalGenre::ScienceFiction]);
+        mappings.insert(
+            "science fiction".to_string(),
+            vec![CanonicalGenre::ScienceFiction],
+        );
         mappings.insert("thriller".to_string(), vec![CanonicalGenre::Thriller]);
         mappings.insert("war".to_string(), vec![CanonicalGenre::War]);
         mappings.insert("western".to_string(), vec![CanonicalGenre::Western]);

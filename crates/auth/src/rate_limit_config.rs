@@ -82,7 +82,9 @@ impl RateLimitConfig {
         }
 
         if self.burst_size == 0 {
-            return Err(AuthError::Internal("Burst size must be non-zero".to_string()));
+            return Err(AuthError::Internal(
+                "Burst size must be non-zero".to_string(),
+            ));
         }
 
         if self.burst_size < self.requests_per_minute {
@@ -137,15 +139,15 @@ impl RateLimitConfigStore {
         let mut conn = self.get_redis_conn().await?;
         let key = Self::redis_key(endpoint, tier);
 
-        let value: Option<String> = conn.get(&key).await.map_err(|e| {
-            AuthError::Internal(format!("Redis GET error: {}", e))
-        })?;
+        let value: Option<String> = conn
+            .get(&key)
+            .await
+            .map_err(|e| AuthError::Internal(format!("Redis GET error: {}", e)))?;
 
         match value {
             Some(v) => {
-                let config: RateLimitConfig = serde_json::from_str(&v).map_err(|e| {
-                    AuthError::Internal(format!("Deserialization error: {}", e))
-                })?;
+                let config: RateLimitConfig = serde_json::from_str(&v)
+                    .map_err(|e| AuthError::Internal(format!("Deserialization error: {}", e)))?;
                 Ok(Some(config))
             }
             None => Ok(None),
@@ -164,9 +166,10 @@ impl RateLimitConfigStore {
 
         let mut configs = Vec::new();
         for key in keys {
-            let value: Option<String> = conn.get(&key).await.map_err(|e| {
-                AuthError::Internal(format!("Redis GET error: {}", e))
-            })?;
+            let value: Option<String> = conn
+                .get(&key)
+                .await
+                .map_err(|e| AuthError::Internal(format!("Redis GET error: {}", e)))?;
 
             if let Some(v) = value {
                 if let Ok(config) = serde_json::from_str::<RateLimitConfig>(&v) {
@@ -186,9 +189,9 @@ impl RateLimitConfigStore {
         let value = serde_json::to_string(config)
             .map_err(|e| AuthError::Internal(format!("Serialization error: {}", e)))?;
 
-        conn.set::<_, _, ()>(&key, value).await.map_err(|e| {
-            AuthError::Internal(format!("Redis SET error: {}", e))
-        })?;
+        conn.set::<_, _, ()>(&key, value)
+            .await
+            .map_err(|e| AuthError::Internal(format!("Redis SET error: {}", e)))?;
 
         Ok(())
     }
@@ -197,9 +200,10 @@ impl RateLimitConfigStore {
         let mut conn = self.get_redis_conn().await?;
         let key = Self::redis_key(endpoint, tier);
 
-        let deleted: usize = conn.del::<_, usize>(&key).await.map_err(|e| {
-            AuthError::Internal(format!("Redis DEL error: {}", e))
-        })?;
+        let deleted: usize = conn
+            .del::<_, usize>(&key)
+            .await
+            .map_err(|e| AuthError::Internal(format!("Redis DEL error: {}", e)))?;
 
         Ok(deleted > 0)
     }
@@ -305,9 +309,7 @@ impl RateLimitConfigStore {
         audit_logger
             .log(event)
             .await
-            .map_err(|e| {
-                AuthError::Internal(format!("Failed to log audit event: {}", e))
-            })?;
+            .map_err(|e| AuthError::Internal(format!("Failed to log audit event: {}", e)))?;
 
         Ok(())
     }
@@ -342,71 +344,35 @@ mod tests {
 
     #[test]
     fn test_rate_limit_config_validation() {
-        let valid_config = RateLimitConfig::new(
-            "/api/v1/test".to_string(),
-            UserTier::Free,
-            10,
-            100,
-            15,
-        );
+        let valid_config =
+            RateLimitConfig::new("/api/v1/test".to_string(), UserTier::Free, 10, 100, 15);
         assert!(valid_config.validate().is_ok());
 
-        let empty_endpoint = RateLimitConfig::new(
-            "".to_string(),
-            UserTier::Free,
-            10,
-            100,
-            15,
-        );
+        let empty_endpoint = RateLimitConfig::new("".to_string(), UserTier::Free, 10, 100, 15);
         assert!(empty_endpoint.validate().is_err());
 
-        let zero_limits = RateLimitConfig::new(
-            "/api/v1/test".to_string(),
-            UserTier::Free,
-            0,
-            0,
-            15,
-        );
+        let zero_limits =
+            RateLimitConfig::new("/api/v1/test".to_string(), UserTier::Free, 0, 0, 15);
         assert!(zero_limits.validate().is_err());
 
-        let zero_burst = RateLimitConfig::new(
-            "/api/v1/test".to_string(),
-            UserTier::Free,
-            10,
-            100,
-            0,
-        );
+        let zero_burst =
+            RateLimitConfig::new("/api/v1/test".to_string(), UserTier::Free, 10, 100, 0);
         assert!(zero_burst.validate().is_err());
 
-        let invalid_burst = RateLimitConfig::new(
-            "/api/v1/test".to_string(),
-            UserTier::Free,
-            10,
-            100,
-            5,
-        );
+        let invalid_burst =
+            RateLimitConfig::new("/api/v1/test".to_string(), UserTier::Free, 10, 100, 5);
         assert!(invalid_burst.validate().is_err());
     }
 
     #[test]
     fn test_endpoint_matching() {
-        let exact_config = RateLimitConfig::new(
-            "/api/v1/users".to_string(),
-            UserTier::Free,
-            10,
-            100,
-            15,
-        );
+        let exact_config =
+            RateLimitConfig::new("/api/v1/users".to_string(), UserTier::Free, 10, 100, 15);
         assert!(exact_config.matches_endpoint("/api/v1/users"));
         assert!(!exact_config.matches_endpoint("/api/v1/users/123"));
 
-        let wildcard_config = RateLimitConfig::new(
-            "/api/v1/*".to_string(),
-            UserTier::Free,
-            10,
-            100,
-            15,
-        );
+        let wildcard_config =
+            RateLimitConfig::new("/api/v1/*".to_string(), UserTier::Free, 10, 100, 15);
         assert!(wildcard_config.matches_endpoint("/api/v1/users"));
         assert!(wildcard_config.matches_endpoint("/api/v1/users/123"));
         assert!(wildcard_config.matches_endpoint("/api/v1/posts"));

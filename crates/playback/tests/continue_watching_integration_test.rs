@@ -12,8 +12,9 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 async fn setup_test_db() -> sqlx::PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+    });
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -65,26 +66,28 @@ async fn test_get_continue_watching_empty() {
         Arc::new(MockContentMetadataProvider),
     ));
 
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(service.clone()))
-            .route(
-                "/api/v1/playback/continue-watching",
-                web::get().to(|service: web::Data<Arc<ContinueWatchingService>>, query: web::Query<std::collections::HashMap<String, String>>| async move {
-                    let user_id = query.get("user_id").unwrap().parse::<Uuid>().unwrap();
-                    let limit = query.get("limit").and_then(|l| l.parse::<i64>().ok());
-                    let result = service.get_continue_watching(user_id, limit).await;
-                    match result {
-                        Ok(response) => actix_web::HttpResponse::Ok().json(response),
-                        Err(e) => e.error_response(),
-                    }
-                }),
-            ),
-    )
+    let app = test::init_service(App::new().app_data(web::Data::new(service.clone())).route(
+        "/api/v1/playback/continue-watching",
+        web::get().to(
+            |service: web::Data<Arc<ContinueWatchingService>>,
+             query: web::Query<std::collections::HashMap<String, String>>| async move {
+                let user_id = query.get("user_id").unwrap().parse::<Uuid>().unwrap();
+                let limit = query.get("limit").and_then(|l| l.parse::<i64>().ok());
+                let result = service.get_continue_watching(user_id, limit).await;
+                match result {
+                    Ok(response) => actix_web::HttpResponse::Ok().json(response),
+                    Err(e) => e.error_response(),
+                }
+            },
+        ),
+    ))
     .await;
 
     let req = test::TestRequest::get()
-        .uri(&format!("/api/v1/playback/continue-watching?user_id={}", user_id))
+        .uri(&format!(
+            "/api/v1/playback/continue-watching?user_id={}",
+            user_id
+        ))
         .to_request();
 
     let resp = test::call_service(&app, req).await;
@@ -108,28 +111,30 @@ async fn test_update_progress_creates_record() {
         Arc::new(MockContentMetadataProvider),
     ));
 
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(service.clone()))
-            .route(
-                "/api/v1/playback/progress",
-                web::post().to(|service: web::Data<Arc<ContinueWatchingService>>, req: web::Json<serde_json::Value>| async move {
-                    let user_id = req["user_id"].as_str().unwrap().parse::<Uuid>().unwrap();
-                    let progress_request = media_gateway_playback::continue_watching::ProgressUpdateRequest {
+    let app = test::init_service(App::new().app_data(web::Data::new(service.clone())).route(
+        "/api/v1/playback/progress",
+        web::post().to(
+            |service: web::Data<Arc<ContinueWatchingService>>,
+             req: web::Json<serde_json::Value>| async move {
+                let user_id = req["user_id"].as_str().unwrap().parse::<Uuid>().unwrap();
+                let progress_request =
+                    media_gateway_playback::continue_watching::ProgressUpdateRequest {
                         content_id: req["content_id"].as_str().unwrap().parse::<Uuid>().unwrap(),
                         platform_id: req["platform_id"].as_str().unwrap().to_string(),
                         progress_seconds: req["progress_seconds"].as_i64().unwrap() as i32,
                         duration_seconds: req["duration_seconds"].as_i64().unwrap() as i32,
-                        device_id: req["device_id"].as_str().and_then(|s| s.parse::<Uuid>().ok()),
+                        device_id: req["device_id"]
+                            .as_str()
+                            .and_then(|s| s.parse::<Uuid>().ok()),
                     };
-                    let result = service.update_progress(user_id, progress_request).await;
-                    match result {
-                        Ok(response) => actix_web::HttpResponse::Ok().json(response),
-                        Err(e) => e.error_response(),
-                    }
-                }),
-            ),
-    )
+                let result = service.update_progress(user_id, progress_request).await;
+                match result {
+                    Ok(response) => actix_web::HttpResponse::Ok().json(response),
+                    Err(e) => e.error_response(),
+                }
+            },
+        ),
+    ))
     .await;
 
     let payload = json!({
@@ -183,7 +188,10 @@ async fn test_full_workflow_progress_and_continue_watching() {
     }
 
     // Get continue watching list
-    let result = service.get_continue_watching(user_id, Some(10)).await.unwrap();
+    let result = service
+        .get_continue_watching(user_id, Some(10))
+        .await
+        .unwrap();
 
     assert_eq!(result.total, 3);
     assert_eq!(result.items.len(), 3);
@@ -222,7 +230,10 @@ async fn test_completion_threshold_excludes_from_continue_watching() {
         duration_seconds: 6000,
         device_id: None,
     };
-    service.update_progress(user_id, incomplete_request).await.unwrap();
+    service
+        .update_progress(user_id, incomplete_request)
+        .await
+        .unwrap();
 
     // Add completed content (95%+)
     let completed_id = Uuid::new_v4();
@@ -233,7 +244,10 @@ async fn test_completion_threshold_excludes_from_continue_watching() {
         duration_seconds: 6000,
         device_id: None,
     };
-    service.update_progress(user_id, completed_request).await.unwrap();
+    service
+        .update_progress(user_id, completed_request)
+        .await
+        .unwrap();
 
     // Get continue watching list
     let result = service.get_continue_watching(user_id, None).await.unwrap();
@@ -347,7 +361,10 @@ async fn test_multiple_platforms_same_content() {
         duration_seconds: 6000,
         device_id: None,
     };
-    service.update_progress(user_id, netflix_request).await.unwrap();
+    service
+        .update_progress(user_id, netflix_request)
+        .await
+        .unwrap();
 
     let hulu_request = media_gateway_playback::continue_watching::ProgressUpdateRequest {
         content_id,
@@ -356,7 +373,10 @@ async fn test_multiple_platforms_same_content() {
         duration_seconds: 6000,
         device_id: None,
     };
-    service.update_progress(user_id, hulu_request).await.unwrap();
+    service
+        .update_progress(user_id, hulu_request)
+        .await
+        .unwrap();
 
     // Should have two separate records
     let result = service.get_continue_watching(user_id, None).await.unwrap();

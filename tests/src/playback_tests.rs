@@ -57,7 +57,9 @@ async fn test_playback_flow_create_update_resume() -> Result<()> {
         user_id: user.id.to_string(),
     };
 
-    let create_response = client.post("/api/v1/playback/sessions", &create_req).await?;
+    let create_response = client
+        .post("/api/v1/playback/sessions", &create_req)
+        .await?;
     assert_eq!(create_response.status(), 201);
 
     let session_data: SessionResponse = create_response.json().await?;
@@ -73,7 +75,10 @@ async fn test_playback_flow_create_update_resume() -> Result<()> {
     };
 
     let update_response = client
-        .patch(&format!("/api/v1/playback/sessions/{}/position", session_id), &update_req)
+        .patch(
+            &format!("/api/v1/playback/sessions/{}/position", session_id),
+            &update_req,
+        )
         .await?;
     assert_eq!(update_response.status(), 200);
 
@@ -86,7 +91,10 @@ async fn test_playback_flow_create_update_resume() -> Result<()> {
     };
 
     let update_response2 = client
-        .patch(&format!("/api/v1/playback/sessions/{}/position", session_id), &update_req2)
+        .patch(
+            &format!("/api/v1/playback/sessions/{}/position", session_id),
+            &update_req2,
+        )
         .await?;
     assert_eq!(update_response2.status(), 200);
 
@@ -95,7 +103,10 @@ async fn test_playback_flow_create_update_resume() -> Result<()> {
 
     // Step 4: Resume playback (get latest session for content)
     let resume_response = client
-        .get(&format!("/api/v1/playback/sessions/resume?content_id={}", content.id))
+        .get(&format!(
+            "/api/v1/playback/sessions/resume?content_id={}",
+            content.id
+        ))
         .await?;
     assert_eq!(resume_response.status(), 200);
 
@@ -124,7 +135,9 @@ async fn test_create_multiple_sessions_same_content() -> Result<()> {
         user_id: user.id.to_string(),
     };
 
-    let response1 = client.post("/api/v1/playback/sessions", &create_req).await?;
+    let response1 = client
+        .post("/api/v1/playback/sessions", &create_req)
+        .await?;
     assert_eq!(response1.status(), 201);
     let session1: SessionResponse = response1.json().await?;
 
@@ -132,12 +145,16 @@ async fn test_create_multiple_sessions_same_content() -> Result<()> {
     client
         .patch(
             &format!("/api/v1/playback/sessions/{}/position", session1.id),
-            &UpdatePositionRequest { position_seconds: 100 },
+            &UpdatePositionRequest {
+                position_seconds: 100,
+            },
         )
         .await?;
 
     // Create second session (new playback instance)
-    let response2 = client.post("/api/v1/playback/sessions", &create_req).await?;
+    let response2 = client
+        .post("/api/v1/playback/sessions", &create_req)
+        .await?;
     assert_eq!(response2.status(), 201);
     let session2: SessionResponse = response2.json().await?;
 
@@ -146,7 +163,10 @@ async fn test_create_multiple_sessions_same_content() -> Result<()> {
 
     // Resume should return the most recent session
     let resume_response = client
-        .get(&format!("/api/v1/playback/sessions/resume?content_id={}", content.id))
+        .get(&format!(
+            "/api/v1/playback/sessions/resume?content_id={}",
+            content.id
+        ))
         .await?;
     let resume_data: ResumeResponse = resume_response.json().await?;
     assert_eq!(resume_data.id, session2.id);
@@ -196,7 +216,9 @@ async fn test_update_position_negative_value() -> Result<()> {
         content_id: content.id.to_string(),
         user_id: user.id.to_string(),
     };
-    let create_response = client.post("/api/v1/playback/sessions", &create_req).await?;
+    let create_response = client
+        .post("/api/v1/playback/sessions", &create_req)
+        .await?;
     let session_data: SessionResponse = create_response.json().await?;
 
     // Try to update with negative position
@@ -227,7 +249,10 @@ async fn test_resume_no_existing_session() -> Result<()> {
     let client = TestClient::new(&ctx.playback_url).with_auth(auth_token);
 
     let response = client
-        .get(&format!("/api/v1/playback/sessions/resume?content_id={}", content.id))
+        .get(&format!(
+            "/api/v1/playback/sessions/resume?content_id={}",
+            content.id
+        ))
         .await?;
     assert_eq!(response.status(), 404);
 
@@ -297,7 +322,9 @@ async fn test_delete_session() -> Result<()> {
         content_id: content.id.to_string(),
         user_id: user.id.to_string(),
     };
-    let create_response = client.post("/api/v1/playback/sessions", &create_req).await?;
+    let create_response = client
+        .post("/api/v1/playback/sessions", &create_req)
+        .await?;
     let session_data: SessionResponse = create_response.json().await?;
 
     // Delete session
@@ -332,7 +359,9 @@ async fn test_unauthorized_access() -> Result<()> {
         user_id: user.id.to_string(),
     };
 
-    let response = client.post("/api/v1/playback/sessions", &create_req).await?;
+    let response = client
+        .post("/api/v1/playback/sessions", &create_req)
+        .await?;
     assert_eq!(response.status(), 401); // Unauthorized
 
     ctx.teardown().await?;
@@ -355,7 +384,9 @@ async fn test_complete_session_when_position_reaches_end() -> Result<()> {
         content_id: content.id.to_string(),
         user_id: user.id.to_string(),
     };
-    let create_response = client.post("/api/v1/playback/sessions", &create_req).await?;
+    let create_response = client
+        .post("/api/v1/playback/sessions", &create_req)
+        .await?;
     let session_data: SessionResponse = create_response.json().await?;
 
     // Update position to end of content (assuming 3600s duration)

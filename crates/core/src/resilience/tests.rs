@@ -8,9 +8,7 @@ use tokio::time::sleep;
 async fn test_circuit_breaker_closed_state_allows_calls() {
     let cb = CircuitBreaker::new("test", CircuitBreakerConfig::default());
 
-    let result = cb
-        .call(async { Ok::<_, String>("success") })
-        .await;
+    let result = cb.call(async { Ok::<_, String>("success") }).await;
 
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "success");
@@ -54,7 +52,9 @@ async fn test_circuit_breaker_rejects_when_open() {
     assert_eq!(cb.state().await, CircuitState::Open);
 
     // Attempt a call - should be rejected
-    let result = cb.call(async { Ok::<_, String>("should not execute") }).await;
+    let result = cb
+        .call(async { Ok::<_, String>("should not execute") })
+        .await;
 
     assert!(matches!(
         result,
@@ -183,7 +183,9 @@ async fn test_circuit_breaker_limits_half_open_calls() {
     sleep(Duration::from_millis(10)).await;
 
     // This third call should be rejected
-    let result = cb.call(async { Ok::<_, String>("should not execute") }).await;
+    let result = cb
+        .call(async { Ok::<_, String>("should not execute") })
+        .await;
 
     assert!(matches!(
         result,
@@ -210,10 +212,7 @@ async fn test_circuit_breaker_with_fallback_uses_fallback_when_open() {
 
     // Call with fallback
     let result = cb
-        .call_with_fallback(
-            async { Ok::<_, String>("primary") },
-            || "fallback",
-        )
+        .call_with_fallback(async { Ok::<_, String>("primary") }, || "fallback")
         .await;
 
     assert!(result.is_ok());
@@ -226,10 +225,7 @@ async fn test_circuit_breaker_with_fallback_uses_primary_when_closed() {
 
     // Call with fallback
     let result = cb
-        .call_with_fallback(
-            async { Ok::<_, String>("primary") },
-            || "fallback",
-        )
+        .call_with_fallback(async { Ok::<_, String>("primary") }, || "fallback")
         .await;
 
     assert!(result.is_ok());

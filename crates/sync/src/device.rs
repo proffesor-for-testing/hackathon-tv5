@@ -1,13 +1,12 @@
 /// Device management and presence tracking
 ///
 /// Handles device registration, capabilities, and remote control
-
 use crate::crdt::HLCTimestamp;
+use chrono::{DateTime, Utc};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
-use chrono::{DateTime, Utc};
 
 /// Device registry for managing user devices
 pub struct DeviceRegistry {
@@ -71,11 +70,7 @@ impl DeviceRegistry {
     /// Get online devices
     pub fn get_online_devices(&self) -> Vec<DeviceInfo> {
         let devices = self.devices.read();
-        devices
-            .values()
-            .filter(|d| d.is_online)
-            .cloned()
-            .collect()
+        devices.values().filter(|d| d.is_online).cloned().collect()
     }
 
     /// Remove device

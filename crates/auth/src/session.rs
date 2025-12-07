@@ -96,14 +96,16 @@ impl SessionManager {
 
         match session_json {
             Some(json) => {
-                let mut session: Session = serde_json::from_str(&json)
-                    .map_err(|e| AuthError::Internal(format!("Failed to deserialize session: {}", e)))?;
+                let mut session: Session = serde_json::from_str(&json).map_err(|e| {
+                    AuthError::Internal(format!("Failed to deserialize session: {}", e))
+                })?;
 
                 session.touch();
 
                 // Update last accessed time
-                let updated_json = serde_json::to_string(&session)
-                    .map_err(|e| AuthError::Internal(format!("Failed to serialize session: {}", e)))?;
+                let updated_json = serde_json::to_string(&session).map_err(|e| {
+                    AuthError::Internal(format!("Failed to serialize session: {}", e))
+                })?;
 
                 conn.set_ex::<_, _, ()>(&session_key, updated_json, SESSION_TTL)
                     .await
@@ -158,11 +160,15 @@ impl SessionManager {
         }
 
         // Delete user sessions index
-        conn.del::<_, ()>(&user_sessions_key)
-            .await
-            .map_err(|e| AuthError::Redis(format!("Failed to delete user sessions index: {}", e)))?;
+        conn.del::<_, ()>(&user_sessions_key).await.map_err(|e| {
+            AuthError::Redis(format!("Failed to delete user sessions index: {}", e))
+        })?;
 
-        tracing::info!("Revoked {} sessions for user {}", session_ids.len(), user_id);
+        tracing::info!(
+            "Revoked {} sessions for user {}",
+            session_ids.len(),
+            user_id
+        );
 
         Ok(())
     }
@@ -202,7 +208,9 @@ impl SessionManager {
             // Remove from user's session set
             conn.srem::<_, _, ()>(&user_sessions_key, session_id)
                 .await
-                .map_err(|e| AuthError::Redis(format!("Failed to remove session from index: {}", e)))?;
+                .map_err(|e| {
+                    AuthError::Redis(format!("Failed to remove session from index: {}", e))
+                })?;
 
             invalidated_count += 1;
         }

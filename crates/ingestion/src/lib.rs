@@ -19,34 +19,34 @@ pub mod repository;
 pub mod webhooks;
 
 // Re-export main types
-pub use pipeline::{IngestionPipeline, IngestionSchedule};
-pub use normalizer::PlatformNormalizer;
-pub use entity_resolution::EntityResolver;
-pub use genre_mapping::GenreMapper;
-pub use embedding::EmbeddingGenerator;
 pub use deep_link::{DeepLinkGenerator, DeepLinkResult};
-pub use qdrant::{QdrantClient, ContentPayload, ContentPoint, to_content_point, VECTOR_DIM};
+pub use embedding::EmbeddingGenerator;
+pub use entity_resolution::EntityResolver;
+pub use events::{
+    AvailabilityChangedEvent, ContentEvent, ContentIngestedEvent, ContentUpdatedEvent, EventError,
+    EventProducer, EventResult, KafkaEventProducer, MetadataEnrichedEvent,
+};
+pub use genre_mapping::GenreMapper;
+pub use normalizer::PlatformNormalizer;
+pub use notifications::{
+    ContentExpiringEvent, ExpirationNotificationConfig, ExpirationNotificationJob,
+    NotificationStatus, NotificationWindow,
+};
+pub use pipeline::{IngestionPipeline, IngestionSchedule};
+pub use qdrant::{to_content_point, ContentPayload, ContentPoint, QdrantClient, VECTOR_DIM};
 pub use quality::{
-    QualityScorer, QualityWeights, QualityReport, LowQualityItem, FreshnessDecay,
-    RecalculationJob, RecalculationReport, RecalculationError, batch_score_content
+    batch_score_content, generate_quality_report, FreshnessDecay, LowQualityItem, QualityReport,
+    QualityScorer, QualityWeights, RecalculationError, RecalculationJob, RecalculationReport,
 };
 pub use rate_limit::RateLimitManager;
-pub use repository::{ContentRepository, PostgresContentRepository, ExpiringContent, StaleContent, LowQualityContentItem};
-pub use events::{
-    KafkaEventProducer, EventProducer, ContentEvent,
-    ContentIngestedEvent, ContentUpdatedEvent,
-    AvailabilityChangedEvent, MetadataEnrichedEvent,
-    EventError, EventResult,
+pub use repository::{
+    ContentRepository, ExpiringContent, LowQualityContentItem, PostgresContentRepository,
+    StaleContent,
 };
 pub use webhooks::{
-    WebhookReceiver, WebhookHandler, WebhookPayload, WebhookEventType,
-    WebhookQueue, RedisWebhookQueue, WebhookDeduplicator, WebhookMetrics,
-    ProcessedWebhook, ProcessingStatus, PlatformWebhookConfig, QueueStats,
-    WebhookProcessor,
-};
-pub use notifications::{
-    ExpirationNotificationJob, ExpirationNotificationConfig,
-    ContentExpiringEvent, NotificationWindow, NotificationStatus,
+    PlatformWebhookConfig, ProcessedWebhook, ProcessingStatus, QueueStats, RedisWebhookQueue,
+    WebhookDeduplicator, WebhookEventType, WebhookHandler, WebhookMetrics, WebhookPayload,
+    WebhookProcessor, WebhookQueue, WebhookReceiver,
 };
 
 /// Common error type for the ingestion pipeline

@@ -1,13 +1,13 @@
-pub mod scorer;
 pub mod canonical_adapter;
 pub mod recalculation;
+pub mod scorer;
 
 pub use scorer::{
-    QualityScorer, QualityWeights, QualityReport, LowQualityItem,
-    ScoreDistribution, MissingFieldsSummary, FreshnessDecay
+    FreshnessDecay, LowQualityItem, MissingFieldsSummary, QualityReport, QualityScorer,
+    QualityWeights, ScoreDistribution,
 };
 
-pub use recalculation::{RecalculationJob, RecalculationReport, RecalculationError};
+pub use recalculation::{RecalculationError, RecalculationJob, RecalculationReport};
 
 use crate::normalizer::CanonicalContent;
 use chrono::{DateTime, Utc};

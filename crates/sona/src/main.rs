@@ -4,7 +4,7 @@
 //! SLA: 99.9% availability
 //! Latency target: <5ms personalization, <200ms recommendations
 
-use actix_web::{web, App, HttpServer, HttpResponse};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use tracing::info;
 
 #[actix_web::main]
@@ -16,13 +16,10 @@ async fn main() -> std::io::Result<()> {
 
     info!("Starting SONA Engine on port 8082");
 
-    HttpServer::new(|| {
-        App::new()
-            .route("/health", web::get().to(health_check))
-    })
-    .bind(("0.0.0.0", 8082))?
-    .run()
-    .await
+    HttpServer::new(|| App::new().route("/health", web::get().to(health_check)))
+        .bind(("0.0.0.0", 8082))?
+        .run()
+        .await
 }
 
 async fn health_check() -> HttpResponse {

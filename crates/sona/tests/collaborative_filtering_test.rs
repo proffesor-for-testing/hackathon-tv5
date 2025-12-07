@@ -12,8 +12,9 @@ use std::env;
 use uuid::Uuid;
 
 async fn setup_test_db() -> Result<sqlx::PgPool> {
-    let database_url = env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+    });
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -312,10 +313,7 @@ fn test_als_convergence() -> Result<()> {
     let item2 = Uuid::new_v4();
 
     // Simple pattern: user1 likes item1, user2 likes item2
-    let interactions = vec![
-        (user1, item1, 1.0),
-        (user2, item2, 1.0),
-    ];
+    let interactions = vec![(user1, item1, 1.0), (user2, item2, 1.0)];
 
     let matrix = mf.build_matrix(interactions)?;
     mf.fit(&matrix)?;

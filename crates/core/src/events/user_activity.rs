@@ -118,11 +118,7 @@ pub struct UserActivityEvent {
 
 impl UserActivityEvent {
     /// Create a new user activity event
-    pub fn new(
-        user_id: Uuid,
-        event_type: ActivityEventType,
-        metadata: serde_json::Value,
-    ) -> Self {
+    pub fn new(user_id: Uuid, event_type: ActivityEventType, metadata: serde_json::Value) -> Self {
         Self {
             event_id: Uuid::new_v4(),
             user_id,
@@ -231,8 +227,7 @@ impl KafkaActivityProducer {
 
     /// Create from environment variables
     pub fn from_env() -> ActivityEventResult<Self> {
-        let brokers =
-            env::var("KAFKA_BROKERS").unwrap_or_else(|_| "localhost:9092".to_string());
+        let brokers = env::var("KAFKA_BROKERS").unwrap_or_else(|_| "localhost:9092".to_string());
 
         let topic_prefix =
             env::var("KAFKA_TOPIC_PREFIX").unwrap_or_else(|_| "media-gateway".to_string());

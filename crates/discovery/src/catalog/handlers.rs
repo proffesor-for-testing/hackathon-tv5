@@ -56,7 +56,11 @@ async fn create_content(
         return e.into();
     }
 
-    match data.catalog_service.create_content(payload.into_inner()).await {
+    match data
+        .catalog_service
+        .create_content(payload.into_inner())
+        .await
+    {
         Ok(content) => HttpResponse::Created().json(content),
         Err(e) => {
             tracing::error!("Failed to create content: {}", e);

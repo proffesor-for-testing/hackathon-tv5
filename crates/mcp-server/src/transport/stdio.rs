@@ -127,10 +127,7 @@ async fn handle_request(state: Arc<McpServerState>, request: JsonRpcRequest) -> 
         "prompts/get" => handle_prompts_get(request.id, request.params).await,
         _ => {
             warn!(method = %request.method, "Unknown method");
-            JsonRpcResponse::error(
-                request.id,
-                JsonRpcError::method_not_found(request.method),
-            )
+            JsonRpcResponse::error(request.id, JsonRpcError::method_not_found(request.method))
         }
     }
 }
@@ -159,10 +156,7 @@ async fn handle_initialize(
             }
         },
         None => {
-            return JsonRpcResponse::error(
-                id,
-                JsonRpcError::invalid_params("Missing parameters"),
-            );
+            return JsonRpcResponse::error(id, JsonRpcError::invalid_params("Missing parameters"));
         }
     };
 
@@ -229,31 +223,24 @@ async fn handle_tools_call(
             }
         },
         None => {
-            return JsonRpcResponse::error(
-                id,
-                JsonRpcError::invalid_params("Missing parameters"),
-            );
+            return JsonRpcResponse::error(id, JsonRpcError::invalid_params("Missing parameters"));
         }
     };
 
     info!(tool = %tool_params.name, "Calling tool");
 
     let executor: Box<dyn ToolExecutor> = match tool_params.name.as_str() {
-        "semantic_search" => {
-            Box::new(crate::tools::SemanticSearchTool::new(state.db_pool.clone()))
-        }
-        "get_recommendations" => {
-            Box::new(crate::tools::GetRecommendationsTool::new(state.db_pool.clone()))
-        }
-        "check_availability" => {
-            Box::new(crate::tools::CheckAvailabilityTool::new(state.db_pool.clone()))
-        }
-        "get_content_details" => {
-            Box::new(crate::tools::GetContentDetailsTool::new(state.db_pool.clone()))
-        }
-        "sync_watchlist" => {
-            Box::new(crate::tools::SyncWatchlistTool::new(state.db_pool.clone()))
-        }
+        "semantic_search" => Box::new(crate::tools::SemanticSearchTool::new(state.db_pool.clone())),
+        "get_recommendations" => Box::new(crate::tools::GetRecommendationsTool::new(
+            state.db_pool.clone(),
+        )),
+        "check_availability" => Box::new(crate::tools::CheckAvailabilityTool::new(
+            state.db_pool.clone(),
+        )),
+        "get_content_details" => Box::new(crate::tools::GetContentDetailsTool::new(
+            state.db_pool.clone(),
+        )),
+        "sync_watchlist" => Box::new(crate::tools::SyncWatchlistTool::new(state.db_pool.clone())),
         _ => {
             return JsonRpcResponse::error(
                 id,
@@ -306,10 +293,7 @@ async fn handle_resources_read(
             }
         },
         None => {
-            return JsonRpcResponse::error(
-                id,
-                JsonRpcError::invalid_params("Missing parameters"),
-            );
+            return JsonRpcResponse::error(id, JsonRpcError::invalid_params("Missing parameters"));
         }
     };
 
@@ -395,10 +379,7 @@ async fn handle_prompts_get(
             }
         },
         None => {
-            return JsonRpcResponse::error(
-                id,
-                JsonRpcError::invalid_params("Missing parameters"),
-            );
+            return JsonRpcResponse::error(id, JsonRpcError::invalid_params("Missing parameters"));
         }
     };
 

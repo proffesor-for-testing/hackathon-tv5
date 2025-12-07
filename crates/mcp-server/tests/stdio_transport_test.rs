@@ -95,9 +95,7 @@ fn test_request_id_variants() {
 fn test_initialize_request_structure() {
     let init_params = InitializeParams {
         protocol_version: "1.0".to_string(),
-        capabilities: ClientCapabilities {
-            experimental: None,
-        },
+        capabilities: ClientCapabilities { experimental: None },
         client_info: ClientInfo {
             name: "Test Client".to_string(),
             version: "1.0.0".to_string(),
@@ -203,10 +201,7 @@ fn test_request_response_cycle() {
     assert_eq!(parsed_request.id, request.id);
 
     // Create a response
-    let response = JsonRpcResponse::success(
-        parsed_request.id.clone(),
-        json!({"tools": []}),
-    );
+    let response = JsonRpcResponse::success(parsed_request.id.clone(), json!({"tools": []}));
 
     // Serialize response
     let response_json = serde_json::to_string(&response).unwrap();

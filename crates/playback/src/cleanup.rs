@@ -4,7 +4,7 @@ use crate::continue_watching::ContinueWatchingService;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time;
-use tracing::{info, error};
+use tracing::{error, info};
 
 const CLEANUP_INTERVAL_HOURS: u64 = 24;
 const STALE_PROGRESS_DAYS: i32 = 30;
@@ -45,8 +45,9 @@ mod tests {
     use uuid::Uuid;
 
     async fn setup_test_db() -> sqlx::PgPool {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+        });
 
         PgPoolOptions::new()
             .max_connections(5)
@@ -77,20 +78,24 @@ mod tests {
         service.update_progress(user_id, request).await.unwrap();
 
         // Make it stale
-        sqlx::query!(
-            "UPDATE playback_progress SET updated_at = NOW() - INTERVAL '31 days' WHERE user_id = $1",
-            user_id
+        sqlx::query(
+            "UPDATE playback_progress SET updated_at = NOW() - INTERVAL '31 days' WHERE user_id = $1"
         )
+        .bind(user_id)
         .execute(&pool)
         .await
         .unwrap();
 
         // Run cleanup
-        let deleted = service.cleanup_stale_progress(STALE_PROGRESS_DAYS).await.unwrap();
+        let deleted = service
+            .cleanup_stale_progress(STALE_PROGRESS_DAYS)
+            .await
+            .unwrap();
         assert!(deleted > 0);
 
         // Cleanup test data
-        sqlx::query!("DELETE FROM playback_progress WHERE user_id = $1", user_id)
+        sqlx::query("DELETE FROM playback_progress WHERE user_id = $1")
+            .bind(user_id)
             .execute(&pool)
             .await
             .ok();
@@ -118,14 +123,18 @@ mod tests {
         service.update_progress(user_id, request).await.unwrap();
 
         // Run cleanup
-        let deleted = service.cleanup_stale_progress(STALE_PROGRESS_DAYS).await.unwrap();
+        let deleted = service
+            .cleanup_stale_progress(STALE_PROGRESS_DAYS)
+            .await
+            .unwrap();
 
         // Should not delete recent records
         let continue_watching = service.get_continue_watching(user_id, None).await.unwrap();
         assert_eq!(continue_watching.total, 1);
 
         // Cleanup test data
-        sqlx::query!("DELETE FROM playback_progress WHERE user_id = $1", user_id)
+        sqlx::query("DELETE FROM playback_progress WHERE user_id = $1")
+            .bind(user_id)
             .execute(&pool)
             .await
             .ok();

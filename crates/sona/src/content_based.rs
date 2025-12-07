@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use qdrant_client::prelude::*;
-use qdrant_client::qdrant::{SearchPoints, Filter, Condition, FieldCondition, Match};
+use qdrant_client::qdrant::{Condition, FieldCondition, Filter, Match, SearchPoints};
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -27,16 +27,13 @@ impl ContentBasedEngine {
     }
 
     /// Get content features from database
-    pub async fn get_content_features(
-        &self,
-        content_id: Uuid,
-    ) -> Result<Option<ContentFeatures>> {
+    pub async fn get_content_features(&self, content_id: Uuid) -> Result<Option<ContentFeatures>> {
         let row = sqlx::query(
             r#"
             SELECT id, title, genres, release_year, popularity_score, embedding
             FROM content.items
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(content_id)
         .fetch_optional(&self.pool)
@@ -60,42 +57,38 @@ impl ContentBasedEngine {
         genre_filter: Option<Vec<String>>,
     ) -> Result<Vec<(Uuid, f32)>> {
         // Get the source content's embedding
-        let content = self.get_content_features(content_id).await?
+        let content = self
+            .get_content_features(content_id)
+            .await?
             .ok_or_else(|| anyhow::anyhow!("Content not found"))?;
 
-        let embedding = content.embedding
+        let embedding = content
+            .embedding
             .ok_or_else(|| anyhow::anyhow!("Content has no embedding"))?;
 
         // Build filter if genres specified
-        let filter = genre_filter.map(|genres| {
-            Filter {
-                must: vec![
-                    qdrant_client::qdrant::Condition {
-                        condition_one_of: Some(
-                            qdrant_client::qdrant::condition::ConditionOneOf::Field(
-                                FieldCondition {
-                                    key: "genres".to_string(),
-                                    r#match: Some(Match {
-                                        match_value: Some(
-                                            qdrant_client::qdrant::r#match::MatchValue::Keywords(
-                                                qdrant_client::qdrant::RepeatedStrings {
-                                                    strings: genres,
-                                                }
-                                            )
-                                        ),
-                                    }),
-                                    ..Default::default()
-                                }
-                            )
-                        ),
-                    }
-                ],
-                ..Default::default()
-            }
+        let filter = genre_filter.map(|genres| Filter {
+            must: vec![qdrant_client::qdrant::Condition {
+                condition_one_of: Some(qdrant_client::qdrant::condition::ConditionOneOf::Field(
+                    FieldCondition {
+                        key: "genres".to_string(),
+                        r#match: Some(Match {
+                            match_value: Some(
+                                qdrant_client::qdrant::r#match::MatchValue::Keywords(
+                                    qdrant_client::qdrant::RepeatedStrings { strings: genres },
+                                ),
+                            ),
+                        }),
+                        ..Default::default()
+                    },
+                )),
+            }],
+            ..Default::default()
         });
 
         // Search Qdrant for similar vectors
-        let search_result = self.qdrant
+        let search_result = self
+            .qdrant
             .search_points(&SearchPoints {
                 collection_name: self.collection_name.clone(),
                 vector: embedding,
@@ -164,11 +157,7 @@ impl ContentBasedEngine {
     }
 
     /// Get user's seed content (highly rated items) for recommendations
-    async fn get_user_seed_content(
-        &self,
-        user_id: Uuid,
-        limit: usize,
-    ) -> Result<Vec<(Uuid, f32)>> {
+    async fn get_user_seed_content(&self, user_id: Uuid, limit: usize) -> Result<Vec<(Uuid, f32)>> {
         let rows = sqlx::query(
             r#"
             SELECT content_id,
@@ -187,16 +176,22 @@ impl ContentBasedEngine {
               )
             ORDER BY timestamp DESC
             LIMIT $2
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(limit as i64)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.iter().map(|r| {
-            (r.get::<Uuid, _>("content_id"), r.get::<f64, _>("score") as f32)
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| {
+                (
+                    r.get::<Uuid, _>("content_id"),
+                    r.get::<f64, _>("score") as f32,
+                )
+            })
+            .collect())
     }
 
     /// Get content IDs the user has already seen
@@ -206,7 +201,7 @@ impl ContentBasedEngine {
             SELECT DISTINCT content_id
             FROM users.interactions
             WHERE user_id = $1
-            "#
+            "#,
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -216,11 +211,7 @@ impl ContentBasedEngine {
     }
 
     /// Compute feature similarity (for non-embedding features)
-    pub fn compute_feature_similarity(
-        &self,
-        a: &ContentFeatures,
-        b: &ContentFeatures,
-    ) -> f32 {
+    pub fn compute_feature_similarity(&self, a: &ContentFeatures, b: &ContentFeatures) -> f32 {
         let mut score = 0.0f32;
         let mut weight_sum = 0.0f32;
 

@@ -5,9 +5,7 @@ pub mod verification;
 pub use controls::{
     ContentRating, ParentalControls, SetParentalControlsRequest, SetParentalControlsResponse,
 };
-pub use handlers::{
-    update_parental_controls, verify_parental_pin, ParentalControlsState,
-};
+pub use handlers::{update_parental_controls, verify_parental_pin, ParentalControlsState};
 pub use verification::{VerifyPinRequest, VerifyPinResponse};
 
 use crate::error::AuthError;

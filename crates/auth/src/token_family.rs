@@ -5,7 +5,7 @@
 //! in the family are revoked.
 
 use anyhow::{Context, Result};
-use redis::{AsyncCommands, Client, aio::MultiplexedConnection};
+use redis::{aio::MultiplexedConnection, AsyncCommands, Client};
 use std::collections::HashSet;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
@@ -29,15 +29,15 @@ pub struct TokenFamilyManager {
 impl TokenFamilyManager {
     /// Create new token family manager
     pub fn new(redis_url: &str) -> Result<Self> {
-        let client = Client::open(redis_url)
-            .context("Failed to create Redis client for token family")?;
+        let client =
+            Client::open(redis_url).context("Failed to create Redis client for token family")?;
         Ok(Self { client })
     }
 
     /// Create from environment
     pub fn from_env() -> Result<Self> {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
         Self::new(&redis_url)
     }
 
@@ -56,12 +56,15 @@ impl TokenFamilyManager {
 
         // Store family metadata
         let meta_key = format!("token_family:{}:meta", family_id);
-        conn.hset::<_, _, _, ()>(&meta_key, "user_id", user_id.to_string()).await?;
-        conn.expire::<_, ()>(&meta_key, FAMILY_TTL_SECS as i64).await?;
+        conn.hset::<_, _, _, ()>(&meta_key, "user_id", user_id.to_string())
+            .await?;
+        conn.expire::<_, ()>(&meta_key, FAMILY_TTL_SECS as i64)
+            .await?;
 
         // Initialize empty JTI set
         let jtis_key = format!("token_family:{}:jtis", family_id);
-        conn.expire::<_, ()>(&jtis_key, FAMILY_TTL_SECS as i64).await?;
+        conn.expire::<_, ()>(&jtis_key, FAMILY_TTL_SECS as i64)
+            .await?;
 
         info!(family_id = %family_id, user_id = %user_id, "Created token family");
         Ok(family_id)
@@ -74,7 +77,8 @@ impl TokenFamilyManager {
         let jtis_key = format!("token_family:{}:jtis", family_id);
 
         conn.sadd::<_, _, ()>(&jtis_key, jti).await?;
-        conn.expire::<_, ()>(&jtis_key, FAMILY_TTL_SECS as i64).await?;
+        conn.expire::<_, ()>(&jtis_key, FAMILY_TTL_SECS as i64)
+            .await?;
 
         debug!(family_id = %family_id, jti = %jti, "Added token to family");
         Ok(())
@@ -208,7 +212,8 @@ impl TokenFamilyManager {
 
             for meta_key in keys {
                 // Extract family_id from key "token_family:{family_id}:meta"
-                if let Some(family_id_str) = meta_key.strip_prefix("token_family:")
+                if let Some(family_id_str) = meta_key
+                    .strip_prefix("token_family:")
                     .and_then(|s| s.strip_suffix(":meta"))
                 {
                     if let Ok(family_id) = Uuid::parse_str(family_id_str) {
@@ -292,13 +297,22 @@ mod tests {
         manager.add_token_to_family(family_id, &jti1).await.unwrap();
 
         // First validation should succeed
-        assert!(manager.validate_refresh_token(family_id, &jti1).await.unwrap());
+        assert!(manager
+            .validate_refresh_token(family_id, &jti1)
+            .await
+            .unwrap());
 
         // Remove token (simulating rotation)
-        manager.remove_token_from_family(family_id, &jti1).await.unwrap();
+        manager
+            .remove_token_from_family(family_id, &jti1)
+            .await
+            .unwrap();
 
         // Reuse attempt should fail and revoke family
-        assert!(!manager.validate_refresh_token(family_id, &jti1).await.unwrap());
+        assert!(!manager
+            .validate_refresh_token(family_id, &jti1)
+            .await
+            .unwrap());
 
         // Family should be revoked
         assert!(!manager.family_exists(family_id).await.unwrap());

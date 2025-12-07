@@ -62,28 +62,60 @@ impl QueryProcessor {
     /// Initialize default dictionaries
     fn init_default_dictionaries(&mut self) {
         let genres = [
-            "action", "adventure", "animation", "comedy", "crime", "documentary",
-            "drama", "family", "fantasy", "history", "horror", "music", "musical",
-            "mystery", "romance", "science fiction", "sci-fi", "thriller", "war",
-            "western", "biography", "sport", "superhero",
+            "action",
+            "adventure",
+            "animation",
+            "comedy",
+            "crime",
+            "documentary",
+            "drama",
+            "family",
+            "fantasy",
+            "history",
+            "horror",
+            "music",
+            "musical",
+            "mystery",
+            "romance",
+            "science fiction",
+            "sci-fi",
+            "thriller",
+            "war",
+            "western",
+            "biography",
+            "sport",
+            "superhero",
         ];
         for genre in genres {
             self.dictionary.insert(genre.to_string());
         }
 
         let keywords = [
-            "movie", "movies", "film", "films", "series", "show", "shows",
-            "tv", "television", "documentary", "documentaries", "anime",
-            "cartoon", "cartoons", "miniseries", "limited series",
+            "movie",
+            "movies",
+            "film",
+            "films",
+            "series",
+            "show",
+            "shows",
+            "tv",
+            "television",
+            "documentary",
+            "documentaries",
+            "anime",
+            "cartoon",
+            "cartoons",
+            "miniseries",
+            "limited series",
         ];
         for keyword in keywords {
             self.dictionary.insert(keyword.to_string());
         }
 
         let descriptors = [
-            "best", "top", "new", "latest", "classic", "popular", "trending",
-            "award", "winning", "oscar", "emmy", "good", "great", "funny",
-            "scary", "romantic", "exciting", "intense", "dark", "light",
+            "best", "top", "new", "latest", "classic", "popular", "trending", "award", "winning",
+            "oscar", "emmy", "good", "great", "funny", "scary", "romantic", "exciting", "intense",
+            "dark", "light",
         ];
         for desc in descriptors {
             self.dictionary.insert(desc.to_string());
@@ -94,36 +126,74 @@ impl QueryProcessor {
     }
 
     fn init_synonyms(&mut self) {
-        self.synonyms.insert("sci-fi".to_string(), vec![
-            "science fiction".to_string(), "scifi".to_string(), "sf".to_string(),
-        ]);
-        self.synonyms.insert("science fiction".to_string(), vec![
-            "sci-fi".to_string(), "scifi".to_string(),
-        ]);
-        self.synonyms.insert("romcom".to_string(), vec![
-            "romantic comedy".to_string(), "romance comedy".to_string(),
-        ]);
-        self.synonyms.insert("action".to_string(), vec!["action-adventure".to_string()]);
-        self.synonyms.insert("scary".to_string(), vec!["horror".to_string(), "thriller".to_string()]);
-        self.synonyms.insert("funny".to_string(), vec!["comedy".to_string(), "comedies".to_string()]);
-        self.synonyms.insert("anime".to_string(), vec![
-            "animation".to_string(), "animated".to_string(), "japanese animation".to_string(),
-        ]);
+        self.synonyms.insert(
+            "sci-fi".to_string(),
+            vec![
+                "science fiction".to_string(),
+                "scifi".to_string(),
+                "sf".to_string(),
+            ],
+        );
+        self.synonyms.insert(
+            "science fiction".to_string(),
+            vec!["sci-fi".to_string(), "scifi".to_string()],
+        );
+        self.synonyms.insert(
+            "romcom".to_string(),
+            vec!["romantic comedy".to_string(), "romance comedy".to_string()],
+        );
+        self.synonyms
+            .insert("action".to_string(), vec!["action-adventure".to_string()]);
+        self.synonyms.insert(
+            "scary".to_string(),
+            vec!["horror".to_string(), "thriller".to_string()],
+        );
+        self.synonyms.insert(
+            "funny".to_string(),
+            vec!["comedy".to_string(), "comedies".to_string()],
+        );
+        self.synonyms.insert(
+            "anime".to_string(),
+            vec![
+                "animation".to_string(),
+                "animated".to_string(),
+                "japanese animation".to_string(),
+            ],
+        );
     }
 
     fn init_typo_corrections(&mut self) {
         let corrections = [
-            ("moive", "movie"), ("moives", "movies"), ("movei", "movie"), ("movis", "movies"),
-            ("flim", "film"), ("flims", "films"), ("scifi", "sci-fi"), ("comdy", "comedy"),
-            ("commedy", "comedy"), ("horrer", "horror"), ("horro", "horror"),
-            ("thriler", "thriller"), ("thiller", "thriller"), ("acton", "action"),
-            ("acion", "action"), ("documentry", "documentary"), ("documentery", "documentary"),
-            ("animaton", "animation"), ("romace", "romance"), ("roamnce", "romance"),
-            ("mystrey", "mystery"), ("myster", "mystery"), ("fantsy", "fantasy"),
-            ("fantacy", "fantasy"), ("adveture", "adventure"), ("adventrue", "adventure"),
+            ("moive", "movie"),
+            ("moives", "movies"),
+            ("movei", "movie"),
+            ("movis", "movies"),
+            ("flim", "film"),
+            ("flims", "films"),
+            ("scifi", "sci-fi"),
+            ("comdy", "comedy"),
+            ("commedy", "comedy"),
+            ("horrer", "horror"),
+            ("horro", "horror"),
+            ("thriler", "thriller"),
+            ("thiller", "thriller"),
+            ("acton", "action"),
+            ("acion", "action"),
+            ("documentry", "documentary"),
+            ("documentery", "documentary"),
+            ("animaton", "animation"),
+            ("romace", "romance"),
+            ("roamnce", "romance"),
+            ("mystrey", "mystery"),
+            ("myster", "mystery"),
+            ("fantsy", "fantasy"),
+            ("fantacy", "fantasy"),
+            ("adveture", "adventure"),
+            ("adventrue", "adventure"),
         ];
         for (typo, correct) in corrections {
-            self.typo_corrections.insert(typo.to_string(), correct.to_string());
+            self.typo_corrections
+                .insert(typo.to_string(), correct.to_string());
         }
     }
 
@@ -153,12 +223,22 @@ impl QueryProcessor {
         }
 
         let corrected = corrected_words.join(" ");
-        let confidence = if words.is_empty() { 1.0 } else { total_confidence / words.len() as f32 };
+        let confidence = if words.is_empty() {
+            1.0
+        } else {
+            total_confidence / words.len() as f32
+        };
         let expanded_terms = self.expand_synonyms(&corrected);
 
         debug!(original = %original, corrected = %corrected, was_corrected = %was_corrected, "Query processed");
 
-        ProcessedQuery { original, corrected, was_corrected, expanded_terms, confidence }
+        ProcessedQuery {
+            original,
+            corrected,
+            was_corrected,
+            expanded_terms,
+            confidence,
+        }
     }
 
     fn correct_word(&self, word: &str) -> (String, f32) {
@@ -202,23 +282,37 @@ impl QueryProcessor {
 }
 
 impl Default for QueryProcessor {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     let s1_chars: Vec<char> = s1.chars().collect();
     let s2_chars: Vec<char> = s2.chars().collect();
     let (len1, len2) = (s1_chars.len(), s2_chars.len());
-    if len1 == 0 { return len2; }
-    if len2 == 0 { return len1; }
+    if len1 == 0 {
+        return len2;
+    }
+    if len2 == 0 {
+        return len1;
+    }
 
     let mut matrix: Vec<Vec<usize>> = vec![vec![0; len2 + 1]; len1 + 1];
-    for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) { row[0] = i; }
-    for j in 0..=len2 { matrix[0][j] = j; }
+    for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+        row[0] = i;
+    }
+    for j in 0..=len2 {
+        matrix[0][j] = j;
+    }
 
     for i in 1..=len1 {
         for j in 1..=len2 {
-            let cost = if s1_chars[i - 1] == s2_chars[j - 1] { 0 } else { 1 };
+            let cost = if s1_chars[i - 1] == s2_chars[j - 1] {
+                0
+            } else {
+                1
+            };
             matrix[i][j] = std::cmp::min(
                 std::cmp::min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1),
                 matrix[i - 1][j - 1] + cost,
@@ -257,7 +351,10 @@ mod tests {
         let processor = QueryProcessor::new();
         let result = processor.process("sci-fi movies");
         assert!(!result.expanded_terms.is_empty());
-        assert!(result.expanded_terms.iter().any(|t| t.contains("science fiction")));
+        assert!(result
+            .expanded_terms
+            .iter()
+            .any(|t| t.contains("science fiction")));
     }
 
     #[test]

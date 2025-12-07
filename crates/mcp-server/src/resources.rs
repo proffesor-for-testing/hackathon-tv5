@@ -114,7 +114,10 @@ impl ResourceManager {
     }
 
     /// Read user preferences
-    async fn read_user_preferences(&self, user_id: Uuid) -> Result<ResourceContent, MediaGatewayError> {
+    async fn read_user_preferences(
+        &self,
+        user_id: Uuid,
+    ) -> Result<ResourceContent, MediaGatewayError> {
         let result = sqlx::query_as::<_, (serde_json::Value,)>(
             r#"
             SELECT preferences
@@ -150,14 +153,11 @@ impl ResourceManager {
     }
 
     /// Read content item
-    async fn read_content_item(&self, content_id: Uuid) -> Result<ResourceContent, MediaGatewayError> {
-        let result = sqlx::query_as::<_, (
-            String,
-            Option<String>,
-            String,
-            serde_json::Value,
-            f64,
-        )>(
+    async fn read_content_item(
+        &self,
+        content_id: Uuid,
+    ) -> Result<ResourceContent, MediaGatewayError> {
+        let result = sqlx::query_as::<_, (String, Option<String>, String, serde_json::Value, f64)>(
             r#"
             SELECT title, description, content_type, metadata, quality_score
             FROM content

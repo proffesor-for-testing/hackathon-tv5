@@ -37,8 +37,7 @@ impl KeywordSearch {
             Ok(idx) => idx,
             Err(_) => {
                 std::fs::create_dir_all(&index_path).expect("Failed to create index directory");
-                Index::create_in_dir(&index_path, schema.clone())
-                    .expect("Failed to create index")
+                Index::create_in_dir(&index_path, schema.clone()).expect("Failed to create index")
             }
         };
 
@@ -69,10 +68,7 @@ impl KeywordSearch {
         let title_field = self.schema.get_field("title").unwrap();
         let overview_field = self.schema.get_field("overview").unwrap();
 
-        let query_parser = QueryParser::for_index(
-            &self.index,
-            vec![title_field, overview_field],
-        );
+        let query_parser = QueryParser::for_index(&self.index, vec![title_field, overview_field]);
 
         let parsed_query = query_parser.parse_query(query)?;
 
@@ -177,10 +173,7 @@ impl KeywordSearch {
     fn matches_filters(&self, content: &ContentSummary, filters: &SearchFilters) -> bool {
         // Genre filter
         if !filters.genres.is_empty() {
-            let has_genre = content
-                .genres
-                .iter()
-                .any(|g| filters.genres.contains(g));
+            let has_genre = content.genres.iter().any(|g| filters.genres.contains(g));
             if !has_genre {
                 return false;
             }
@@ -213,10 +206,7 @@ impl KeywordSearch {
 
         let mut doc = tantivy::TantivyDocument::default();
 
-        doc.add_text(
-            self.schema.get_field("id").unwrap(),
-            content.id.to_string(),
-        );
+        doc.add_text(self.schema.get_field("id").unwrap(), content.id.to_string());
         doc.add_text(self.schema.get_field("title").unwrap(), &content.title);
         doc.add_text(
             self.schema.get_field("overview").unwrap(),

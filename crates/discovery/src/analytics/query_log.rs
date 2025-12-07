@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
-use sqlx::{PgPool, FromRow};
-use uuid::Uuid;
+use sha2::{Digest, Sha256};
+use sqlx::{FromRow, PgPool};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 /// Represents a search event with anonymized user context
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -98,7 +98,7 @@ impl QueryLog {
             INSERT INTO search_clicks (search_event_id, content_id, position)
             VALUES ($1, $2, $3)
             RETURNING id
-            "#
+            "#,
         )
         .bind(search_event_id)
         .bind(content_id)
@@ -110,10 +110,7 @@ impl QueryLog {
     }
 
     /// Get recent search events
-    pub async fn get_recent_events(
-        &self,
-        limit: i64,
-    ) -> Result<Vec<SearchEvent>, sqlx::Error> {
+    pub async fn get_recent_events(&self, limit: i64) -> Result<Vec<SearchEvent>, sqlx::Error> {
         sqlx::query_as::<_, SearchEvent>(
             r#"
             SELECT id, query_hash, query_text, user_id_hash, result_count, latency_ms,
@@ -121,7 +118,7 @@ impl QueryLog {
             FROM search_events
             ORDER BY created_at DESC
             LIMIT $1
-            "#
+            "#,
         )
         .bind(limit)
         .fetch_all(&self.pool)
@@ -139,7 +136,7 @@ impl QueryLog {
             FROM search_clicks
             WHERE search_event_id = $1
             ORDER BY clicked_at ASC
-            "#
+            "#,
         )
         .bind(search_event_id)
         .fetch_all(&self.pool)
@@ -162,7 +159,10 @@ mod tests {
 
         let different_query = "comedy movies";
         let hash3 = QueryLog::hash_query(different_query);
-        assert_ne!(hash1, hash3, "Different queries should produce different hashes");
+        assert_ne!(
+            hash1, hash3,
+            "Different queries should produce different hashes"
+        );
     }
 
     #[test]
@@ -177,7 +177,10 @@ mod tests {
 
         let different_user = "user456";
         let hash3 = QueryLog::anonymize_user_id(different_user);
-        assert_ne!(hash1, hash3, "Different user IDs should produce different hashes");
+        assert_ne!(
+            hash1, hash3,
+            "Different user IDs should produce different hashes"
+        );
     }
 
     #[tokio::test]
@@ -288,18 +291,21 @@ mod tests {
 
     // Test helpers
     async fn setup_test_db() -> PgPool {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost/media_gateway_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url)
             .await
             .expect("Failed to connect to test database");
 
         // Run migrations
-        sqlx::query(include_str!("../../migrations/20251206_search_analytics.sql"))
-            .execute(&pool)
-            .await
-            .expect("Failed to run migrations");
+        sqlx::query(include_str!(
+            "../../migrations/20251206_search_analytics.sql"
+        ))
+        .execute(&pool)
+        .await
+        .expect("Failed to run migrations");
 
         pool
     }

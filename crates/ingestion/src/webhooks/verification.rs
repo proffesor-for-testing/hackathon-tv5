@@ -1,8 +1,8 @@
 //! HMAC signature verification for webhooks
 
+use crate::webhooks::{WebhookError, WebhookResult};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
-use crate::webhooks::{WebhookError, WebhookResult};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -15,11 +15,7 @@ type HmacSha256 = Hmac<Sha256>;
 ///
 /// # Returns
 /// True if signature is valid, false otherwise
-pub fn verify_hmac_signature(
-    payload: &[u8],
-    signature: &str,
-    secret: &str,
-) -> WebhookResult<bool> {
+pub fn verify_hmac_signature(payload: &[u8], signature: &str, secret: &str) -> WebhookResult<bool> {
     // Parse signature format: "sha256=hexstring"
     let signature_hex = signature
         .strip_prefix("sha256=")
@@ -104,7 +100,10 @@ mod tests {
 
         let result = verify_hmac_signature(payload, "abcd1234", secret);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), WebhookError::InvalidSignature(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            WebhookError::InvalidSignature(_)
+        ));
     }
 
     #[test]
@@ -114,7 +113,10 @@ mod tests {
 
         let result = verify_hmac_signature(payload, "sha256=invalid_hex", secret);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), WebhookError::InvalidSignature(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            WebhookError::InvalidSignature(_)
+        ));
     }
 
     #[test]

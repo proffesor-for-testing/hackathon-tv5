@@ -6,7 +6,9 @@
 
 use actix_web::{test, web, App};
 use chrono::{Duration, Utc};
-use media_gateway_ingestion::normalizer::{AvailabilityInfo, CanonicalContent, ContentType, ImageSet};
+use media_gateway_ingestion::normalizer::{
+    AvailabilityInfo, CanonicalContent, ContentType, ImageSet,
+};
 use media_gateway_ingestion::repository::{ContentRepository, PostgresContentRepository};
 use serde_json::Value;
 use sqlx::postgres::PgPoolOptions;
@@ -42,7 +44,10 @@ fn create_expiring_content(
     expires_in_days: i64,
 ) -> CanonicalContent {
     let mut external_ids = HashMap::new();
-    external_ids.insert("imdb".to_string(), format!("tt{}", Uuid::new_v4().as_u128() % 10000000));
+    external_ids.insert(
+        "imdb".to_string(),
+        format!("tt{}", Uuid::new_v4().as_u128() % 10000000),
+    );
 
     let expires_at = Utc::now() + Duration::days(expires_in_days);
 
@@ -91,14 +96,16 @@ async fn test_get_expiring_content_default_params() {
 
     // Create content expiring in 5 days
     let content = create_expiring_content("API Test Movie", "netflix", "US", 5);
-    let content_id = repo.upsert(&content).await.expect("Failed to insert content");
+    let content_id = repo
+        .upsert(&content)
+        .await
+        .expect("Failed to insert content");
 
     // Create test app
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(pool.clone()))
-            .route("/api/v1/content/expiring", web::get().to(handlers::get_expiring_content))
-    )
+    let app = test::init_service(App::new().app_data(web::Data::new(pool.clone())).route(
+        "/api/v1/content/expiring",
+        web::get().to(handlers::get_expiring_content),
+    ))
     .await;
 
     // Make request
@@ -116,9 +123,9 @@ async fn test_get_expiring_content_default_params() {
     assert_eq!(body["window_days"].as_i64().unwrap(), 7); // Default is 7 days
 
     let items = body["items"].as_array().expect("items should be array");
-    let found = items.iter().any(|item| {
-        item["content_id"].as_str().unwrap() == content_id.to_string()
-    });
+    let found = items
+        .iter()
+        .any(|item| item["content_id"].as_str().unwrap() == content_id.to_string());
 
     assert!(found, "Should find our test content");
 
@@ -134,14 +141,16 @@ async fn test_get_expiring_content_custom_days() {
 
     // Create content expiring in 5 days
     let content = create_expiring_content("Custom Days Movie", "netflix", "US", 5);
-    let content_id = repo.upsert(&content).await.expect("Failed to insert content");
+    let content_id = repo
+        .upsert(&content)
+        .await
+        .expect("Failed to insert content");
 
     // Create test app
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(pool.clone()))
-            .route("/api/v1/content/expiring", web::get().to(handlers::get_expiring_content))
-    )
+    let app = test::init_service(App::new().app_data(web::Data::new(pool.clone())).route(
+        "/api/v1/content/expiring",
+        web::get().to(handlers::get_expiring_content),
+    ))
     .await;
 
     // Request with 10 days window (should find content)
@@ -156,9 +165,9 @@ async fn test_get_expiring_content_custom_days() {
     assert_eq!(body["window_days"].as_i64().unwrap(), 10);
 
     let items = body["items"].as_array().expect("items should be array");
-    let found = items.iter().any(|item| {
-        item["content_id"].as_str().unwrap() == content_id.to_string()
-    });
+    let found = items
+        .iter()
+        .any(|item| item["content_id"].as_str().unwrap() == content_id.to_string());
 
     assert!(found, "Should find content with 10-day window");
 
@@ -176,15 +185,20 @@ async fn test_get_expiring_content_platform_filter() {
     let netflix_content = create_expiring_content("Netflix Movie", "netflix", "US", 5);
     let disney_content = create_expiring_content("Disney Movie", "disney", "US", 5);
 
-    let netflix_id = repo.upsert(&netflix_content).await.expect("Failed to insert");
-    let disney_id = repo.upsert(&disney_content).await.expect("Failed to insert");
+    let netflix_id = repo
+        .upsert(&netflix_content)
+        .await
+        .expect("Failed to insert");
+    let disney_id = repo
+        .upsert(&disney_content)
+        .await
+        .expect("Failed to insert");
 
     // Create test app
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(pool.clone()))
-            .route("/api/v1/content/expiring", web::get().to(handlers::get_expiring_content))
-    )
+    let app = test::init_service(App::new().app_data(web::Data::new(pool.clone())).route(
+        "/api/v1/content/expiring",
+        web::get().to(handlers::get_expiring_content),
+    ))
     .await;
 
     // Request with platform filter
@@ -198,16 +212,19 @@ async fn test_get_expiring_content_platform_filter() {
     let body: Value = test::read_body_json(resp).await;
     let items = body["items"].as_array().expect("items should be array");
 
-    let has_netflix = items.iter().any(|item| {
-        item["content_id"].as_str().unwrap() == netflix_id.to_string()
-    });
+    let has_netflix = items
+        .iter()
+        .any(|item| item["content_id"].as_str().unwrap() == netflix_id.to_string());
 
-    let has_disney = items.iter().any(|item| {
-        item["content_id"].as_str().unwrap() == disney_id.to_string()
-    });
+    let has_disney = items
+        .iter()
+        .any(|item| item["content_id"].as_str().unwrap() == disney_id.to_string());
 
     assert!(has_netflix, "Should find Netflix content");
-    assert!(!has_disney, "Should not find Disney content with Netflix filter");
+    assert!(
+        !has_disney,
+        "Should not find Disney content with Netflix filter"
+    );
 
     // Cleanup
     cleanup_test_content(&pool, netflix_id).await;
@@ -228,11 +245,10 @@ async fn test_get_expiring_content_region_filter() {
     let uk_id = repo.upsert(&uk_content).await.expect("Failed to insert");
 
     // Create test app
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(pool.clone()))
-            .route("/api/v1/content/expiring", web::get().to(handlers::get_expiring_content))
-    )
+    let app = test::init_service(App::new().app_data(web::Data::new(pool.clone())).route(
+        "/api/v1/content/expiring",
+        web::get().to(handlers::get_expiring_content),
+    ))
     .await;
 
     // Request with region filter
@@ -246,13 +262,13 @@ async fn test_get_expiring_content_region_filter() {
     let body: Value = test::read_body_json(resp).await;
     let items = body["items"].as_array().expect("items should be array");
 
-    let has_us = items.iter().any(|item| {
-        item["content_id"].as_str().unwrap() == us_id.to_string()
-    });
+    let has_us = items
+        .iter()
+        .any(|item| item["content_id"].as_str().unwrap() == us_id.to_string());
 
-    let has_uk = items.iter().any(|item| {
-        item["content_id"].as_str().unwrap() == uk_id.to_string()
-    });
+    let has_uk = items
+        .iter()
+        .any(|item| item["content_id"].as_str().unwrap() == uk_id.to_string());
 
     assert!(has_us, "Should find US content");
     assert!(!has_uk, "Should not find UK content with US filter");
@@ -271,22 +287,17 @@ async fn test_get_expiring_content_limit() {
     // Create multiple expiring content items
     let mut content_ids = Vec::new();
     for i in 1..=5 {
-        let content = create_expiring_content(
-            &format!("Limit Test Movie {}", i),
-            "netflix",
-            "US",
-            5,
-        );
+        let content =
+            create_expiring_content(&format!("Limit Test Movie {}", i), "netflix", "US", 5);
         let id = repo.upsert(&content).await.expect("Failed to insert");
         content_ids.push(id);
     }
 
     // Create test app
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(pool.clone()))
-            .route("/api/v1/content/expiring", web::get().to(handlers::get_expiring_content))
-    )
+    let app = test::init_service(App::new().app_data(web::Data::new(pool.clone())).route(
+        "/api/v1/content/expiring",
+        web::get().to(handlers::get_expiring_content),
+    ))
     .await;
 
     // Request with limit
@@ -317,14 +328,16 @@ async fn test_get_expiring_content_response_format() {
 
     // Create test content
     let content = create_expiring_content("Format Test Movie", "netflix", "US", 5);
-    let content_id = repo.upsert(&content).await.expect("Failed to insert content");
+    let content_id = repo
+        .upsert(&content)
+        .await
+        .expect("Failed to insert content");
 
     // Create test app
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(pool.clone()))
-            .route("/api/v1/content/expiring", web::get().to(handlers::get_expiring_content))
-    )
+    let app = test::init_service(App::new().app_data(web::Data::new(pool.clone())).route(
+        "/api/v1/content/expiring",
+        web::get().to(handlers::get_expiring_content),
+    ))
     .await;
 
     // Make request

@@ -25,7 +25,9 @@ pub fn score_canonical_content(content: &CanonicalContent, weights: &super::Qual
     if content.user_rating.is_some() {
         score += weights.has_imdb_rating;
     }
-    if content.external_ids.get("imdb_id").is_some() || content.external_ids.get("tmdb_id").is_some() {
+    if content.external_ids.get("imdb_id").is_some()
+        || content.external_ids.get("tmdb_id").is_some()
+    {
         score += weights.has_external_ids;
     }
 
@@ -39,7 +41,8 @@ pub fn score_canonical_with_decay(
 ) -> f32 {
     let base_score = score_canonical_content(content, weights);
     let freshness_factor = calculate_freshness(last_updated);
-    let final_score = base_score * (1.0 - weights.freshness_weight) + freshness_factor * weights.freshness_weight;
+    let final_score =
+        base_score * (1.0 - weights.freshness_weight) + freshness_factor * weights.freshness_weight;
     final_score.clamp(0.0, 1.0)
 }
 
@@ -74,7 +77,9 @@ pub fn identify_missing_fields_canonical(content: &CanonicalContent) -> Vec<Stri
     if content.user_rating.is_none() {
         missing.push("user_rating".to_string());
     }
-    if content.external_ids.get("imdb_id").is_none() && content.external_ids.get("tmdb_id").is_none() {
+    if content.external_ids.get("imdb_id").is_none()
+        && content.external_ids.get("tmdb_id").is_none()
+    {
         missing.push("external_ids".to_string());
     }
 
@@ -84,7 +89,7 @@ pub fn identify_missing_fields_canonical(content: &CanonicalContent) -> Vec<Stri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::normalizer::{CanonicalContent, ContentType, ImageSet, AvailabilityInfo};
+    use crate::normalizer::{AvailabilityInfo, CanonicalContent, ContentType, ImageSet};
     use crate::quality::QualityWeights;
     use std::collections::HashMap;
 

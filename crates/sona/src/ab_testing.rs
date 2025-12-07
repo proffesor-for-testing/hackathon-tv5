@@ -68,7 +68,9 @@ pub enum ExperimentStatus {
 }
 
 impl Default for ExperimentStatus {
-    fn default() -> Self { Self::Draft }
+    fn default() -> Self {
+        Self::Draft
+    }
 }
 
 /// Experiment configuration
@@ -146,13 +148,18 @@ impl ABTestingService {
 
     /// Create a new experiment
     #[instrument(skip(self))]
-    pub async fn create_experiment(&self, name: &str, description: Option<&str>, traffic_allocation: f64) -> Result<Experiment> {
+    pub async fn create_experiment(
+        &self,
+        name: &str,
+        description: Option<&str>,
+        traffic_allocation: f64,
+    ) -> Result<Experiment> {
         let experiment = sqlx::query_as::<_, Experiment>(
             r#"
             INSERT INTO experiments (name, description, traffic_allocation)
             VALUES ($1, $2, $3)
             RETURNING id, name, description, status, traffic_allocation, created_at, updated_at
-            "#
+            "#,
         )
         .bind(name)
         .bind(description)
@@ -167,13 +174,19 @@ impl ABTestingService {
 
     /// Add variant to experiment
     #[instrument(skip(self))]
-    pub async fn add_variant(&self, experiment_id: Uuid, name: &str, weight: f64, config: serde_json::Value) -> Result<Variant> {
+    pub async fn add_variant(
+        &self,
+        experiment_id: Uuid,
+        name: &str,
+        weight: f64,
+        config: serde_json::Value,
+    ) -> Result<Variant> {
         let variant = sqlx::query_as::<_, Variant>(
             r#"
             INSERT INTO experiment_variants (experiment_id, name, weight, config)
             VALUES ($1, $2, $3, $4)
             RETURNING id, experiment_id, name, weight, config
-            "#
+            "#,
         )
         .bind(experiment_id)
         .bind(name)
@@ -285,7 +298,7 @@ impl ABTestingService {
     /// Get variant by ID
     async fn get_variant_by_id(&self, variant_id: Uuid) -> Result<Variant> {
         sqlx::query_as::<_, Variant>(
-            "SELECT id, experiment_id, name, weight, config FROM experiment_variants WHERE id = $1"
+            "SELECT id, experiment_id, name, weight, config FROM experiment_variants WHERE id = $1",
         )
         .bind(variant_id)
         .fetch_one(&self.pool)
@@ -295,7 +308,12 @@ impl ABTestingService {
 
     /// Record exposure (user saw recommendation with variant)
     #[instrument(skip(self))]
-    pub async fn record_exposure(&self, experiment_id: Uuid, variant_id: Uuid, user_id: Uuid) -> Result<()> {
+    pub async fn record_exposure(
+        &self,
+        experiment_id: Uuid,
+        variant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<()> {
         sqlx::query(
             "INSERT INTO experiment_metrics (experiment_id, variant_id, user_id, metric_name, metric_value) VALUES ($1, $2, $3, 'exposure', 1.0)"
         )
@@ -312,7 +330,14 @@ impl ABTestingService {
 
     /// Record conversion (user clicked/watched recommended content)
     #[instrument(skip(self))]
-    pub async fn record_conversion(&self, experiment_id: Uuid, variant_id: Uuid, user_id: Uuid, metric_name: &str, value: f64) -> Result<()> {
+    pub async fn record_conversion(
+        &self,
+        experiment_id: Uuid,
+        variant_id: Uuid,
+        user_id: Uuid,
+        metric_name: &str,
+        value: f64,
+    ) -> Result<()> {
         sqlx::query(
             "INSERT INTO experiment_metrics (experiment_id, variant_id, user_id, metric_name, metric_value) VALUES ($1, $2, $3, $4, $5)"
         )
@@ -360,7 +385,11 @@ impl ABTestingService {
             .fetch_one(&self.pool)
             .await?;
 
-            let conversion_rate = if exposures.0 > 0 { conversions.0 as f64 / exposures.0 as f64 } else { 0.0 };
+            let conversion_rate = if exposures.0 > 0 {
+                conversions.0 as f64 / exposures.0 as f64
+            } else {
+                0.0
+            };
 
             variant_metrics.push(VariantMetrics {
                 variant_id: variant.id,
@@ -372,7 +401,10 @@ impl ABTestingService {
             });
         }
 
-        Ok(ExperimentMetrics { experiment_id, variant_metrics })
+        Ok(ExperimentMetrics {
+            experiment_id,
+            variant_metrics,
+        })
     }
 }
 
@@ -383,38 +415,77 @@ mod tests {
     #[test]
     fn test_consistent_hashing() {
         let variants = vec![
-            Variant { id: Uuid::new_v4(), experiment_id: Uuid::new_v4(), name: "control".to_string(), weight: 0.5, config: serde_json::json!({}) },
-            Variant { id: Uuid::new_v4(), experiment_id: Uuid::new_v4(), name: "treatment".to_string(), weight: 0.5, config: serde_json::json!({}) },
+            Variant {
+                id: Uuid::new_v4(),
+                experiment_id: Uuid::new_v4(),
+                name: "control".to_string(),
+                weight: 0.5,
+                config: serde_json::json!({}),
+            },
+            Variant {
+                id: Uuid::new_v4(),
+                experiment_id: Uuid::new_v4(),
+                name: "treatment".to_string(),
+                weight: 0.5,
+                config: serde_json::json!({}),
+            },
         ];
 
         let user_id = Uuid::new_v4();
-        let service = ABTestingService { pool: unsafe { std::mem::zeroed() } }; // Note: only for hash test
+        let service = ABTestingService {
+            pool: unsafe { std::mem::zeroed() },
+        }; // Note: only for hash test
 
         // Same user should always get same variant
         let v1 = service.select_variant_by_hash(&variants, user_id);
         let v2 = service.select_variant_by_hash(&variants, user_id);
-        assert_eq!(v1.id, v2.id, "Consistent hashing should return same variant");
+        assert_eq!(
+            v1.id, v2.id,
+            "Consistent hashing should return same variant"
+        );
     }
 
     #[test]
     fn test_weight_distribution() {
         let variants = vec![
-            Variant { id: Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(), experiment_id: Uuid::new_v4(), name: "control".to_string(), weight: 0.8, config: serde_json::json!({}) },
-            Variant { id: Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap(), experiment_id: Uuid::new_v4(), name: "treatment".to_string(), weight: 0.2, config: serde_json::json!({}) },
+            Variant {
+                id: Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
+                experiment_id: Uuid::new_v4(),
+                name: "control".to_string(),
+                weight: 0.8,
+                config: serde_json::json!({}),
+            },
+            Variant {
+                id: Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap(),
+                experiment_id: Uuid::new_v4(),
+                name: "treatment".to_string(),
+                weight: 0.2,
+                config: serde_json::json!({}),
+            },
         ];
 
-        let service = ABTestingService { pool: unsafe { std::mem::zeroed() } };
+        let service = ABTestingService {
+            pool: unsafe { std::mem::zeroed() },
+        };
         let mut control_count = 0;
         let mut treatment_count = 0;
 
         for i in 0..1000 {
             let user_id = Uuid::new_v5(&Uuid::NAMESPACE_DNS, format!("user{}", i).as_bytes());
             let selected = service.select_variant_by_hash(&variants, user_id);
-            if selected.name == "control" { control_count += 1; } else { treatment_count += 1; }
+            if selected.name == "control" {
+                control_count += 1;
+            } else {
+                treatment_count += 1;
+            }
         }
 
         // Should be roughly 80/20 split (with some variance)
         let control_ratio = control_count as f64 / 1000.0;
-        assert!(control_ratio > 0.7 && control_ratio < 0.9, "Control should be ~80%, got {}", control_ratio);
+        assert!(
+            control_ratio > 0.7 && control_ratio < 0.9,
+            "Control should be ~80%, got {}",
+            control_ratio
+        );
     }
 }

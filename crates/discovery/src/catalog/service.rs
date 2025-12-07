@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
 use chrono::Utc;
-use qdrant_client::qdrant::PointStruct;
+use qdrant_client::qdrant::{PointStruct, UpsertPointsBuilder};
 use qdrant_client::Qdrant;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::ClientConfig;
 use serde_json::json;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -57,7 +57,7 @@ impl CatalogService {
         let now = Utc::now();
         let content_type_str = content_type_to_string(&request.content_type);
 
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             INSERT INTO content (
                 id, content_type, title, overview, release_date, runtime_minutes,
@@ -66,58 +66,60 @@ impl CatalogService {
             VALUES ($1, $2, $3, $4, $5, $6, 0.5, 0.0, 0, $7, $7)
             RETURNING id, created_at, last_updated
             "#,
-            content_id,
-            content_type_str,
-            request.title,
-            request.overview,
-            request.release_year.map(|y| format!("{}-01-01", y)),
-            request.runtime_minutes,
-            now
         )
+        .bind(content_id)
+        .bind(content_type_str)
+        .bind(&request.title)
+        .bind(&request.overview)
+        .bind(request.release_year.map(|y| format!("{}-01-01", y)))
+        .bind(request.runtime_minutes)
+        .bind(now)
         .fetch_one(&self.db_pool)
         .await?;
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO platform_ids (content_id, platform, platform_content_id)
             VALUES ($1, $2, $3)
             "#,
-            content_id,
-            request.platform,
-            request.platform_content_id
         )
+        .bind(content_id)
+        .bind(&request.platform)
+        .bind(&request.platform_content_id)
         .execute(&self.db_pool)
         .await?;
 
         for genre in &request.genres {
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO content_genres (content_id, genre)
                 VALUES ($1, $2)
                 ON CONFLICT DO NOTHING
                 "#,
-                content_id,
-                genre
             )
+            .bind(content_id)
+            .bind(genre)
             .execute(&self.db_pool)
             .await?;
         }
 
         if let Some(rating) = &request.rating {
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO content_ratings (content_id, region, rating)
                 VALUES ($1, 'US', $2)
                 ON CONFLICT DO NOTHING
                 "#,
-                content_id,
-                rating
             )
+            .bind(content_id)
+            .bind(rating)
             .execute(&self.db_pool)
             .await?;
         }
 
-        let embedding = self.generate_embedding(&request.title, request.overview.as_deref()).await?;
+        let embedding = self
+            .generate_embedding(&request.title, request.overview.as_deref())
+            .await?;
         self.upsert_to_qdrant(content_id, &request.title, &request.genres, &embedding)
             .await?;
 
@@ -136,14 +138,14 @@ impl CatalogService {
             genres: request.genres,
             rating: request.rating,
             images: request.images,
-            created_at: result.created_at.unwrap_or(now),
-            updated_at: result.last_updated.unwrap_or(now),
+            created_at: result.try_get("created_at").unwrap_or(now),
+            updated_at: result.try_get("last_updated").unwrap_or(now),
             deleted_at: None,
         })
     }
 
     pub async fn get_content(&self, id: Uuid) -> Result<Option<ContentResponse>> {
-        let record = sqlx::query!(
+        let record = sqlx::query(
             r#"
             SELECT
                 c.id,
@@ -156,7 +158,7 @@ impl CatalogService {
                 c.last_updated,
                 p.platform,
                 p.platform_content_id,
-                ARRAY_AGG(DISTINCT g.genre) FILTER (WHERE g.genre IS NOT NULL) as "genres!: Vec<String>",
+                ARRAY_AGG(DISTINCT g.genre) FILTER (WHERE g.genre IS NOT NULL) as genres,
                 r.rating
             FROM content c
             LEFT JOIN platform_ids p ON c.id = p.content_id
@@ -167,25 +169,25 @@ impl CatalogService {
                      c.runtime_minutes, c.created_at, c.last_updated,
                      p.platform, p.platform_content_id, r.rating
             "#,
-            id
         )
+        .bind(id)
         .fetch_optional(&self.db_pool)
         .await?;
 
         Ok(record.map(|r| ContentResponse {
-            id: r.id,
-            title: r.title,
-            content_type: parse_content_type(&r.content_type),
-            platform: r.platform.unwrap_or_default(),
-            platform_content_id: r.platform_content_id.unwrap_or_default(),
-            overview: r.overview,
-            release_year: r.release_year,
-            runtime_minutes: r.runtime_minutes,
-            genres: r.genres,
-            rating: r.rating,
+            id: r.try_get("id").unwrap(),
+            title: r.try_get("title").unwrap(),
+            content_type: parse_content_type(&r.try_get::<String, _>("content_type").unwrap()),
+            platform: r.try_get("platform").unwrap_or_default(),
+            platform_content_id: r.try_get("platform_content_id").unwrap_or_default(),
+            overview: r.try_get("overview").ok(),
+            release_year: r.try_get("release_year").ok(),
+            runtime_minutes: r.try_get("runtime_minutes").ok(),
+            genres: r.try_get::<Vec<String>, _>("genres").unwrap_or_default(),
+            rating: r.try_get("rating").ok(),
             images: ImageSet::default(),
-            created_at: r.created_at.unwrap_or_else(Utc::now),
-            updated_at: r.last_updated.unwrap_or_else(Utc::now),
+            created_at: r.try_get("created_at").unwrap_or_else(|_| Utc::now()),
+            updated_at: r.try_get("last_updated").unwrap_or_else(|_| Utc::now()),
             deleted_at: None,
         }))
     }
@@ -204,7 +206,7 @@ impl CatalogService {
         let overview = request.overview.clone().or(existing.overview.clone());
 
         if request.title.is_some() || request.overview.is_some() {
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 UPDATE content
                 SET title = COALESCE($1, title),
@@ -212,49 +214,49 @@ impl CatalogService {
                     last_updated = $3
                 WHERE id = $4
                 "#,
-                request.title,
-                request.overview,
-                Utc::now(),
-                id
             )
+            .bind(&request.title)
+            .bind(&request.overview)
+            .bind(Utc::now())
+            .bind(id)
             .execute(&self.db_pool)
             .await?;
         }
 
         if let Some(genres) = &request.genres {
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 DELETE FROM content_genres WHERE content_id = $1
                 "#,
-                id
             )
+            .bind(id)
             .execute(&self.db_pool)
             .await?;
 
             for genre in genres {
-                sqlx::query!(
+                sqlx::query(
                     r#"
                     INSERT INTO content_genres (content_id, genre)
                     VALUES ($1, $2)
                     "#,
-                    id,
-                    genre
                 )
+                .bind(id)
+                .bind(genre)
                 .execute(&self.db_pool)
                 .await?;
             }
         }
 
         if let Some(rating) = &request.rating {
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO content_ratings (content_id, region, rating)
                 VALUES ($1, 'US', $2)
                 ON CONFLICT (content_id, region) DO UPDATE SET rating = $2
                 "#,
-                id,
-                rating
             )
+            .bind(id)
+            .bind(rating)
             .execute(&self.db_pool)
             .await?;
         }
@@ -277,15 +279,15 @@ impl CatalogService {
             .await?
             .ok_or_else(|| anyhow!("Content not found"))?;
 
-        sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE content
             SET last_updated = $1
             WHERE id = $2
             "#,
-            Utc::now(),
-            id
         )
+        .bind(Utc::now())
+        .bind(id)
         .execute(&self.db_pool)
         .await?;
 
@@ -297,11 +299,7 @@ impl CatalogService {
         Ok(())
     }
 
-    pub async fn update_availability(
-        &self,
-        id: Uuid,
-        update: AvailabilityUpdate,
-    ) -> Result<()> {
+    pub async fn update_availability(&self, id: Uuid, update: AvailabilityUpdate) -> Result<()> {
         let content = self
             .get_content(id)
             .await?
@@ -318,7 +316,7 @@ impl CatalogService {
                 "free"
             };
 
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO platform_availability (
                     content_id, platform, region, availability_type,
@@ -327,14 +325,19 @@ impl CatalogService {
                 )
                 VALUES ($1, $2, $3, $4, $5, 'USD', '', '', $6, $7)
                 "#,
-                id,
-                content.platform,
-                region,
-                availability_type,
-                update.purchase_price.or(update.rental_price).map(|p| (p * 100.0) as i32),
-                update.available_from.unwrap_or_else(Utc::now),
-                update.available_until
             )
+            .bind(id)
+            .bind(&content.platform)
+            .bind(region)
+            .bind(availability_type)
+            .bind(
+                update
+                    .purchase_price
+                    .or(update.rental_price)
+                    .map(|p| (p * 100.0) as i32),
+            )
+            .bind(update.available_from.unwrap_or_else(Utc::now))
+            .bind(update.available_until)
             .execute(&self.db_pool)
             .await?;
         }
@@ -396,14 +399,17 @@ impl CatalogService {
         );
 
         self.qdrant_client
-            .upsert_points(&self.qdrant_collection, vec![point], None)
+            .upsert_points(UpsertPointsBuilder::new(
+                &self.qdrant_collection,
+                vec![point],
+            ))
             .await?;
 
         Ok(())
     }
 
     async fn remove_from_qdrant(&self, id: Uuid) -> Result<()> {
-        use qdrant_client::qdrant::{PointId, DeletePointsBuilder};
+        use qdrant_client::qdrant::{DeletePointsBuilder, PointId};
 
         let points = vec![PointId {
             point_id_options: Some(qdrant_client::qdrant::point_id::PointIdOptions::Uuid(
@@ -412,10 +418,7 @@ impl CatalogService {
         }];
 
         self.qdrant_client
-            .delete_points(
-                DeletePointsBuilder::new(&self.qdrant_collection)
-                    .points(points)
-            )
+            .delete_points(DeletePointsBuilder::new(&self.qdrant_collection).points(points))
             .await?;
 
         Ok(())
@@ -436,7 +439,9 @@ impl CatalogService {
                 .key(&key)
                 .payload(&payload);
 
-            producer.send(record, std::time::Duration::from_secs(0)).await
+            producer
+                .send(record, std::time::Duration::from_secs(0))
+                .await
                 .map_err(|e| anyhow!("Failed to send Kafka event: {:?}", e))?;
         }
 

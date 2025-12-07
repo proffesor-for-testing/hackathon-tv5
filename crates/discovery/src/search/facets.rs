@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, instrument};
 
-use super::{SearchResult, ContentSummary};
+use super::{ContentSummary, SearchResult};
 
 /// A single facet count
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,10 +30,18 @@ pub struct FacetResults {
 }
 
 #[derive(Debug, Clone)]
-pub struct YearBucket { pub label: String, pub min_year: i32, pub max_year: i32 }
+pub struct YearBucket {
+    pub label: String,
+    pub min_year: i32,
+    pub max_year: i32,
+}
 
 #[derive(Debug, Clone)]
-pub struct RatingBucket { pub label: String, pub min_rating: f32, pub max_rating: f32 }
+pub struct RatingBucket {
+    pub label: String,
+    pub min_rating: f32,
+    pub max_rating: f32,
+}
 
 /// Facet service for computing aggregations
 pub struct FacetService {
@@ -51,27 +59,75 @@ impl FacetService {
         }
     }
 
-    pub fn with_config(year_buckets: Vec<YearBucket>, rating_buckets: Vec<RatingBucket>, max_facets: usize) -> Self {
-        Self { year_buckets, rating_buckets, max_facets }
+    pub fn with_config(
+        year_buckets: Vec<YearBucket>,
+        rating_buckets: Vec<RatingBucket>,
+        max_facets: usize,
+    ) -> Self {
+        Self {
+            year_buckets,
+            rating_buckets,
+            max_facets,
+        }
     }
 
     fn default_year_buckets() -> Vec<YearBucket> {
         vec![
-            YearBucket { label: "2020s".to_string(), min_year: 2020, max_year: 2029 },
-            YearBucket { label: "2010s".to_string(), min_year: 2010, max_year: 2019 },
-            YearBucket { label: "2000s".to_string(), min_year: 2000, max_year: 2009 },
-            YearBucket { label: "1990s".to_string(), min_year: 1990, max_year: 1999 },
-            YearBucket { label: "1980s".to_string(), min_year: 1980, max_year: 1989 },
-            YearBucket { label: "Classic (pre-1980)".to_string(), min_year: 0, max_year: 1979 },
+            YearBucket {
+                label: "2020s".to_string(),
+                min_year: 2020,
+                max_year: 2029,
+            },
+            YearBucket {
+                label: "2010s".to_string(),
+                min_year: 2010,
+                max_year: 2019,
+            },
+            YearBucket {
+                label: "2000s".to_string(),
+                min_year: 2000,
+                max_year: 2009,
+            },
+            YearBucket {
+                label: "1990s".to_string(),
+                min_year: 1990,
+                max_year: 1999,
+            },
+            YearBucket {
+                label: "1980s".to_string(),
+                min_year: 1980,
+                max_year: 1989,
+            },
+            YearBucket {
+                label: "Classic (pre-1980)".to_string(),
+                min_year: 0,
+                max_year: 1979,
+            },
         ]
     }
 
     fn default_rating_buckets() -> Vec<RatingBucket> {
         vec![
-            RatingBucket { label: "Excellent (8-10)".to_string(), min_rating: 8.0, max_rating: 10.0 },
-            RatingBucket { label: "Good (7-8)".to_string(), min_rating: 7.0, max_rating: 8.0 },
-            RatingBucket { label: "Average (5-7)".to_string(), min_rating: 5.0, max_rating: 7.0 },
-            RatingBucket { label: "Below Average (0-5)".to_string(), min_rating: 0.0, max_rating: 5.0 },
+            RatingBucket {
+                label: "Excellent (8-10)".to_string(),
+                min_rating: 8.0,
+                max_rating: 10.0,
+            },
+            RatingBucket {
+                label: "Good (7-8)".to_string(),
+                min_rating: 7.0,
+                max_rating: 8.0,
+            },
+            RatingBucket {
+                label: "Average (5-7)".to_string(),
+                min_rating: 5.0,
+                max_rating: 7.0,
+            },
+            RatingBucket {
+                label: "Below Average (0-5)".to_string(),
+                min_rating: 0.0,
+                max_rating: 5.0,
+            },
         ]
     }
 
@@ -100,7 +156,11 @@ impl FacetService {
             facets.insert("ratings".to_string(), ratings);
         }
 
-        debug!(elapsed_ms = start.elapsed().as_millis(), facet_count = facets.len(), "Computed facets");
+        debug!(
+            elapsed_ms = start.elapsed().as_millis(),
+            facet_count = facets.len(),
+            "Computed facets"
+        );
         facets
     }
 
@@ -113,14 +173,29 @@ impl FacetService {
         let years = self.compute_year_facets(results);
         let ratings = self.compute_rating_facets(results);
         debug!(elapsed_ms = start.elapsed().as_millis(), "Computed facets");
-        FacetResults { genres, platforms, years, ratings }
+        FacetResults {
+            genres,
+            platforms,
+            years,
+            ratings,
+        }
     }
 
-    pub fn compute_facets_from_content(&self, content: &[ContentSummary]) -> HashMap<String, Vec<FacetCount>> {
-        let results: Vec<SearchResult> = content.iter().map(|c| SearchResult {
-            content: c.clone(), relevance_score: 0.0, match_reasons: vec![],
-            vector_similarity: None, graph_score: None, keyword_score: None,
-        }).collect();
+    pub fn compute_facets_from_content(
+        &self,
+        content: &[ContentSummary],
+    ) -> HashMap<String, Vec<FacetCount>> {
+        let results: Vec<SearchResult> = content
+            .iter()
+            .map(|c| SearchResult {
+                content: c.clone(),
+                relevance_score: 0.0,
+                match_reasons: vec![],
+                vector_similarity: None,
+                graph_score: None,
+                keyword_score: None,
+            })
+            .collect();
         self.compute_facets(&results)
     }
 
@@ -155,9 +230,16 @@ impl FacetService {
                 }
             }
         }
-        self.year_buckets.iter()
-            .filter_map(|bucket| bucket_counts.get(&bucket.label).map(|&count| FacetCount { value: bucket.label.clone(), count }))
-            .filter(|f| f.count > 0).collect()
+        self.year_buckets
+            .iter()
+            .filter_map(|bucket| {
+                bucket_counts.get(&bucket.label).map(|&count| FacetCount {
+                    value: bucket.label.clone(),
+                    count,
+                })
+            })
+            .filter(|f| f.count > 0)
+            .collect()
     }
 
     fn compute_rating_facets(&self, results: &[SearchResult]) -> Vec<FacetCount> {
@@ -171,14 +253,23 @@ impl FacetService {
                 }
             }
         }
-        self.rating_buckets.iter()
-            .filter_map(|bucket| bucket_counts.get(&bucket.label).map(|&count| FacetCount { value: bucket.label.clone(), count }))
-            .filter(|f| f.count > 0).collect()
+        self.rating_buckets
+            .iter()
+            .filter_map(|bucket| {
+                bucket_counts.get(&bucket.label).map(|&count| FacetCount {
+                    value: bucket.label.clone(),
+                    count,
+                })
+            })
+            .filter(|f| f.count > 0)
+            .collect()
     }
 
     fn to_sorted_facets(&self, counts: HashMap<String, usize>) -> Vec<FacetCount> {
-        let mut facets: Vec<FacetCount> = counts.into_iter()
-            .map(|(value, count)| FacetCount { value, count }).collect();
+        let mut facets: Vec<FacetCount> = counts
+            .into_iter()
+            .map(|(value, count)| FacetCount { value, count })
+            .collect();
         facets.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.value.cmp(&b.value)));
         facets.truncate(self.max_facets);
         facets
@@ -186,7 +277,9 @@ impl FacetService {
 }
 
 impl Default for FacetService {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -194,14 +287,27 @@ mod tests {
     use super::*;
     use uuid::Uuid;
 
-    fn create_test_result(genres: Vec<&str>, platforms: Vec<&str>, year: i32, popularity: f32) -> SearchResult {
+    fn create_test_result(
+        genres: Vec<&str>,
+        platforms: Vec<&str>,
+        year: i32,
+        popularity: f32,
+    ) -> SearchResult {
         SearchResult {
             content: ContentSummary {
-                id: Uuid::new_v4(), title: "Test".to_string(), overview: "Desc".to_string(),
-                release_year: year, genres: genres.into_iter().map(String::from).collect(),
-                platforms: platforms.into_iter().map(String::from).collect(), popularity_score: popularity,
+                id: Uuid::new_v4(),
+                title: "Test".to_string(),
+                overview: "Desc".to_string(),
+                release_year: year,
+                genres: genres.into_iter().map(String::from).collect(),
+                platforms: platforms.into_iter().map(String::from).collect(),
+                popularity_score: popularity,
             },
-            relevance_score: 0.8, match_reasons: vec![], vector_similarity: None, graph_score: None, keyword_score: None,
+            relevance_score: 0.8,
+            match_reasons: vec![],
+            vector_similarity: None,
+            graph_score: None,
+            keyword_score: None,
         }
     }
 
@@ -238,10 +344,20 @@ mod tests {
         let platforms = ["Netflix", "Hulu", "Disney+", "HBO Max"];
         let mut results = Vec::new();
         for i in 0..1000 {
-            results.push(create_test_result(vec![genres[i % genres.len()]], vec![platforms[i % platforms.len()]], 2000 + (i % 25) as i32, (i % 100) as f32 / 100.0));
+            results.push(create_test_result(
+                vec![genres[i % genres.len()]],
+                vec![platforms[i % platforms.len()]],
+                2000 + (i % 25) as i32,
+                (i % 100) as f32 / 100.0,
+            ));
         }
         let start = std::time::Instant::now();
-        for _ in 0..100 { let _ = service.compute_facets(&results); }
-        assert!(start.elapsed().as_millis() < 500, "Facet computation too slow");
+        for _ in 0..100 {
+            let _ = service.compute_facets(&results);
+        }
+        assert!(
+            start.elapsed().as_millis() < 500,
+            "Facet computation too slow"
+        );
     }
 }

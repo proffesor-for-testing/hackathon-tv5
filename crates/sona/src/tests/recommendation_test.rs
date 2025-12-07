@@ -86,9 +86,13 @@ fn test_explanation_generation_content_based() {
         explanation: "Because you watched The Matrix and Inception".to_string(),
         generated_at: Utc::now(),
         ttl_seconds: 3600,
+        experiment_variant: None,
     };
 
-    assert_eq!(recommendation.recommendation_type, RecommendationType::ContentBased);
+    assert_eq!(
+        recommendation.recommendation_type,
+        RecommendationType::ContentBased
+    );
     assert_eq!(recommendation.based_on.len(), 2);
     assert!(recommendation.explanation.contains("Because you watched"));
 }
@@ -103,9 +107,13 @@ fn test_explanation_generation_collaborative() {
         explanation: "Users with similar taste also enjoyed this".to_string(),
         generated_at: Utc::now(),
         ttl_seconds: 3600,
+        experiment_variant: None,
     };
 
-    assert_eq!(recommendation.recommendation_type, RecommendationType::Collaborative);
+    assert_eq!(
+        recommendation.recommendation_type,
+        RecommendationType::Collaborative
+    );
     assert!(recommendation.explanation.contains("similar taste"));
 }
 
@@ -119,6 +127,7 @@ fn test_recommendation_confidence_score_range() {
         explanation: String::new(),
         generated_at: Utc::now(),
         ttl_seconds: 3600,
+        experiment_variant: None,
     };
 
     assert!(high_confidence.confidence_score >= 0.0);
@@ -136,6 +145,7 @@ fn test_recommendation_ttl() {
         explanation: String::new(),
         generated_at: Utc::now(),
         ttl_seconds: 1800, // 30 minutes
+        experiment_variant: None,
     };
 
     assert_eq!(recommendation.ttl_seconds, 1800);
@@ -182,6 +192,7 @@ fn test_hybrid_recommendation_combines_sources() {
         explanation: "Combines multiple signals for better accuracy".to_string(),
         generated_at: Utc::now(),
         ttl_seconds: 3600,
+        experiment_variant: None,
     };
 
     assert_eq!(hybrid.recommendation_type, RecommendationType::Hybrid);
@@ -194,13 +205,20 @@ fn test_context_aware_recommendation() {
         content_id: Uuid::new_v4(),
         confidence_score: 0.82,
         recommendation_type: RecommendationType::ContextAware,
-        based_on: vec!["evening viewing pattern".to_string(), "weekend preference".to_string()],
+        based_on: vec![
+            "evening viewing pattern".to_string(),
+            "weekend preference".to_string(),
+        ],
         explanation: "Based on your viewing patterns at this time".to_string(),
         generated_at: Utc::now(),
         ttl_seconds: 600, // 10 minutes (context changes quickly)
+        experiment_variant: None,
     };
 
-    assert_eq!(context_rec.recommendation_type, RecommendationType::ContextAware);
+    assert_eq!(
+        context_rec.recommendation_type,
+        RecommendationType::ContextAware
+    );
     assert!(context_rec.ttl_seconds < 3600); // Context-aware should have shorter TTL
 }
 
@@ -215,6 +233,7 @@ fn test_recommendation_ranking_by_confidence() {
             explanation: String::new(),
             generated_at: Utc::now(),
             ttl_seconds: 3600,
+            experiment_variant: None,
         },
         Recommendation {
             content_id: Uuid::new_v4(),
@@ -224,6 +243,7 @@ fn test_recommendation_ranking_by_confidence() {
             explanation: String::new(),
             generated_at: Utc::now(),
             ttl_seconds: 3600,
+            experiment_variant: None,
         },
         Recommendation {
             content_id: Uuid::new_v4(),
@@ -233,6 +253,7 @@ fn test_recommendation_ranking_by_confidence() {
             explanation: String::new(),
             generated_at: Utc::now(),
             ttl_seconds: 3600,
+            experiment_variant: None,
         },
     ];
 

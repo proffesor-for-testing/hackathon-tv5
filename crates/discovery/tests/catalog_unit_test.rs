@@ -96,7 +96,10 @@ fn test_create_request_validation_empty_platform_id() {
     };
 
     assert!(request.validate().is_err());
-    assert_eq!(request.validate().unwrap_err(), "Platform content ID is required");
+    assert_eq!(
+        request.validate().unwrap_err(),
+        "Platform content ID is required"
+    );
 }
 
 #[test]

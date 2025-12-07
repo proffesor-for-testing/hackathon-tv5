@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use serde_json::json;
-use sqlx::{PgPool, Postgres, Transaction};
+use sqlx::{PgPool, Postgres, Row, Transaction};
 use uuid::Uuid;
 
 use crate::normalizer::{AvailabilityInfo, CanonicalContent, ContentType, ImageSet};
@@ -133,43 +133,48 @@ impl PostgresContentRepository {
         // Extract external IDs for conflict detection
         let eidr_id = content.external_ids.get("eidr");
         let imdb_id = content.external_ids.get("imdb");
-        let tmdb_id = content.external_ids.get("tmdb").and_then(|id| id.parse::<i32>().ok());
-        let tvdb_id = content.external_ids.get("tvdb").and_then(|id| id.parse::<i32>().ok());
+        let tmdb_id = content
+            .external_ids
+            .get("tmdb")
+            .and_then(|id| id.parse::<i32>().ok());
+        let tvdb_id = content
+            .external_ids
+            .get("tvdb")
+            .and_then(|id| id.parse::<i32>().ok());
         let gracenote_id = content.external_ids.get("gracenote");
 
         // Serialize complex types to JSONB
         let external_ids_json = serde_json::to_value(&content.external_ids)
             .context("Failed to serialize external_ids")?;
-        let genres_json = serde_json::to_value(&content.genres)
-            .context("Failed to serialize genres")?;
+        let genres_json =
+            serde_json::to_value(&content.genres).context("Failed to serialize genres")?;
         let images_json = Self::serialize_images(&content.images);
         let availability_json = Self::serialize_availability(&content.availability);
 
         let content_type_str = Self::content_type_to_string(&content.content_type);
 
         // Extract release date (convert from release_year if needed)
-        let release_date = content.release_year.map(|year| {
-            chrono::NaiveDate::from_ymd_opt(year, 1, 1)
-                .map(|d| d.and_hms_opt(0, 0, 0))
-                .flatten()
-                .map(|dt| DateTime::<Utc>::from_utc(dt, Utc))
-        }).flatten();
+        let release_date = content
+            .release_year
+            .map(|year| {
+                chrono::NaiveDate::from_ymd_opt(year, 1, 1)
+                    .map(|d| d.and_hms_opt(0, 0, 0))
+                    .flatten()
+                    .map(|dt| DateTime::<Utc>::from_utc(dt, Utc))
+            })
+            .flatten();
 
         // Try to find existing content by external IDs
         let existing_id = if let Some(eidr) = eidr_id {
-            sqlx::query_scalar::<_, Uuid>(
-                "SELECT content_id FROM external_ids WHERE eidr_id = $1"
-            )
-            .bind(eidr)
-            .fetch_optional(&mut **tx)
-            .await?
+            sqlx::query_scalar::<_, Uuid>("SELECT content_id FROM external_ids WHERE eidr_id = $1")
+                .bind(eidr)
+                .fetch_optional(&mut **tx)
+                .await?
         } else if let Some(imdb) = imdb_id {
-            sqlx::query_scalar::<_, Uuid>(
-                "SELECT content_id FROM external_ids WHERE imdb_id = $1"
-            )
-            .bind(imdb)
-            .fetch_optional(&mut **tx)
-            .await?
+            sqlx::query_scalar::<_, Uuid>("SELECT content_id FROM external_ids WHERE imdb_id = $1")
+                .bind(imdb)
+                .fetch_optional(&mut **tx)
+                .await?
         } else if let Some(year) = content.release_year {
             // Fallback: match by title + release year (within 1 year tolerance)
             sqlx::query_scalar::<_, Uuid>(
@@ -180,7 +185,7 @@ impl PostgresContentRepository {
                   AND c.content_type = $2
                   AND EXTRACT(YEAR FROM c.release_date) BETWEEN $3 AND $4
                 LIMIT 1
-                "#
+                "#,
             )
             .bind(&content.title)
             .bind(content_type_str)
@@ -214,7 +219,7 @@ impl PostgresContentRepository {
                 average_rating = EXCLUDED.average_rating,
                 vote_count = EXCLUDED.vote_count,
                 last_updated = EXCLUDED.last_updated
-            "#
+            "#,
         )
         .bind(content_id)
         .bind(content_type_str)
@@ -262,7 +267,7 @@ impl PostgresContentRepository {
             VALUES ($1, $2, $3)
             ON CONFLICT (content_id, platform) DO UPDATE SET
                 platform_content_id = EXCLUDED.platform_content_id
-            "#
+            "#,
         )
         .bind(content_id)
         .bind(&content.platform_id)
@@ -278,13 +283,11 @@ impl PostgresContentRepository {
             .await?;
 
         for genre in &content.genres {
-            sqlx::query(
-                "INSERT INTO content_genres (content_id, genre) VALUES ($1, $2)"
-            )
-            .bind(content_id)
-            .bind(genre)
-            .execute(&mut **tx)
-            .await?;
+            sqlx::query("INSERT INTO content_genres (content_id, genre) VALUES ($1, $2)")
+                .bind(content_id)
+                .bind(genre)
+                .execute(&mut **tx)
+                .await?;
         }
 
         // Upsert content rating if available
@@ -297,7 +300,7 @@ impl PostgresContentRepository {
                     ON CONFLICT (content_id, region) DO UPDATE SET
                         rating = EXCLUDED.rating,
                         advisory_notes = EXCLUDED.advisory_notes
-                    "#
+                    "#,
                 )
                 .bind(content_id)
                 .bind(region)
@@ -310,8 +313,15 @@ impl PostgresContentRepository {
 
         // Upsert platform availability
         for region in &content.availability.regions {
-            let deep_link = format!("https://{}.com/watch/{}", content.platform_id, content.platform_content_id);
-            let availability_type = if content.availability.subscription_required { "subscription" } else { "free" };
+            let deep_link = format!(
+                "https://{}.com/watch/{}",
+                content.platform_id, content.platform_content_id
+            );
+            let availability_type = if content.availability.subscription_required {
+                "subscription"
+            } else {
+                "free"
+            };
 
             // First, delete any existing availability records for this content/platform/region
             // to avoid conflicts with different availability types
@@ -333,13 +343,18 @@ impl PostgresContentRepository {
                     available_from, expires_at
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                "#
+                "#,
             )
             .bind(content_id)
             .bind(&content.platform_id)
             .bind(region)
             .bind(availability_type)
-            .bind(content.availability.purchase_price.map(|p| (p * 100.0) as i32))
+            .bind(
+                content
+                    .availability
+                    .purchase_price
+                    .map(|p| (p * 100.0) as i32),
+            )
             .bind(&content.availability.currency)
             .bind(&deep_link)
             .bind(&deep_link)
@@ -356,7 +371,11 @@ impl PostgresContentRepository {
 #[async_trait]
 impl ContentRepository for PostgresContentRepository {
     async fn upsert(&self, content: &CanonicalContent) -> Result<Uuid> {
-        let mut tx = self.pool.begin().await.context("Failed to begin transaction")?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .context("Failed to begin transaction")?;
         let content_id = Self::upsert_in_transaction(&mut tx, content).await?;
         tx.commit().await.context("Failed to commit transaction")?;
         Ok(content_id)
@@ -368,7 +387,11 @@ impl ContentRepository for PostgresContentRepository {
 
         // Process items in batches of 10
         for chunk in items.chunks(BATCH_SIZE) {
-            let mut tx = self.pool.begin().await.context("Failed to begin batch transaction")?;
+            let mut tx = self
+                .pool
+                .begin()
+                .await
+                .context("Failed to begin batch transaction")?;
             let mut batch_ids = Vec::with_capacity(chunk.len());
 
             // Process all items in this batch within the same transaction
@@ -380,7 +403,9 @@ impl ContentRepository for PostgresContentRepository {
             }
 
             // Commit this batch
-            tx.commit().await.context("Failed to commit batch transaction")?;
+            tx.commit()
+                .await
+                .context("Failed to commit batch transaction")?;
             all_ids.extend(batch_ids);
         }
 
@@ -393,7 +418,7 @@ impl ContentRepository for PostgresContentRepository {
         platform: &str,
     ) -> Result<Option<Uuid>> {
         let result = sqlx::query_scalar::<_, Uuid>(
-            "SELECT content_id FROM platform_ids WHERE platform_content_id = $1 AND platform = $2"
+            "SELECT content_id FROM platform_ids WHERE platform_content_id = $1 AND platform = $2",
         )
         .bind(platform_content_id)
         .bind(platform)
@@ -426,7 +451,7 @@ impl ContentRepository for PostgresContentRepository {
                 WHERE platform_availability.content_id = $1
                   AND platform_availability.platform = $2
                   AND platform_availability.region = $3
-                "#
+                "#,
             )
             .bind(content_id)
             .bind(platform)
@@ -443,7 +468,7 @@ impl ContentRepository for PostgresContentRepository {
                 UPDATE platform_availability
                 SET expires_at = $1
                 WHERE content_id = $2 AND platform = $3 AND region = $4
-                "#
+                "#,
             )
             .bind(Utc::now())
             .bind(content_id)
@@ -460,7 +485,7 @@ impl ContentRepository for PostgresContentRepository {
     async fn find_expiring_within(&self, duration: Duration) -> Result<Vec<ExpiringContent>> {
         let expiring_threshold = Utc::now() + duration;
 
-        let results = sqlx::query_as::<_, (Uuid, String, String, String, DateTime<Utc>)>(
+        let rows = sqlx::query(
             r#"
             SELECT
                 pa.content_id,
@@ -474,20 +499,29 @@ impl ContentRepository for PostgresContentRepository {
               AND pa.expires_at <= $1
               AND pa.expires_at > NOW()
             ORDER BY pa.expires_at ASC
-            "#
+            "#,
         )
         .bind(expiring_threshold)
         .fetch_all(&self.pool)
         .await
         .context("Failed to find expiring content")?;
 
-        let expiring_content = results.into_iter()
-            .map(|(content_id, title, platform, region, expires_at)| ExpiringContent {
-                content_id,
-                title,
-                platform,
-                region,
-                expires_at,
+        let expiring_content = rows
+            .into_iter()
+            .map(|row| {
+                let content_id: Uuid = row.get("content_id");
+                let title: String = row.get("title");
+                let platform: String = row.get("platform");
+                let region: String = row.get("region");
+                let expires_at: DateTime<Utc> = row.get("expires_at");
+
+                ExpiringContent {
+                    content_id,
+                    title,
+                    platform,
+                    region,
+                    expires_at,
+                }
             })
             .collect();
 
@@ -496,19 +530,7 @@ impl ContentRepository for PostgresContentRepository {
 
     async fn find_stale_embeddings(&self, threshold: DateTime<Utc>) -> Result<Vec<StaleContent>> {
         // Query for content where last_updated < threshold or embedding is null
-        let results = sqlx::query_as::<_, (
-            Uuid,
-            String,
-            String,
-            String,
-            Option<String>,
-            String,
-            Option<i32>,
-            Option<i32>,
-            Option<String>,
-            Option<f64>,
-            DateTime<Utc>,
-        )>(
+        let rows = sqlx::query(
             r#"
             SELECT
                 c.id,
@@ -528,7 +550,7 @@ impl ContentRepository for PostgresContentRepository {
                OR c.embedding IS NULL
             ORDER BY c.last_updated ASC
             LIMIT 1000
-            "#
+            "#,
         )
         .bind(threshold)
         .fetch_all(&self.pool)
@@ -538,18 +560,29 @@ impl ContentRepository for PostgresContentRepository {
         // Convert to StaleContent with CanonicalContent
         let mut stale_items = Vec::new();
 
-        for (content_id, title, content_type, _original_title, overview, platform, release_year, runtime_minutes, rating, average_rating, last_updated) in results {
+        for row in rows {
+            let content_id: Uuid = row.get("id");
+            let title: String = row.get("title");
+            let content_type: String = row.get("content_type");
+            let _original_title: String = row.get("original_title");
+            let overview: Option<String> = row.get("overview");
+            let platform: String = row.get("platform");
+            let release_year: Option<i32> = row.get("release_year");
+            let runtime_minutes: Option<i32> = row.get("runtime_minutes");
+            let rating: Option<String> = row.get("rating");
+            let average_rating: Option<f64> = row.get("average_rating");
+            let last_updated: DateTime<Utc> = row.get("last_updated");
             // Fetch genres
-            let genres = sqlx::query_scalar::<_, String>(
-                "SELECT genre FROM content_genres WHERE content_id = $1"
-            )
-            .bind(content_id)
-            .fetch_all(&self.pool)
-            .await
-            .unwrap_or_default();
+            let genre_rows = sqlx::query("SELECT genre FROM content_genres WHERE content_id = $1")
+                .bind(content_id)
+                .fetch_all(&self.pool)
+                .await
+                .unwrap_or_default();
+
+            let genres: Vec<String> = genre_rows.iter().map(|row| row.get("genre")).collect();
 
             // Fetch external IDs
-            let external_ids_row = sqlx::query_as::<_, (Option<String>, Option<String>, Option<i32>, Option<i32>, Option<String>)>(
+            let external_ids_row = sqlx::query(
                 "SELECT eidr_id, imdb_id, tmdb_id, tvdb_id, gracenote_tms_id FROM external_ids WHERE content_id = $1"
             )
             .bind(content_id)
@@ -558,16 +591,30 @@ impl ContentRepository for PostgresContentRepository {
             .unwrap_or(None);
 
             let mut external_ids = std::collections::HashMap::new();
-            if let Some((eidr, imdb, tmdb, tvdb, gracenote)) = external_ids_row {
-                if let Some(e) = eidr { external_ids.insert("eidr".to_string(), e); }
-                if let Some(i) = imdb { external_ids.insert("imdb".to_string(), i); }
-                if let Some(t) = tmdb { external_ids.insert("tmdb".to_string(), t.to_string()); }
-                if let Some(t) = tvdb { external_ids.insert("tvdb".to_string(), t.to_string()); }
-                if let Some(g) = gracenote { external_ids.insert("gracenote".to_string(), g); }
+            if let Some(row) = external_ids_row {
+                if let Some(e) = row.try_get::<Option<String>, _>("eidr_id").ok().flatten() {
+                    external_ids.insert("eidr".to_string(), e);
+                }
+                if let Some(i) = row.try_get::<Option<String>, _>("imdb_id").ok().flatten() {
+                    external_ids.insert("imdb".to_string(), i);
+                }
+                if let Some(t) = row.try_get::<Option<i32>, _>("tmdb_id").ok().flatten() {
+                    external_ids.insert("tmdb".to_string(), t.to_string());
+                }
+                if let Some(t) = row.try_get::<Option<i32>, _>("tvdb_id").ok().flatten() {
+                    external_ids.insert("tvdb".to_string(), t.to_string());
+                }
+                if let Some(g) = row
+                    .try_get::<Option<String>, _>("gracenote_tms_id")
+                    .ok()
+                    .flatten()
+                {
+                    external_ids.insert("gracenote".to_string(), g);
+                }
             }
 
             // Fetch platform content ID
-            let platform_content_id = sqlx::query_scalar::<_, String>(
+            let platform_content_id = sqlx::query(
                 "SELECT platform_content_id FROM platform_ids WHERE content_id = $1 AND platform = $2"
             )
             .bind(content_id)
@@ -575,6 +622,7 @@ impl ContentRepository for PostgresContentRepository {
             .fetch_optional(&self.pool)
             .await
             .unwrap_or(None)
+            .and_then(|row| row.try_get::<String, _>("platform_content_id").ok())
             .unwrap_or_else(|| content_id.to_string());
 
             // Parse content type
@@ -626,8 +674,8 @@ impl ContentRepository for PostgresContentRepository {
 
     async fn update_embedding(&self, content_id: Uuid, embedding: &[f32]) -> Result<()> {
         // Store embedding as JSONB array
-        let embedding_json = serde_json::to_value(embedding)
-            .context("Failed to serialize embedding")?;
+        let embedding_json =
+            serde_json::to_value(embedding).context("Failed to serialize embedding")?;
 
         sqlx::query(
             r#"
@@ -635,7 +683,7 @@ impl ContentRepository for PostgresContentRepository {
             SET embedding = $1,
                 last_updated = $2
             WHERE id = $3
-            "#
+            "#,
         )
         .bind(embedding_json)
         .bind(Utc::now())
@@ -653,7 +701,7 @@ impl ContentRepository for PostgresContentRepository {
             UPDATE content
             SET quality_score = $1
             WHERE id = $2
-            "#
+            "#,
         )
         .bind(quality_score)
         .bind(content_id)
@@ -670,20 +718,7 @@ impl ContentRepository for PostgresContentRepository {
         limit: i64,
     ) -> Result<Vec<LowQualityContentItem>> {
         // Query for content with quality_score below threshold
-        let results = sqlx::query_as::<_, (
-            Uuid,
-            String,
-            String,
-            String,
-            Option<String>,
-            String,
-            Option<i32>,
-            Option<i32>,
-            Option<String>,
-            Option<f64>,
-            f64,
-            DateTime<Utc>,
-        )>(
+        let rows = sqlx::query(
             r#"
             SELECT
                 c.id,
@@ -703,7 +738,7 @@ impl ContentRepository for PostgresContentRepository {
             WHERE COALESCE(c.quality_score, 0.0) < $1
             ORDER BY quality_score ASC
             LIMIT $2
-            "#
+            "#,
         )
         .bind(threshold as f64)
         .bind(limit)
@@ -713,18 +748,30 @@ impl ContentRepository for PostgresContentRepository {
 
         let mut low_quality_items = Vec::new();
 
-        for (content_id, title, content_type, _original_title, overview, platform, release_year, runtime_minutes, rating, average_rating, quality_score, last_updated) in results {
+        for row in rows {
+            let content_id: Uuid = row.get("id");
+            let title: String = row.get("title");
+            let content_type: String = row.get("content_type");
+            let _original_title: String = row.get("original_title");
+            let overview: Option<String> = row.get("overview");
+            let platform: String = row.get("platform");
+            let release_year: Option<i32> = row.get("release_year");
+            let runtime_minutes: Option<i32> = row.get("runtime_minutes");
+            let rating: Option<String> = row.get("rating");
+            let average_rating: Option<f64> = row.get("average_rating");
+            let quality_score: f64 = row.get("quality_score");
+            let last_updated: DateTime<Utc> = row.get("last_updated");
             // Fetch genres
-            let genres = sqlx::query_scalar::<_, String>(
-                "SELECT genre FROM content_genres WHERE content_id = $1"
-            )
-            .bind(content_id)
-            .fetch_all(&self.pool)
-            .await
-            .unwrap_or_default();
+            let genre_rows = sqlx::query("SELECT genre FROM content_genres WHERE content_id = $1")
+                .bind(content_id)
+                .fetch_all(&self.pool)
+                .await
+                .unwrap_or_default();
+
+            let genres: Vec<String> = genre_rows.iter().map(|row| row.get("genre")).collect();
 
             // Fetch external IDs
-            let external_ids_row = sqlx::query_as::<_, (Option<String>, Option<String>, Option<i32>, Option<i32>, Option<String>)>(
+            let external_ids_row = sqlx::query(
                 "SELECT eidr_id, imdb_id, tmdb_id, tvdb_id, gracenote_tms_id FROM external_ids WHERE content_id = $1"
             )
             .bind(content_id)
@@ -733,16 +780,30 @@ impl ContentRepository for PostgresContentRepository {
             .unwrap_or(None);
 
             let mut external_ids = std::collections::HashMap::new();
-            if let Some((eidr, imdb, tmdb, tvdb, gracenote)) = external_ids_row {
-                if let Some(e) = eidr { external_ids.insert("eidr".to_string(), e); }
-                if let Some(i) = imdb { external_ids.insert("imdb".to_string(), i); }
-                if let Some(t) = tmdb { external_ids.insert("tmdb".to_string(), t.to_string()); }
-                if let Some(t) = tvdb { external_ids.insert("tvdb".to_string(), t.to_string()); }
-                if let Some(g) = gracenote { external_ids.insert("gracenote".to_string(), g); }
+            if let Some(row) = external_ids_row {
+                if let Some(e) = row.try_get::<Option<String>, _>("eidr_id").ok().flatten() {
+                    external_ids.insert("eidr".to_string(), e);
+                }
+                if let Some(i) = row.try_get::<Option<String>, _>("imdb_id").ok().flatten() {
+                    external_ids.insert("imdb".to_string(), i);
+                }
+                if let Some(t) = row.try_get::<Option<i32>, _>("tmdb_id").ok().flatten() {
+                    external_ids.insert("tmdb".to_string(), t.to_string());
+                }
+                if let Some(t) = row.try_get::<Option<i32>, _>("tvdb_id").ok().flatten() {
+                    external_ids.insert("tvdb".to_string(), t.to_string());
+                }
+                if let Some(g) = row
+                    .try_get::<Option<String>, _>("gracenote_tms_id")
+                    .ok()
+                    .flatten()
+                {
+                    external_ids.insert("gracenote".to_string(), g);
+                }
             }
 
             // Fetch platform content ID
-            let platform_content_id = sqlx::query_scalar::<_, String>(
+            let platform_content_id = sqlx::query(
                 "SELECT platform_content_id FROM platform_ids WHERE content_id = $1 AND platform = $2"
             )
             .bind(content_id)
@@ -750,6 +811,7 @@ impl ContentRepository for PostgresContentRepository {
             .fetch_optional(&self.pool)
             .await
             .unwrap_or(None)
+            .and_then(|row| row.try_get::<String, _>("platform_content_id").ok())
             .unwrap_or_else(|| content_id.to_string());
 
             // Parse content type

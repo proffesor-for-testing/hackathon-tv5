@@ -1,11 +1,7 @@
 use actix_web::{test, App};
 use media_gateway_auth::{
-    jwt::JwtManager,
-    mfa::MfaManager,
-    server::AppState,
-    session::SessionManager,
-    storage::AuthStorage,
-    token_family::TokenFamilyManager,
+    jwt::JwtManager, mfa::MfaManager, server::AppState, session::SessionManager,
+    storage::AuthStorage, token_family::TokenFamilyManager,
 };
 use serde_json::json;
 use sqlx::PgPool;
@@ -14,11 +10,7 @@ use std::sync::Arc;
 async fn setup_test_app(
     pool: PgPool,
 ) -> (
-    actix_web::dev::Service<
-        actix_http::Request,
-        actix_web::dev::ServiceResponse,
-        actix_web::Error,
-    >,
+    actix_web::dev::Service<actix_http::Request, actix_web::dev::ServiceResponse, actix_web::Error>,
     Arc<JwtManager>,
 ) {
     let jwt_manager = Arc::new(JwtManager::new("test-secret".to_string(), "MediaGateway"));

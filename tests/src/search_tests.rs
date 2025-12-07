@@ -52,9 +52,13 @@ async fn test_search_flow_search_get_details_track_view() -> Result<()> {
     ctx.run_migrations().await?;
 
     // Create test content
-    let content1 = fixtures::create_test_content_with_type(&ctx, "video/mp4", "Action Movie 2024").await?;
-    let content2 = fixtures::create_test_content_with_type(&ctx, "video/mp4", "Action Series Episode 1").await?;
-    let content3 = fixtures::create_test_content_with_type(&ctx, "audio/mp3", "Action Podcast").await?;
+    let content1 =
+        fixtures::create_test_content_with_type(&ctx, "video/mp4", "Action Movie 2024").await?;
+    let content2 =
+        fixtures::create_test_content_with_type(&ctx, "video/mp4", "Action Series Episode 1")
+            .await?;
+    let content3 =
+        fixtures::create_test_content_with_type(&ctx, "audio/mp3", "Action Podcast").await?;
 
     // Create test user for authenticated search
     let user = fixtures::create_test_user(&ctx).await?;
@@ -70,12 +74,14 @@ async fn test_search_flow_search_get_details_track_view() -> Result<()> {
         offset: Some(0),
     };
 
-    let search_response = client.get(&format!(
-        "/api/v1/search?query={}&limit={}&offset={}",
-        search_req.query,
-        search_req.limit.unwrap(),
-        search_req.offset.unwrap()
-    )).await?;
+    let search_response = client
+        .get(&format!(
+            "/api/v1/search?query={}&limit={}&offset={}",
+            search_req.query,
+            search_req.limit.unwrap(),
+            search_req.offset.unwrap()
+        ))
+        .await?;
     assert_eq!(search_response.status(), 200);
 
     let search_data: SearchResponse = search_response.json().await?;
@@ -84,7 +90,9 @@ async fn test_search_flow_search_get_details_track_view() -> Result<()> {
 
     // Step 2: Get details for first result
     let first_result = &search_data.results[0];
-    let details_response = client.get(&format!("/api/v1/content/{}", first_result.id)).await?;
+    let details_response = client
+        .get(&format!("/api/v1/content/{}", first_result.id))
+        .await?;
     assert_eq!(details_response.status(), 200);
 
     let details_data: ContentDetail = details_response.json().await?;
@@ -100,7 +108,9 @@ async fn test_search_flow_search_get_details_track_view() -> Result<()> {
     assert_eq!(track_response.status(), 200);
 
     // Verify view count increased
-    let updated_details = client.get(&format!("/api/v1/content/{}", first_result.id)).await?;
+    let updated_details = client
+        .get(&format!("/api/v1/content/{}", first_result.id))
+        .await?;
     let updated_data: ContentDetail = updated_details.json().await?;
     assert_eq!(updated_data.views, details_data.views + 1);
 
@@ -121,7 +131,9 @@ async fn test_search_with_content_type_filter() -> Result<()> {
     let client = TestClient::new(&ctx.discovery_url);
 
     // Search for videos only
-    let search_response = client.get("/api/v1/search?query=Content&content_type=video/mp4").await?;
+    let search_response = client
+        .get("/api/v1/search?query=Content&content_type=video/mp4")
+        .await?;
     assert_eq!(search_response.status(), 200);
 
     let search_data: SearchResponse = search_response.json().await?;
@@ -141,17 +153,16 @@ async fn test_search_pagination() -> Result<()> {
 
     // Create 5 items
     for i in 1..=5 {
-        fixtures::create_test_content_with_type(
-            &ctx,
-            "video/mp4",
-            &format!("Test Video {}", i),
-        ).await?;
+        fixtures::create_test_content_with_type(&ctx, "video/mp4", &format!("Test Video {}", i))
+            .await?;
     }
 
     let client = TestClient::new(&ctx.discovery_url);
 
     // Get first page (2 items)
-    let page1_response = client.get("/api/v1/search?query=Test&limit=2&offset=0").await?;
+    let page1_response = client
+        .get("/api/v1/search?query=Test&limit=2&offset=0")
+        .await?;
     let page1_data: SearchResponse = page1_response.json().await?;
     assert_eq!(page1_data.results.len(), 2);
     assert_eq!(page1_data.total, 5);
@@ -159,14 +170,18 @@ async fn test_search_pagination() -> Result<()> {
     assert_eq!(page1_data.offset, 0);
 
     // Get second page (2 items)
-    let page2_response = client.get("/api/v1/search?query=Test&limit=2&offset=2").await?;
+    let page2_response = client
+        .get("/api/v1/search?query=Test&limit=2&offset=2")
+        .await?;
     let page2_data: SearchResponse = page2_response.json().await?;
     assert_eq!(page2_data.results.len(), 2);
     assert_eq!(page2_data.total, 5);
     assert_eq!(page2_data.offset, 2);
 
     // Get third page (1 item)
-    let page3_response = client.get("/api/v1/search?query=Test&limit=2&offset=4").await?;
+    let page3_response = client
+        .get("/api/v1/search?query=Test&limit=2&offset=4")
+        .await?;
     let page3_data: SearchResponse = page3_response.json().await?;
     assert_eq!(page3_data.results.len(), 1);
     assert_eq!(page3_data.total, 5);
@@ -203,7 +218,9 @@ async fn test_get_content_details_not_found() -> Result<()> {
     let client = TestClient::new(&ctx.discovery_url);
     let non_existent_id = Uuid::new_v4();
 
-    let details_response = client.get(&format!("/api/v1/content/{}", non_existent_id)).await?;
+    let details_response = client
+        .get(&format!("/api/v1/content/{}", non_existent_id))
+        .await?;
     assert_eq!(details_response.status(), 404);
 
     ctx.teardown().await?;
@@ -260,22 +277,34 @@ async fn test_popular_content_endpoint() -> Result<()> {
     ctx.run_migrations().await?;
 
     // Create content and track views
-    let content1 = fixtures::create_test_content_with_type(&ctx, "video/mp4", "Popular Video").await?;
-    let content2 = fixtures::create_test_content_with_type(&ctx, "video/mp4", "Less Popular").await?;
+    let content1 =
+        fixtures::create_test_content_with_type(&ctx, "video/mp4", "Popular Video").await?;
+    let content2 =
+        fixtures::create_test_content_with_type(&ctx, "video/mp4", "Less Popular").await?;
 
     let client = TestClient::new(&ctx.discovery_url);
 
     // Track views for content1 (3 times)
     for _ in 0..3 {
-        client.post("/api/v1/analytics/view", &TrackViewRequest {
-            content_id: content1.id.to_string(),
-        }).await?;
+        client
+            .post(
+                "/api/v1/analytics/view",
+                &TrackViewRequest {
+                    content_id: content1.id.to_string(),
+                },
+            )
+            .await?;
     }
 
     // Track views for content2 (1 time)
-    client.post("/api/v1/analytics/view", &TrackViewRequest {
-        content_id: content2.id.to_string(),
-    }).await?;
+    client
+        .post(
+            "/api/v1/analytics/view",
+            &TrackViewRequest {
+                content_id: content2.id.to_string(),
+            },
+        )
+        .await?;
 
     // Get popular content
     let popular_response = client.get("/api/v1/content/popular?limit=10").await?;

@@ -9,8 +9,9 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 async fn setup_test_db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+    });
 
     PgPool::connect(&database_url)
         .await
@@ -18,8 +19,8 @@ async fn setup_test_db() -> PgPool {
 }
 
 async fn setup_test_redis() -> redis::Client {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     redis::Client::open(redis_url).expect("Failed to connect to Redis")
 }
@@ -29,11 +30,7 @@ async fn create_test_user(pool: &PgPool) -> User {
     let password_hash = PasswordHasher::hash_password("OldPassword123").unwrap();
 
     user_repo
-        .create_user(
-            "test@example.com",
-            &password_hash,
-            "Test User",
-        )
+        .create_user("test@example.com", &password_hash, "Test User")
         .await
         .expect("Failed to create test user")
 }
@@ -48,10 +45,7 @@ async fn cleanup_test_user(pool: &PgPool, email: &str) {
 
 #[tokio::test]
 async fn test_password_reset_token_generation() {
-    let token = PasswordResetToken::new(
-        "user123".to_string(),
-        "test@example.com".to_string(),
-    );
+    let token = PasswordResetToken::new("user123".to_string(), "test@example.com".to_string());
 
     assert_eq!(token.user_id, "user123");
     assert_eq!(token.email, "test@example.com");
@@ -63,10 +57,7 @@ async fn test_password_reset_token_generation() {
 
 #[tokio::test]
 async fn test_password_reset_token_expiration() {
-    let mut token = PasswordResetToken::new(
-        "user123".to_string(),
-        "test@example.com".to_string(),
-    );
+    let mut token = PasswordResetToken::new("user123".to_string(), "test@example.com".to_string());
 
     // Manually set expiration to past
     token.expires_at = token.created_at - 1;
@@ -79,10 +70,8 @@ async fn test_store_and_retrieve_password_reset_token() {
     let storage = AuthStorage::new(&redis_client.get_connection_info().addr.to_string())
         .expect("Failed to create storage");
 
-    let reset_token = PasswordResetToken::new(
-        "user123".to_string(),
-        "test@example.com".to_string(),
-    );
+    let reset_token =
+        PasswordResetToken::new("user123".to_string(), "test@example.com".to_string());
 
     // Store token
     storage
@@ -114,10 +103,8 @@ async fn test_password_reset_token_single_use() {
     let storage = AuthStorage::new(&redis_client.get_connection_info().addr.to_string())
         .expect("Failed to create storage");
 
-    let reset_token = PasswordResetToken::new(
-        "user123".to_string(),
-        "test@example.com".to_string(),
-    );
+    let reset_token =
+        PasswordResetToken::new("user123".to_string(), "test@example.com".to_string());
 
     // Store token
     storage
@@ -154,7 +141,12 @@ async fn test_password_reset_rate_limiting() {
             .check_password_reset_rate_limit(&email)
             .await
             .expect("Failed to check rate limit");
-        assert_eq!(remaining, 3 - i - 1, "Expected {} remaining attempts", 3 - i - 1);
+        assert_eq!(
+            remaining,
+            3 - i - 1,
+            "Expected {} remaining attempts",
+            3 - i - 1
+        );
     }
 
     // 4th request should be rate limited
@@ -188,7 +180,9 @@ async fn test_update_user_password() {
         .expect("User not found");
 
     assert!(PasswordHasher::verify_password(new_password, &updated_user.password_hash).unwrap());
-    assert!(!PasswordHasher::verify_password("OldPassword123", &updated_user.password_hash).unwrap());
+    assert!(
+        !PasswordHasher::verify_password("OldPassword123", &updated_user.password_hash).unwrap()
+    );
 
     // Cleanup
     cleanup_test_user(&pool, "test@example.com").await;
@@ -203,7 +197,10 @@ async fn test_delete_all_user_sessions_on_password_reset() {
     let user_id = uuid::Uuid::new_v4().to_string();
 
     // Create some fake session keys
-    let mut conn = redis_client.get_multiplexed_async_connection().await.unwrap();
+    let mut conn = redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .unwrap();
     use redis::AsyncCommands;
 
     conn.set::<_, _, ()>(format!("session:user:{}:session1", user_id), "data1", None)
@@ -223,9 +220,18 @@ async fn test_delete_all_user_sessions_on_password_reset() {
         .expect("Failed to delete sessions");
 
     // Verify sessions are deleted
-    let result1: Option<String> = conn.get(format!("session:user:{}:session1", user_id)).await.unwrap();
-    let result2: Option<String> = conn.get(format!("session:user:{}:session2", user_id)).await.unwrap();
-    let result3: Option<String> = conn.get(format!("session:user:{}:session3", user_id)).await.unwrap();
+    let result1: Option<String> = conn
+        .get(format!("session:user:{}:session1", user_id))
+        .await
+        .unwrap();
+    let result2: Option<String> = conn
+        .get(format!("session:user:{}:session2", user_id))
+        .await
+        .unwrap();
+    let result3: Option<String> = conn
+        .get(format!("session:user:{}:session3", user_id))
+        .await
+        .unwrap();
 
     assert!(result1.is_none());
     assert!(result2.is_none());
@@ -321,10 +327,7 @@ async fn test_email_manager_send_password_reset() {
     let email_manager = EmailManager::new(provider, redis_client, email_config);
 
     let result = email_manager
-        .send_password_reset_email(
-            "test@example.com".to_string(),
-            "test_token_123".to_string(),
-        )
+        .send_password_reset_email("test@example.com".to_string(), "test_token_123".to_string())
         .await;
 
     assert!(result.is_ok());

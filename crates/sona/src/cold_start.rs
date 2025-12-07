@@ -5,8 +5,8 @@
 
 use crate::types::{Recommendation, RecommendationType};
 use anyhow::Result;
-use uuid::Uuid;
 use chrono::Utc;
+use uuid::Uuid;
 
 /// Signup context for cold start users
 #[derive(Debug, Clone)]
@@ -52,7 +52,8 @@ impl HandleColdStartUser {
                     &age_range,
                     context.region.as_deref().unwrap_or("US"),
                     20,
-                ).await;
+                )
+                .await;
             }
         }
 
@@ -83,6 +84,7 @@ impl HandleColdStartUser {
                 explanation: format!("Popular {} content", genre),
                 generated_at: Utc::now(),
                 ttl_seconds: 3600,
+                experiment_variant: None,
             });
         }
 
@@ -107,6 +109,7 @@ impl HandleColdStartUser {
                 explanation: format!("Trending in your area"),
                 generated_at: Utc::now(),
                 ttl_seconds: 3600,
+                experiment_variant: None,
             });
         }
 
@@ -127,6 +130,7 @@ impl HandleColdStartUser {
                 explanation: "Popular with all users".to_string(),
                 generated_at: Utc::now(),
                 ttl_seconds: 1800,
+                experiment_variant: None,
             });
         }
 
@@ -164,20 +168,18 @@ mod tests {
             region: None,
         };
 
-        let recommendations = HandleColdStartUser::execute(
-            Uuid::new_v4(),
-            Some(context),
-        ).await.unwrap();
+        let recommendations = HandleColdStartUser::execute(Uuid::new_v4(), Some(context))
+            .await
+            .unwrap();
 
         assert!(!recommendations.is_empty());
     }
 
     #[tokio::test]
     async fn test_cold_start_trending_fallback() {
-        let recommendations = HandleColdStartUser::execute(
-            Uuid::new_v4(),
-            None,
-        ).await.unwrap();
+        let recommendations = HandleColdStartUser::execute(Uuid::new_v4(), None)
+            .await
+            .unwrap();
 
         assert!(!recommendations.is_empty());
         assert_eq!(recommendations.len(), 20);

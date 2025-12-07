@@ -1,23 +1,27 @@
 //! Webhook receiver implementation
 
+use crate::webhooks::{
+    PlatformWebhookConfig, ProcessedWebhook, ProcessingStatus, WebhookDeduplicator, WebhookError,
+    WebhookHandler, WebhookMetrics, WebhookPayload, WebhookQueue, WebhookResult,
+};
 use async_trait::async_trait;
+use chrono::Utc;
+use governor::{
+    clock::DefaultClock,
+    state::{InMemoryState, NotKeyed},
+    Quota, RateLimiter,
+};
+use nonzero_ext::nonzero;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::webhooks::{
-    WebhookError, WebhookResult, WebhookPayload, WebhookHandler,
-    ProcessedWebhook, ProcessingStatus, PlatformWebhookConfig,
-    WebhookQueue, WebhookDeduplicator, WebhookMetrics,
-};
-use chrono::Utc;
-use governor::{Quota, RateLimiter, clock::DefaultClock, state::{InMemoryState, NotKeyed}};
-use nonzero_ext::nonzero;
 
 /// Webhook receiver
 pub struct WebhookReceiver {
     handlers: Arc<RwLock<HashMap<String, Box<dyn WebhookHandler>>>>,
     configs: Arc<RwLock<HashMap<String, PlatformWebhookConfig>>>,
-    rate_limiters: Arc<RwLock<HashMap<String, Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>>>>,
+    rate_limiters:
+        Arc<RwLock<HashMap<String, Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>>>>,
     queue: Arc<dyn WebhookQueue>,
     deduplicator: Arc<WebhookDeduplicator>,
     metrics: Arc<WebhookMetrics>,
@@ -50,13 +54,21 @@ impl WebhookReceiver {
 
         // Create rate limiter with runtime value
         let rate_limit_value = config.rate_limit;
-        let quota = Quota::per_minute(std::num::NonZeroU32::new(rate_limit_value).unwrap_or(nonzero!(100u32)));
+        let quota = Quota::per_minute(
+            std::num::NonZeroU32::new(rate_limit_value).unwrap_or(nonzero!(100u32)),
+        );
         let rate_limiter = Arc::new(RateLimiter::direct(quota));
 
         // Store handler, config, and rate limiter
-        self.handlers.write().await.insert(platform.clone(), handler);
+        self.handlers
+            .write()
+            .await
+            .insert(platform.clone(), handler);
         self.configs.write().await.insert(platform.clone(), config);
-        self.rate_limiters.write().await.insert(platform, rate_limiter);
+        self.rate_limiters
+            .write()
+            .await
+            .insert(platform, rate_limiter);
 
         Ok(())
     }
@@ -72,24 +84,28 @@ impl WebhookReceiver {
 
         // Check if platform is registered
         let handlers = self.handlers.read().await;
-        let handler = handlers.get(platform)
+        let handler = handlers
+            .get(platform)
             .ok_or_else(|| WebhookError::UnsupportedPlatform(platform.to_string()))?;
 
         // Get config
         let configs = self.configs.read().await;
-        let config = configs.get(platform)
+        let config = configs
+            .get(platform)
             .ok_or_else(|| WebhookError::UnsupportedPlatform(platform.to_string()))?;
 
         // Check if enabled
         if !config.enabled {
-            return Err(WebhookError::ProcessingError(
-                format!("Webhooks disabled for platform: {}", platform)
-            ));
+            return Err(WebhookError::ProcessingError(format!(
+                "Webhooks disabled for platform: {}",
+                platform
+            )));
         }
 
         // Check rate limit
         let rate_limiters = self.rate_limiters.read().await;
-        let rate_limiter = rate_limiters.get(platform)
+        let rate_limiter = rate_limiters
+            .get(platform)
             .ok_or_else(|| WebhookError::RateLimitExceeded(platform.to_string()))?;
 
         if rate_limiter.check().is_err() {
@@ -101,7 +117,9 @@ impl WebhookReceiver {
         let is_valid = handler.verify_signature(body, signature, &config.secret)?;
         if !is_valid {
             self.metrics.increment_failed();
-            return Err(WebhookError::InvalidSignature("Signature verification failed".to_string()));
+            return Err(WebhookError::InvalidSignature(
+                "Signature verification failed".to_string(),
+            ));
         }
 
         // Parse payload
@@ -134,7 +152,8 @@ impl WebhookReceiver {
             if let Some((message_id, webhook)) = item {
                 // Get handler
                 let handlers = self.handlers.read().await;
-                let handler = handlers.get(&webhook.platform)
+                let handler = handlers
+                    .get(&webhook.platform)
                     .ok_or_else(|| WebhookError::UnsupportedPlatform(webhook.platform.clone()))?;
 
                 // Process event
@@ -189,7 +208,7 @@ impl WebhookReceiver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::webhooks::{WebhookEventType, queue::RedisWebhookQueue};
+    use crate::webhooks::{queue::RedisWebhookQueue, WebhookEventType};
 
     struct MockHandler;
 
@@ -199,7 +218,12 @@ mod tests {
             "test-platform"
         }
 
-        fn verify_signature(&self, _payload: &[u8], _signature: &str, _secret: &str) -> WebhookResult<bool> {
+        fn verify_signature(
+            &self,
+            _payload: &[u8],
+            _signature: &str,
+            _secret: &str,
+        ) -> WebhookResult<bool> {
             Ok(true)
         }
 
@@ -222,8 +246,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_register_handler() {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
         let queue = match RedisWebhookQueue::new(&redis_url, None, None, None) {
             Ok(q) => Arc::new(q) as Arc<dyn WebhookQueue>,
@@ -254,8 +278,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_receive_webhook() {
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
         let queue = match RedisWebhookQueue::new(&redis_url, None, None, None) {
             Ok(q) => Arc::new(q) as Arc<dyn WebhookQueue>,
@@ -289,7 +313,10 @@ mod tests {
         };
 
         let body = serde_json::to_vec(&webhook).unwrap();
-        let event_id = receiver.receive("test-platform", &body, "sha256=test").await.unwrap();
+        let event_id = receiver
+            .receive("test-platform", &body, "sha256=test")
+            .await
+            .unwrap();
 
         assert!(!event_id.is_empty());
     }

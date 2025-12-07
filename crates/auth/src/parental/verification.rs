@@ -44,9 +44,9 @@ pub async fn verify_pin(
     jwt_secret: &str,
 ) -> Result<VerifyPinResponse, AuthError> {
     // Get parental controls
-    let controls = get_parental_controls(pool, user_id)
-        .await?
-        .ok_or_else(|| AuthError::ValidationError("Parental controls not configured".to_string()))?;
+    let controls = get_parental_controls(pool, user_id).await?.ok_or_else(|| {
+        AuthError::ValidationError("Parental controls not configured".to_string())
+    })?;
 
     if !controls.enabled {
         return Err(AuthError::ValidationError(

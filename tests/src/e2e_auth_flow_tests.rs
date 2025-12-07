@@ -177,26 +177,38 @@ async fn test_full_registration_flow() -> Result<()> {
     };
 
     let register_response = client.post("/api/v1/auth/register", &register_req).await?;
-    assert_eq!(register_response.status(), 201, "Registration should succeed");
+    assert_eq!(
+        register_response.status(),
+        201,
+        "Registration should succeed"
+    );
 
     let register_data: RegisterResponse = register_response.json().await?;
     assert_eq!(register_data.email, email);
-    assert!(register_data.verification_required, "Email verification should be required");
+    assert!(
+        register_data.verification_required,
+        "Email verification should be required"
+    );
 
     // Step 2: Simulate email verification (extract token from database)
-    let verification_token: String = sqlx::query_scalar(
-        "SELECT verification_token FROM users WHERE email = $1"
-    )
-    .bind(&email)
-    .fetch_one(&ctx.db_pool)
-    .await?;
+    let verification_token: String =
+        sqlx::query_scalar("SELECT verification_token FROM users WHERE email = $1")
+            .bind(&email)
+            .fetch_one(&ctx.db_pool)
+            .await?;
 
     let verify_req = VerifyEmailRequest {
         token: verification_token,
     };
 
-    let verify_response = client.post("/api/v1/auth/verify-email", &verify_req).await?;
-    assert_eq!(verify_response.status(), 200, "Email verification should succeed");
+    let verify_response = client
+        .post("/api/v1/auth/verify-email", &verify_req)
+        .await?;
+    assert_eq!(
+        verify_response.status(),
+        200,
+        "Email verification should succeed"
+    );
 
     let verify_data: VerifyEmailResponse = verify_response.json().await?;
     assert!(verify_data.success, "Verification should be successful");
@@ -212,14 +224,24 @@ async fn test_full_registration_flow() -> Result<()> {
     assert_eq!(login_response.status(), 200, "Login should succeed");
 
     let login_data: LoginResponse = login_response.json().await?;
-    assert!(!login_data.access_token.is_empty(), "Access token should be present");
-    assert!(!login_data.refresh_token.is_empty(), "Refresh token should be present");
+    assert!(
+        !login_data.access_token.is_empty(),
+        "Access token should be present"
+    );
+    assert!(
+        !login_data.refresh_token.is_empty(),
+        "Refresh token should be present"
+    );
     assert!(login_data.expires_in > 0, "Token expiry should be positive");
 
     // Step 4: Verify access token works
     let authed_client = TestClient::new(&ctx.auth_url).with_auth(&login_data.access_token);
     let me_response = authed_client.get("/api/v1/auth/me").await?;
-    assert_eq!(me_response.status(), 200, "Authenticated request should succeed");
+    assert_eq!(
+        me_response.status(),
+        200,
+        "Authenticated request should succeed"
+    );
 
     // Step 5: Refresh access token
     let refresh_req = RefreshRequest {
@@ -227,11 +249,21 @@ async fn test_full_registration_flow() -> Result<()> {
     };
 
     let refresh_response = client.post("/api/v1/auth/refresh", &refresh_req).await?;
-    assert_eq!(refresh_response.status(), 200, "Token refresh should succeed");
+    assert_eq!(
+        refresh_response.status(),
+        200,
+        "Token refresh should succeed"
+    );
 
     let refresh_data: RefreshResponse = refresh_response.json().await?;
-    assert!(!refresh_data.access_token.is_empty(), "New access token should be present");
-    assert_ne!(refresh_data.access_token, login_data.access_token, "New token should differ");
+    assert!(
+        !refresh_data.access_token.is_empty(),
+        "New access token should be present"
+    );
+    assert_ne!(
+        refresh_data.access_token, login_data.access_token,
+        "New token should differ"
+    );
 
     // Step 6: Verify new token works
     let new_authed_client = TestClient::new(&ctx.auth_url).with_auth(&refresh_data.access_token);
@@ -239,12 +271,18 @@ async fn test_full_registration_flow() -> Result<()> {
     assert_eq!(me_response_2.status(), 200, "New token should work");
 
     // Step 7: Logout
-    let logout_response = authed_client.post("/api/v1/auth/logout", &json!({})).await?;
+    let logout_response = authed_client
+        .post("/api/v1/auth/logout", &json!({}))
+        .await?;
     assert_eq!(logout_response.status(), 200, "Logout should succeed");
 
     // Step 8: Verify token is revoked
     let me_response_after_logout = authed_client.get("/api/v1/auth/me").await?;
-    assert_eq!(me_response_after_logout.status(), 401, "Token should be invalid after logout");
+    assert_eq!(
+        me_response_after_logout.status(),
+        401,
+        "Token should be invalid after logout"
+    );
 
     ctx.teardown().await?;
     Ok(())
@@ -273,27 +311,36 @@ async fn test_email_verification_flow() -> Result<()> {
     let invalid_verify_req = VerifyEmailRequest {
         token: "invalid-token-12345".to_string(),
     };
-    let invalid_response = client.post("/api/v1/auth/verify-email", &invalid_verify_req).await?;
+    let invalid_response = client
+        .post("/api/v1/auth/verify-email", &invalid_verify_req)
+        .await?;
     assert_eq!(invalid_response.status(), 400, "Invalid token should fail");
 
     // Get valid token
-    let verification_token: String = sqlx::query_scalar(
-        "SELECT verification_token FROM users WHERE email = $1"
-    )
-    .bind(&email)
-    .fetch_one(&ctx.db_pool)
-    .await?;
+    let verification_token: String =
+        sqlx::query_scalar("SELECT verification_token FROM users WHERE email = $1")
+            .bind(&email)
+            .fetch_one(&ctx.db_pool)
+            .await?;
 
     // Verify email successfully
     let verify_req = VerifyEmailRequest {
         token: verification_token.clone(),
     };
-    let verify_response = client.post("/api/v1/auth/verify-email", &verify_req).await?;
+    let verify_response = client
+        .post("/api/v1/auth/verify-email", &verify_req)
+        .await?;
     assert_eq!(verify_response.status(), 200, "Valid token should succeed");
 
     // Test: Double verification with same token
-    let double_verify_response = client.post("/api/v1/auth/verify-email", &verify_req).await?;
-    assert_eq!(double_verify_response.status(), 400, "Already verified should fail");
+    let double_verify_response = client
+        .post("/api/v1/auth/verify-email", &verify_req)
+        .await?;
+    assert_eq!(
+        double_verify_response.status(),
+        400,
+        "Already verified should fail"
+    );
 
     ctx.teardown().await?;
     Ok(())
@@ -319,17 +366,18 @@ async fn test_login_and_refresh_flow() -> Result<()> {
     client.post("/api/v1/auth/register", &register_req).await?;
 
     // Get and use verification token
-    let verification_token: String = sqlx::query_scalar(
-        "SELECT verification_token FROM users WHERE email = $1"
-    )
-    .bind(&email)
-    .fetch_one(&ctx.db_pool)
-    .await?;
+    let verification_token: String =
+        sqlx::query_scalar("SELECT verification_token FROM users WHERE email = $1")
+            .bind(&email)
+            .fetch_one(&ctx.db_pool)
+            .await?;
 
     let verify_req = VerifyEmailRequest {
         token: verification_token,
     };
-    client.post("/api/v1/auth/verify-email", &verify_req).await?;
+    client
+        .post("/api/v1/auth/verify-email", &verify_req)
+        .await?;
 
     // Test: Login with wrong password
     let wrong_login_req = LoginRequest {
@@ -363,8 +411,14 @@ async fn test_login_and_refresh_flow() -> Result<()> {
     let invalid_refresh_req = RefreshRequest {
         refresh_token: "invalid-refresh-token".to_string(),
     };
-    let invalid_refresh_response = client.post("/api/v1/auth/refresh", &invalid_refresh_req).await?;
-    assert_eq!(invalid_refresh_response.status(), 401, "Invalid refresh token should fail");
+    let invalid_refresh_response = client
+        .post("/api/v1/auth/refresh", &invalid_refresh_req)
+        .await?;
+    assert_eq!(
+        invalid_refresh_response.status(),
+        401,
+        "Invalid refresh token should fail"
+    );
 
     // Test: Unverified user cannot login
     let unverified_email = format!("unverified-{}@example.com", Uuid::new_v4());
@@ -373,15 +427,23 @@ async fn test_login_and_refresh_flow() -> Result<()> {
         password: password.to_string(),
         username: None,
     };
-    client.post("/api/v1/auth/register", &unverified_req).await?;
+    client
+        .post("/api/v1/auth/register", &unverified_req)
+        .await?;
 
     let unverified_login_req = LoginRequest {
         email: unverified_email.clone(),
         password: password.to_string(),
         mfa_code: None,
     };
-    let unverified_login_response = client.post("/api/v1/auth/login", &unverified_login_req).await?;
-    assert_eq!(unverified_login_response.status(), 403, "Unverified user should not login");
+    let unverified_login_response = client
+        .post("/api/v1/auth/login", &unverified_login_req)
+        .await?;
+    assert_eq!(
+        unverified_login_response.status(),
+        403,
+        "Unverified user should not login"
+    );
 
     ctx.teardown().await?;
     Ok(())
@@ -406,17 +468,18 @@ async fn test_mfa_enrollment_and_verify() -> Result<()> {
     };
     client.post("/api/v1/auth/register", &register_req).await?;
 
-    let verification_token: String = sqlx::query_scalar(
-        "SELECT verification_token FROM users WHERE email = $1"
-    )
-    .bind(&email)
-    .fetch_one(&ctx.db_pool)
-    .await?;
+    let verification_token: String =
+        sqlx::query_scalar("SELECT verification_token FROM users WHERE email = $1")
+            .bind(&email)
+            .fetch_one(&ctx.db_pool)
+            .await?;
 
     let verify_req = VerifyEmailRequest {
         token: verification_token,
     };
-    client.post("/api/v1/auth/verify-email", &verify_req).await?;
+    client
+        .post("/api/v1/auth/verify-email", &verify_req)
+        .await?;
 
     // Login to get access token
     let login_req = LoginRequest {
@@ -433,14 +496,33 @@ async fn test_mfa_enrollment_and_verify() -> Result<()> {
     let mfa_enroll_req = MfaEnrollRequest {
         method: "totp".to_string(),
     };
-    let mfa_enroll_response = authed_client.post("/api/v1/auth/mfa/enroll", &mfa_enroll_req).await?;
-    assert_eq!(mfa_enroll_response.status(), 200, "MFA enrollment should succeed");
+    let mfa_enroll_response = authed_client
+        .post("/api/v1/auth/mfa/enroll", &mfa_enroll_req)
+        .await?;
+    assert_eq!(
+        mfa_enroll_response.status(),
+        200,
+        "MFA enrollment should succeed"
+    );
 
     let mfa_enroll_data: MfaEnrollResponse = mfa_enroll_response.json().await?;
-    assert!(!mfa_enroll_data.secret.is_empty(), "MFA secret should be present");
-    assert!(!mfa_enroll_data.qr_code.is_empty(), "QR code should be present");
-    assert!(!mfa_enroll_data.backup_codes.is_empty(), "Backup codes should be present");
-    assert_eq!(mfa_enroll_data.backup_codes.len(), 10, "Should have 10 backup codes");
+    assert!(
+        !mfa_enroll_data.secret.is_empty(),
+        "MFA secret should be present"
+    );
+    assert!(
+        !mfa_enroll_data.qr_code.is_empty(),
+        "QR code should be present"
+    );
+    assert!(
+        !mfa_enroll_data.backup_codes.is_empty(),
+        "Backup codes should be present"
+    );
+    assert_eq!(
+        mfa_enroll_data.backup_codes.len(),
+        10,
+        "Should have 10 backup codes"
+    );
 
     // Step 2: Verify MFA enrollment (simulate TOTP generation)
     // Note: In real test, would generate TOTP code from secret
@@ -448,7 +530,9 @@ async fn test_mfa_enrollment_and_verify() -> Result<()> {
     let mfa_verify_req = MfaVerifyRequest {
         code: "123456".to_string(),
     };
-    let mfa_verify_response = authed_client.post("/api/v1/auth/mfa/verify", &mfa_verify_req).await?;
+    let mfa_verify_response = authed_client
+        .post("/api/v1/auth/mfa/verify", &mfa_verify_req)
+        .await?;
     // Expected to fail with invalid code, but tests endpoint exists
     assert!(
         mfa_verify_response.status() == 200 || mfa_verify_response.status() == 401,
@@ -462,12 +546,14 @@ async fn test_mfa_enrollment_and_verify() -> Result<()> {
         password: password.to_string(),
         mfa_code: Some("123456".to_string()),
     };
-    let login_with_mfa_response = client.post("/api/v1/auth/login", &login_with_mfa_req).await?;
+    let login_with_mfa_response = client
+        .post("/api/v1/auth/login", &login_with_mfa_req)
+        .await?;
     // Should either require MFA or fail with invalid code
     assert!(
-        login_with_mfa_response.status() == 200 ||
-        login_with_mfa_response.status() == 401 ||
-        login_with_mfa_response.status() == 403,
+        login_with_mfa_response.status() == 200
+            || login_with_mfa_response.status() == 401
+            || login_with_mfa_response.status() == 403,
         "Login with MFA should respond appropriately"
     );
 
@@ -481,8 +567,7 @@ async fn test_mfa_enrollment_and_verify() -> Result<()> {
     let backup_login_response = client.post("/api/v1/auth/login", &backup_login_req).await?;
     // Backup code should work or endpoint should exist
     assert!(
-        backup_login_response.status() == 200 ||
-        backup_login_response.status() == 401,
+        backup_login_response.status() == 200 || backup_login_response.status() == 401,
         "Backup code login should respond"
     );
 
@@ -510,28 +595,37 @@ async fn test_password_reset_flow() -> Result<()> {
     };
     client.post("/api/v1/auth/register", &register_req).await?;
 
-    let verification_token: String = sqlx::query_scalar(
-        "SELECT verification_token FROM users WHERE email = $1"
-    )
-    .bind(&email)
-    .fetch_one(&ctx.db_pool)
-    .await?;
+    let verification_token: String =
+        sqlx::query_scalar("SELECT verification_token FROM users WHERE email = $1")
+            .bind(&email)
+            .fetch_one(&ctx.db_pool)
+            .await?;
 
     let verify_req = VerifyEmailRequest {
         token: verification_token,
     };
-    client.post("/api/v1/auth/verify-email", &verify_req).await?;
+    client
+        .post("/api/v1/auth/verify-email", &verify_req)
+        .await?;
 
     // Step 1: Request password reset
     let forgot_password_req = ForgotPasswordRequest {
         email: email.clone(),
     };
-    let forgot_response = client.post("/api/v1/auth/forgot-password", &forgot_password_req).await?;
-    assert_eq!(forgot_response.status(), 200, "Forgot password request should succeed");
+    let forgot_response = client
+        .post("/api/v1/auth/forgot-password", &forgot_password_req)
+        .await?;
+    assert_eq!(
+        forgot_response.status(),
+        200,
+        "Forgot password request should succeed"
+    );
 
     let forgot_data: ForgotPasswordResponse = forgot_response.json().await?;
-    assert!(forgot_data.message.contains("sent") || forgot_data.message.contains("reset"),
-            "Response should confirm reset initiated");
+    assert!(
+        forgot_data.message.contains("sent") || forgot_data.message.contains("reset"),
+        "Response should confirm reset initiated"
+    );
 
     // Step 2: Get reset token from database
     let reset_token: String = sqlx::query_scalar(
@@ -546,8 +640,14 @@ async fn test_password_reset_flow() -> Result<()> {
         token: reset_token.clone(),
         new_password: new_password.to_string(),
     };
-    let reset_response = client.post("/api/v1/auth/reset-password", &reset_req).await?;
-    assert_eq!(reset_response.status(), 200, "Password reset should succeed");
+    let reset_response = client
+        .post("/api/v1/auth/reset-password", &reset_req)
+        .await?;
+    assert_eq!(
+        reset_response.status(),
+        200,
+        "Password reset should succeed"
+    );
 
     let reset_data: ResetPasswordResponse = reset_response.json().await?;
     assert!(reset_data.success, "Reset should be successful");
@@ -559,7 +659,11 @@ async fn test_password_reset_flow() -> Result<()> {
         mfa_code: None,
     };
     let old_login_response = client.post("/api/v1/auth/login", &old_login_req).await?;
-    assert_eq!(old_login_response.status(), 401, "Old password should not work");
+    assert_eq!(
+        old_login_response.status(),
+        401,
+        "Old password should not work"
+    );
 
     // Step 5: Verify new password works
     let new_login_req = LoginRequest {
@@ -571,14 +675,19 @@ async fn test_password_reset_flow() -> Result<()> {
     assert_eq!(new_login_response.status(), 200, "New password should work");
 
     let new_login_data: LoginResponse = new_login_response.json().await?;
-    assert!(!new_login_data.access_token.is_empty(), "Should receive access token");
+    assert!(
+        !new_login_data.access_token.is_empty(),
+        "Should receive access token"
+    );
 
     // Step 6: Verify reset token cannot be reused
     let reuse_reset_req = ResetPasswordRequest {
         token: reset_token,
         new_password: "AnotherPass789!".to_string(),
     };
-    let reuse_response = client.post("/api/v1/auth/reset-password", &reuse_reset_req).await?;
+    let reuse_response = client
+        .post("/api/v1/auth/reset-password", &reuse_reset_req)
+        .await?;
     assert_eq!(reuse_response.status(), 400, "Used token should fail");
 
     // Step 7: Test invalid reset token
@@ -586,7 +695,9 @@ async fn test_password_reset_flow() -> Result<()> {
         token: "invalid-token-12345".to_string(),
         new_password: "AnotherPass789!".to_string(),
     };
-    let invalid_response = client.post("/api/v1/auth/reset-password", &invalid_reset_req).await?;
+    let invalid_response = client
+        .post("/api/v1/auth/reset-password", &invalid_reset_req)
+        .await?;
     assert_eq!(invalid_response.status(), 400, "Invalid token should fail");
 
     ctx.teardown().await?;
@@ -603,7 +714,9 @@ async fn test_oauth_login_flow() -> Result<()> {
     let client = TestClient::new(&ctx.auth_url);
 
     // Test: Google OAuth initiation
-    let google_auth_response = client.get("/api/v1/auth/oauth/google?redirect_uri=http://localhost:3000/callback").await?;
+    let google_auth_response = client
+        .get("/api/v1/auth/oauth/google?redirect_uri=http://localhost:3000/callback")
+        .await?;
     // Should redirect or return authorization URL
     assert!(
         google_auth_response.status() == 302 || google_auth_response.status() == 200,
@@ -611,7 +724,9 @@ async fn test_oauth_login_flow() -> Result<()> {
     );
 
     // Test: Apple OAuth initiation
-    let apple_auth_response = client.get("/api/v1/auth/oauth/apple?redirect_uri=http://localhost:3000/callback").await?;
+    let apple_auth_response = client
+        .get("/api/v1/auth/oauth/apple?redirect_uri=http://localhost:3000/callback")
+        .await?;
     // Should redirect or return authorization URL
     assert!(
         apple_auth_response.status() == 302 || apple_auth_response.status() == 200,
@@ -645,20 +760,21 @@ async fn test_admin_user_management() -> Result<()> {
         password: password.to_string(),
         username: Some("admin_user".to_string()),
     };
-    client.post("/api/v1/auth/register", &admin_register_req).await?;
+    client
+        .post("/api/v1/auth/register", &admin_register_req)
+        .await?;
 
     // Verify admin
-    let admin_token: String = sqlx::query_scalar(
-        "SELECT verification_token FROM users WHERE email = $1"
-    )
-    .bind(&admin_email)
-    .fetch_one(&ctx.db_pool)
-    .await?;
+    let admin_token: String =
+        sqlx::query_scalar("SELECT verification_token FROM users WHERE email = $1")
+            .bind(&admin_email)
+            .fetch_one(&ctx.db_pool)
+            .await?;
 
-    let verify_req = VerifyEmailRequest {
-        token: admin_token,
-    };
-    client.post("/api/v1/auth/verify-email", &verify_req).await?;
+    let verify_req = VerifyEmailRequest { token: admin_token };
+    client
+        .post("/api/v1/auth/verify-email", &verify_req)
+        .await?;
 
     // Set admin role in database
     sqlx::query("UPDATE users SET role = 'admin' WHERE email = $1")
@@ -683,7 +799,9 @@ async fn test_admin_user_management() -> Result<()> {
         password: password.to_string(),
         username: Some("regular_user".to_string()),
     };
-    client.post("/api/v1/auth/register", &user_register_req).await?;
+    client
+        .post("/api/v1/auth/register", &user_register_req)
+        .await?;
 
     let user_id: String = sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
         .bind(&user_email)
@@ -691,7 +809,9 @@ async fn test_admin_user_management() -> Result<()> {
         .await?;
 
     // Step 1: List users (admin endpoint)
-    let list_response = admin_client.get("/api/v1/admin/users?limit=10&offset=0").await?;
+    let list_response = admin_client
+        .get("/api/v1/admin/users?limit=10&offset=0")
+        .await?;
     assert_eq!(list_response.status(), 200, "Admin should list users");
 
     let list_data: AdminUserListResponse = list_response.json().await?;
@@ -699,8 +819,14 @@ async fn test_admin_user_management() -> Result<()> {
     assert!(list_data.total >= 2, "Total should be at least 2");
 
     // Step 2: Get user detail
-    let detail_response = admin_client.get(&format!("/api/v1/admin/users/{}", user_id)).await?;
-    assert_eq!(detail_response.status(), 200, "Admin should get user detail");
+    let detail_response = admin_client
+        .get(&format!("/api/v1/admin/users/{}", user_id))
+        .await?;
+    assert_eq!(
+        detail_response.status(),
+        200,
+        "Admin should get user detail"
+    );
 
     // Step 3: Update user
     let update_req = AdminUpdateUserRequest {
@@ -708,7 +834,9 @@ async fn test_admin_user_management() -> Result<()> {
         verified: Some(true),
         active: Some(true),
     };
-    let update_response = admin_client.put(&format!("/api/v1/admin/users/{}", user_id), &update_req).await?;
+    let update_response = admin_client
+        .put(&format!("/api/v1/admin/users/{}", user_id), &update_req)
+        .await?;
     assert_eq!(update_response.status(), 200, "Admin should update user");
 
     // Verify update in database
@@ -719,11 +847,22 @@ async fn test_admin_user_management() -> Result<()> {
     assert!(is_verified, "User should be verified after admin update");
 
     // Step 4: Test impersonation token generation
-    let impersonate_response = admin_client.post(&format!("/api/v1/admin/users/{}/impersonate", user_id), &json!({})).await?;
-    assert_eq!(impersonate_response.status(), 200, "Admin should generate impersonation token");
+    let impersonate_response = admin_client
+        .post(
+            &format!("/api/v1/admin/users/{}/impersonate", user_id),
+            &json!({}),
+        )
+        .await?;
+    assert_eq!(
+        impersonate_response.status(),
+        200,
+        "Admin should generate impersonation token"
+    );
 
     // Step 5: Delete user
-    let delete_response = admin_client.delete(&format!("/api/v1/admin/users/{}", user_id)).await?;
+    let delete_response = admin_client
+        .delete(&format!("/api/v1/admin/users/{}", user_id))
+        .await?;
     assert_eq!(delete_response.status(), 200, "Admin should delete user");
 
     // Verify deletion
@@ -748,7 +887,11 @@ async fn test_admin_user_management() -> Result<()> {
 
     let regular_client = TestClient::new(&ctx.auth_url).with_auth(&admin_login_data.access_token);
     let unauthorized_response = regular_client.get("/api/v1/admin/users").await?;
-    assert_eq!(unauthorized_response.status(), 403, "Non-admin should be forbidden");
+    assert_eq!(
+        unauthorized_response.status(),
+        403,
+        "Non-admin should be forbidden"
+    );
 
     ctx.teardown().await?;
     Ok(())
@@ -773,17 +916,18 @@ async fn test_session_management() -> Result<()> {
     };
     client.post("/api/v1/auth/register", &register_req).await?;
 
-    let verification_token: String = sqlx::query_scalar(
-        "SELECT verification_token FROM users WHERE email = $1"
-    )
-    .bind(&email)
-    .fetch_one(&ctx.db_pool)
-    .await?;
+    let verification_token: String =
+        sqlx::query_scalar("SELECT verification_token FROM users WHERE email = $1")
+            .bind(&email)
+            .fetch_one(&ctx.db_pool)
+            .await?;
 
     let verify_req = VerifyEmailRequest {
         token: verification_token,
     };
-    client.post("/api/v1/auth/verify-email", &verify_req).await?;
+    client
+        .post("/api/v1/auth/verify-email", &verify_req)
+        .await?;
 
     // Step 1: Create multiple sessions (simulate different devices)
     let login_req = LoginRequest {

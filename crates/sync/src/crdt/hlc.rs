@@ -1,17 +1,22 @@
+use serde::{Deserialize, Serialize};
 /// Hybrid Logical Clock implementation for distributed timestamp ordering
 ///
 /// Provides total ordering of events without physical clock synchronization
 /// Format: 48-bit physical time (microseconds) + 16-bit logical counter
-
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Deserialize, Serialize};
 
 /// HLC timestamp combining physical and logical time
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct HLCTimestamp(pub i64);
 
 impl HLCTimestamp {
+    /// Create a new HLCTimestamp with physical time and logical counter
+    /// The device_id is included for compatibility but not stored in the timestamp
+    pub fn new(physical: u64, logical: u16, _device_id: String) -> Self {
+        Self::from_components(physical as i64, logical)
+    }
+
     /// Extract physical time component (microseconds since epoch)
     pub fn physical_time(&self) -> i64 {
         self.0 >> 16
@@ -85,16 +90,17 @@ impl HybridLogicalClock {
         let last_physical = self.last_physical.load(Ordering::SeqCst);
         let logical = self.logical.load(Ordering::SeqCst);
 
-        let (new_physical, new_logical) = if physical > last_physical && physical > received_physical {
-            // Local physical clock is newest
-            (physical, 0)
-        } else if received_physical > last_physical {
-            // Received timestamp is newer
-            (received_physical, received_logical + 1)
-        } else {
-            // Same physical time, increment logical counter
-            (last_physical, std::cmp::max(logical, received_logical) + 1)
-        };
+        let (new_physical, new_logical) =
+            if physical > last_physical && physical > received_physical {
+                // Local physical clock is newest
+                (physical, 0)
+            } else if received_physical > last_physical {
+                // Received timestamp is newer
+                (received_physical, received_logical + 1)
+            } else {
+                // Same physical time, increment logical counter
+                (last_physical, std::cmp::max(logical, received_logical) + 1)
+            };
 
         self.last_physical.store(new_physical, Ordering::SeqCst);
         self.logical.store(new_logical, Ordering::SeqCst);

@@ -27,7 +27,9 @@ use crate::analytics::SearchAnalytics;
 use crate::cache::RedisCache;
 use crate::config::DiscoveryConfig;
 use crate::intent::{IntentParser, ParsedIntent};
-use media_gateway_core::{ActivityEventType, KafkaActivityProducer, UserActivityEvent, UserActivityProducer};
+use media_gateway_core::{
+    ActivityEventType, KafkaActivityProducer, UserActivityEvent, UserActivityProducer,
+};
 
 /// Hybrid search service orchestrator
 pub struct HybridSearchService {
@@ -292,8 +294,10 @@ impl HybridSearchService {
 
         // Phase 2: Execute parallel search strategies
         let (vector_results, keyword_results) = tokio::join!(
-            self.vector_search.search(&request.query, request.filters.clone()),
-            self.keyword_search.search(&request.query, request.filters.clone())
+            self.vector_search
+                .search(&request.query, request.filters.clone()),
+            self.keyword_search
+                .search(&request.query, request.filters.clone())
         );
 
         // Phase 3: Merge results using Reciprocal Rank Fusion with fallback
@@ -339,7 +343,7 @@ impl HybridSearchService {
                 .personalization_service
                 .personalize_results(
                     user_id,
-                    merged_results,
+                    merged_results.clone(),
                     request.experiment_variant.as_deref(),
                 )
                 .await
@@ -421,7 +425,7 @@ impl HybridSearchService {
                 popularity_score
             FROM content
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(id)
         .fetch_optional(&self.db_pool)
@@ -505,8 +509,8 @@ impl HybridSearchService {
     #[instrument(skip(self, request), fields(query = %request.query))]
     fn generate_cache_key(&self, request: &SearchRequest) -> String {
         // Serialize request to JSON for consistent hashing
-        let json = serde_json::to_string(request)
-            .expect("SearchRequest serialization should never fail");
+        let json =
+            serde_json::to_string(request).expect("SearchRequest serialization should never fail");
 
         // Generate SHA256 hash
         let mut hasher = Sha256::new();
@@ -618,11 +622,7 @@ mod tests {
                 String::new(),
                 cache.clone(),
             )),
-            vector_search: Arc::new(vector::VectorSearch::new(
-                String::new(),
-                String::new(),
-                768,
-            )),
+            vector_search: Arc::new(vector::VectorSearch::new(String::new(), String::new(), 768)),
             keyword_search: Arc::new(keyword::KeywordSearch::new(String::new())),
             db_pool: db_pool.clone(),
             cache,

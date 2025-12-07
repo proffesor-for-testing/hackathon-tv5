@@ -75,13 +75,11 @@ impl GitHubOAuthProvider {
             .map_err(|_| AuthError::Config("GITHUB_CLIENT_ID not set".to_string()))?;
         let client_secret = std::env::var("GITHUB_CLIENT_SECRET")
             .map_err(|_| AuthError::Config("GITHUB_CLIENT_SECRET not set".to_string()))?;
-        let redirect_uri = std::env::var("GITHUB_REDIRECT_URI")
-            .unwrap_or_else(|_| "https://api.mediagateway.io/auth/oauth/github/callback".to_string());
+        let redirect_uri = std::env::var("GITHUB_REDIRECT_URI").unwrap_or_else(|_| {
+            "https://api.mediagateway.io/auth/oauth/github/callback".to_string()
+        });
 
-        let scopes = vec![
-            "user:email".to_string(),
-            "read:user".to_string(),
-        ];
+        let scopes = vec!["user:email".to_string(), "read:user".to_string()];
 
         Ok(Self::new(client_id, client_secret, redirect_uri, scopes))
     }
@@ -130,9 +128,15 @@ impl GitHubOAuthProvider {
             .map_err(|e| AuthError::Internal(format!("Token exchange request failed: {}", e)))?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             tracing::error!("GitHub token exchange failed: {}", error_text);
-            return Err(AuthError::Internal(format!("Token exchange failed: {}", error_text)));
+            return Err(AuthError::Internal(format!(
+                "Token exchange failed: {}",
+                error_text
+            )));
         }
 
         let token_response: GitHubTokenResponse = response
@@ -157,9 +161,15 @@ impl GitHubOAuthProvider {
             .map_err(|e| AuthError::Internal(format!("User profile request failed: {}", e)))?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             tracing::error!("GitHub user profile fetch failed: {}", error_text);
-            return Err(AuthError::Internal(format!("User profile fetch failed: {}", error_text)));
+            return Err(AuthError::Internal(format!(
+                "User profile fetch failed: {}",
+                error_text
+            )));
         }
 
         let profile: GitHubUserProfile = response
@@ -184,9 +194,15 @@ impl GitHubOAuthProvider {
             .map_err(|e| AuthError::Internal(format!("User emails request failed: {}", e)))?;
 
         if !response.status().is_success() {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             tracing::error!("GitHub user emails fetch failed: {}", error_text);
-            return Err(AuthError::Internal(format!("User emails fetch failed: {}", error_text)));
+            return Err(AuthError::Internal(format!(
+                "User emails fetch failed: {}",
+                error_text
+            )));
         }
 
         let emails: Vec<GitHubUserEmail> = response
@@ -282,10 +298,10 @@ mod tests {
 
         // Scopes should be space-separated and URL-encoded
         assert!(
-            auth_url.contains("scope=user%3Aemail+read%3Auser") ||
-            auth_url.contains("scope=user%3Aemail%20read%3Auser") ||
-            auth_url.contains("scope=user:email+read:user") ||
-            auth_url.contains("scope=user:email%20read:user")
+            auth_url.contains("scope=user%3Aemail+read%3Auser")
+                || auth_url.contains("scope=user%3Aemail%20read%3Auser")
+                || auth_url.contains("scope=user:email+read:user")
+                || auth_url.contains("scope=user:email%20read:user")
         );
     }
 
@@ -313,11 +329,13 @@ mod tests {
             .match_header("accept", "application/json")
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "access_token": "gho_test_token_123",
                 "token_type": "bearer",
                 "scope": "user:email,read:user"
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
 
@@ -339,7 +357,8 @@ mod tests {
             .match_header("user-agent", "MediaGateway-Auth")
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "id": 123456,
                 "login": "testuser",
                 "name": "Test User",
@@ -354,7 +373,8 @@ mod tests {
                 "followers": 5,
                 "following": 3,
                 "created_at": "2020-01-01T00:00:00Z"
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
     }
@@ -370,7 +390,8 @@ mod tests {
             .match_header("user-agent", "MediaGateway-Auth")
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"[
+            .with_body(
+                r#"[
                 {
                     "email": "test@example.com",
                     "primary": true,
@@ -383,7 +404,8 @@ mod tests {
                     "verified": false,
                     "visibility": "private"
                 }
-            ]"#)
+            ]"#,
+            )
             .create_async()
             .await;
     }

@@ -1,18 +1,18 @@
 //! Webhook processor that integrates with ingestion pipeline
 
-use async_trait::async_trait;
-use std::sync::Arc;
-use chrono::Utc;
-use uuid::Uuid;
 use crate::{
-    webhooks::{
-        WebhookPayload, WebhookEventType, ProcessedWebhook, ProcessingStatus,
-        WebhookError, WebhookResult, WebhookDeduplicator,
-    },
-    events::{EventProducer, ContentEvent, ContentIngestedEvent, ContentUpdatedEvent},
-    normalizer::{RawContent, CanonicalContent, ContentType, AvailabilityInfo, ImageSet},
+    events::{ContentEvent, ContentIngestedEvent, ContentUpdatedEvent, EventProducer},
+    normalizer::{AvailabilityInfo, CanonicalContent, ContentType, ImageSet, RawContent},
     repository::ContentRepository,
+    webhooks::{
+        ProcessedWebhook, ProcessingStatus, WebhookDeduplicator, WebhookError, WebhookEventType,
+        WebhookPayload, WebhookResult,
+    },
 };
+use async_trait::async_trait;
+use chrono::Utc;
+use std::sync::Arc;
+use uuid::Uuid;
 
 /// Webhook processor that integrates webhooks with the ingestion pipeline
 pub struct WebhookProcessor {
@@ -33,7 +33,10 @@ impl WebhookProcessor {
     }
 
     /// Process a webhook event and integrate with ingestion pipeline
-    pub async fn process_webhook(&self, webhook: WebhookPayload) -> WebhookResult<ProcessedWebhook> {
+    pub async fn process_webhook(
+        &self,
+        webhook: WebhookPayload,
+    ) -> WebhookResult<ProcessedWebhook> {
         let event_id = WebhookDeduplicator::compute_hash(&webhook);
 
         tracing::info!(
@@ -44,9 +47,7 @@ impl WebhookProcessor {
         );
 
         match webhook.event_type {
-            WebhookEventType::ContentAdded => {
-                self.handle_content_added(&webhook, &event_id).await
-            }
+            WebhookEventType::ContentAdded => self.handle_content_added(&webhook, &event_id).await,
             WebhookEventType::ContentUpdated => {
                 self.handle_content_updated(&webhook, &event_id).await
             }
@@ -62,17 +63,20 @@ impl WebhookProcessor {
         webhook: &WebhookPayload,
         event_id: &str,
     ) -> WebhookResult<ProcessedWebhook> {
-        let platform_content_id = webhook.payload
+        let platform_content_id = webhook
+            .payload
             .get("content_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| WebhookError::InvalidPayload("Missing content_id".to_string()))?;
 
-        let title = webhook.payload
+        let title = webhook
+            .payload
             .get("title")
             .and_then(|v| v.as_str())
             .unwrap_or("Untitled");
 
-        let content_type_str = webhook.payload
+        let content_type_str = webhook
+            .payload
             .get("content_type")
             .and_then(|v| v.as_str())
             .unwrap_or("movie");
@@ -86,7 +90,8 @@ impl WebhookProcessor {
             _ => ContentType::Movie,
         };
 
-        let regions = webhook.payload
+        let regions = webhook
+            .payload
             .get("regions")
             .and_then(|v| v.as_array())
             .map(|arr| {
@@ -101,10 +106,22 @@ impl WebhookProcessor {
             platform_id: webhook.platform.clone(),
             entity_id: None,
             title: title.to_string(),
-            overview: webhook.payload.get("overview").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            overview: webhook
+                .payload
+                .get("overview")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             content_type,
-            release_year: webhook.payload.get("year").and_then(|v| v.as_i64()).map(|y| y as i32),
-            runtime_minutes: webhook.payload.get("runtime").and_then(|v| v.as_i64()).map(|r| r as i32),
+            release_year: webhook
+                .payload
+                .get("year")
+                .and_then(|v| v.as_i64())
+                .map(|y| y as i32),
+            runtime_minutes: webhook
+                .payload
+                .get("runtime")
+                .and_then(|v| v.as_i64())
+                .map(|r| r as i32),
             genres: vec![],
             external_ids: std::collections::HashMap::new(),
             availability: AvailabilityInfo {
@@ -157,7 +174,10 @@ impl WebhookProcessor {
             if let Err(e) = producer.publish_event(event).await {
                 tracing::warn!("Failed to publish content ingested event: {}", e);
             } else {
-                tracing::debug!("Published content ingested event for content_id={}", content_id);
+                tracing::debug!(
+                    "Published content ingested event for content_id={}",
+                    content_id
+                );
             }
         }
 
@@ -176,15 +196,17 @@ impl WebhookProcessor {
         webhook: &WebhookPayload,
         event_id: &str,
     ) -> WebhookResult<ProcessedWebhook> {
-        let platform_content_id = webhook.payload
+        let platform_content_id = webhook
+            .payload
             .get("content_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| WebhookError::InvalidPayload("Missing content_id".to_string()))?;
 
-        let content_id = match self.repository.find_by_platform_id(
-            platform_content_id,
-            &webhook.platform,
-        ).await {
+        let content_id = match self
+            .repository
+            .find_by_platform_id(platform_content_id, &webhook.platform)
+            .await
+        {
             Ok(Some(id)) => id,
             Ok(None) => {
                 tracing::warn!(
@@ -220,7 +242,8 @@ impl WebhookProcessor {
         );
 
         if let Some(producer) = &self.event_producer {
-            let updated_fields: Vec<String> = webhook.payload
+            let updated_fields: Vec<String> = webhook
+                .payload
                 .as_object()
                 .map(|obj| obj.keys().map(|k| k.to_string()).collect())
                 .unwrap_or_default();
@@ -234,7 +257,10 @@ impl WebhookProcessor {
             if let Err(e) = producer.publish_event(event).await {
                 tracing::warn!("Failed to publish content updated event: {}", e);
             } else {
-                tracing::debug!("Published content updated event for content_id={}", content_id);
+                tracing::debug!(
+                    "Published content updated event for content_id={}",
+                    content_id
+                );
             }
         }
 
@@ -253,7 +279,8 @@ impl WebhookProcessor {
         webhook: &WebhookPayload,
         event_id: &str,
     ) -> WebhookResult<ProcessedWebhook> {
-        let platform_content_id = webhook.payload
+        let platform_content_id = webhook
+            .payload
             .get("content_id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| WebhookError::InvalidPayload("Missing content_id".to_string()))?;
@@ -277,8 +304,8 @@ impl WebhookProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository::PostgresContentRepository;
     use crate::events::MockEventProducer;
+    use crate::repository::PostgresContentRepository;
     use sqlx::PgPool;
 
     async fn setup_test_processor() -> Option<WebhookProcessor> {
@@ -287,13 +314,10 @@ mod tests {
 
         let repository = Arc::new(PostgresContentRepository::new(pool));
         let event_producer = Arc::new(MockEventProducer::new(
-            crate::events::KafkaConfig::from_env().ok()?
+            crate::events::KafkaConfig::from_env().ok()?,
         ));
 
-        Some(WebhookProcessor::new(
-            repository,
-            Some(event_producer),
-        ))
+        Some(WebhookProcessor::new(repository, Some(event_producer)))
     }
 
     #[tokio::test]

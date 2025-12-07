@@ -11,7 +11,7 @@
 
 use anyhow::Result;
 use media_gateway_sona::{
-    LoRAStorage, UserLoRAAdapter, UpdateUserLoRA, BuildUserPreferenceVector, UserProfile,
+    BuildUserPreferenceVector, LoRAStorage, UpdateUserLoRA, UserLoRAAdapter, UserProfile,
 };
 use sqlx::postgres::PgPoolOptions;
 use uuid::Uuid;
@@ -22,8 +22,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     // Connect to PostgreSQL
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -47,7 +46,10 @@ async fn main() -> Result<()> {
 
     println!("Loading adapter...");
     let loaded = storage.load_adapter(user_id, "default").await?;
-    println!("✓ Loaded adapter (training_iterations: {})", loaded.training_iterations);
+    println!(
+        "✓ Loaded adapter (training_iterations: {})",
+        loaded.training_iterations
+    );
 
     // Example 2: Versioning
     println!("\n=== Example 2: Versioning ===");
@@ -61,7 +63,10 @@ async fn main() -> Result<()> {
 
     // Load latest
     let latest = storage.load_adapter(user_id, "default").await?;
-    println!("Latest version training_iterations: {}", latest.training_iterations);
+    println!(
+        "Latest version training_iterations: {}",
+        latest.training_iterations
+    );
 
     // Load specific version
     let v1 = storage.load_adapter_version(user_id, "default", 1).await?;
@@ -102,8 +107,7 @@ async fn main() -> Result<()> {
     let test_adapter = storage.load_adapter(user_id, adapter_name).await?;
     println!(
         "Loaded {} adapter (iterations: {})",
-        adapter_name,
-        test_adapter.training_iterations
+        adapter_name, test_adapter.training_iterations
     );
 
     // Example 5: Storage statistics
@@ -121,7 +125,9 @@ async fn main() -> Result<()> {
     println!("\n=== Example 6: Cleanup ===");
 
     // Delete specific version
-    let deleted_v1 = storage.delete_adapter_version(user_id, "default", 1).await?;
+    let deleted_v1 = storage
+        .delete_adapter_version(user_id, "default", 1)
+        .await?;
     println!("Deleted version 1: {}", deleted_v1);
 
     // Delete all versions of experimental

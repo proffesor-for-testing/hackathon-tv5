@@ -13,11 +13,12 @@ pub struct TestContext {
 
 impl TestContext {
     pub async fn new() -> Result<Self> {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+        });
 
-        let redis_url = std::env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+        let redis_url =
+            std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
         let auth_url = std::env::var("AUTH_SERVICE_URL")
             .unwrap_or_else(|_| "http://localhost:8081".to_string());
@@ -37,8 +38,8 @@ impl TestContext {
             .context("Failed to connect to test database")?;
 
         // Create Redis connection
-        let redis_client = redis::Client::open(redis_url.as_str())
-            .context("Failed to create Redis client")?;
+        let redis_client =
+            redis::Client::open(redis_url.as_str()).context("Failed to create Redis client")?;
 
         let redis = ConnectionManager::new(redis_client)
             .await
@@ -112,7 +113,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_context_creation() {
-        let ctx = TestContext::new().await.expect("Failed to create test context");
+        let ctx = TestContext::new()
+            .await
+            .expect("Failed to create test context");
         assert!(ctx.auth_url.starts_with("http"));
         assert!(ctx.discovery_url.starts_with("http"));
         assert!(ctx.playback_url.starts_with("http"));
@@ -120,15 +123,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_migrations() {
-        let ctx = TestContext::new().await.expect("Failed to create test context");
-        ctx.run_migrations().await.expect("Failed to run migrations");
+        let ctx = TestContext::new()
+            .await
+            .expect("Failed to create test context");
+        ctx.run_migrations()
+            .await
+            .expect("Failed to run migrations");
         ctx.teardown().await.expect("Failed to teardown");
     }
 
     #[tokio::test]
     async fn test_cleanup() {
-        let ctx = TestContext::new().await.expect("Failed to create test context");
-        ctx.run_migrations().await.expect("Failed to run migrations");
+        let ctx = TestContext::new()
+            .await
+            .expect("Failed to create test context");
+        ctx.run_migrations()
+            .await
+            .expect("Failed to run migrations");
         ctx.cleanup().await.expect("Failed to cleanup");
         ctx.teardown().await.expect("Failed to teardown");
     }

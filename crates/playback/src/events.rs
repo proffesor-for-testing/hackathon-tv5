@@ -5,15 +5,17 @@
 //!
 //! Also publishes unified user activity events via core event system.
 
+use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
+use media_gateway_core::{
+    ActivityEventType, KafkaActivityProducer, UserActivityEvent, UserActivityProducer,
+};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use anyhow::{Result, Context};
-use media_gateway_core::{ActivityEventType, KafkaActivityProducer, UserActivityEvent, UserActivityProducer};
 
 /// Playback event types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,19 +111,17 @@ impl KafkaPlaybackProducer {
 
     /// Create from environment variables
     pub fn from_env() -> Result<Self> {
-        let brokers = std::env::var("KAFKA_BROKERS")
-            .unwrap_or_else(|_| "localhost:9092".to_string());
-        let topic_prefix = std::env::var("KAFKA_TOPIC_PREFIX")
-            .unwrap_or_else(|_| "playback".to_string());
+        let brokers =
+            std::env::var("KAFKA_BROKERS").unwrap_or_else(|_| "localhost:9092".to_string());
+        let topic_prefix =
+            std::env::var("KAFKA_TOPIC_PREFIX").unwrap_or_else(|_| "playback".to_string());
 
         Self::new(&brokers, topic_prefix)
     }
 
     /// Publish event to Kafka
     async fn publish(&self, topic: &str, key: &str, payload: &[u8]) -> Result<()> {
-        let record = FutureRecord::to(topic)
-            .key(key)
-            .payload(payload);
+        let record = FutureRecord::to(topic).key(key).payload(payload);
 
         // Send with timeout
         self.producer
@@ -138,8 +138,8 @@ impl PlaybackEventProducer for KafkaPlaybackProducer {
     async fn publish_session_created(&self, event: SessionCreatedEvent) -> Result<()> {
         let topic = format!("{}.session-created", self.topic_prefix);
         let key = event.session_id.to_string();
-        let payload = serde_json::to_vec(&event)
-            .context("Failed to serialize session created event")?;
+        let payload =
+            serde_json::to_vec(&event).context("Failed to serialize session created event")?;
 
         self.publish(&topic, &key, &payload).await?;
 
@@ -166,13 +166,10 @@ impl PlaybackEventProducer for KafkaPlaybackProducer {
                     "quality": quality,
                 });
 
-                let activity_event = UserActivityEvent::new(
-                    user_id,
-                    ActivityEventType::PlaybackStart,
-                    metadata,
-                )
-                .with_content_id(content_id)
-                .with_device_id(device_id);
+                let activity_event =
+                    UserActivityEvent::new(user_id, ActivityEventType::PlaybackStart, metadata)
+                        .with_content_id(content_id)
+                        .with_device_id(device_id);
 
                 if let Err(e) = producer.publish_activity(activity_event).await {
                     tracing::warn!(error = %e, "Failed to publish playback start activity event");
@@ -186,8 +183,8 @@ impl PlaybackEventProducer for KafkaPlaybackProducer {
     async fn publish_position_updated(&self, event: PositionUpdatedEvent) -> Result<()> {
         let topic = format!("{}.position-updated", self.topic_prefix);
         let key = event.session_id.to_string();
-        let payload = serde_json::to_vec(&event)
-            .context("Failed to serialize position updated event")?;
+        let payload =
+            serde_json::to_vec(&event).context("Failed to serialize position updated event")?;
 
         self.publish(&topic, &key, &payload).await?;
 
@@ -203,8 +200,8 @@ impl PlaybackEventProducer for KafkaPlaybackProducer {
     async fn publish_session_ended(&self, event: SessionEndedEvent) -> Result<()> {
         let topic = format!("{}.session-ended", self.topic_prefix);
         let key = event.session_id.to_string();
-        let payload = serde_json::to_vec(&event)
-            .context("Failed to serialize session ended event")?;
+        let payload =
+            serde_json::to_vec(&event).context("Failed to serialize session ended event")?;
 
         self.publish(&topic, &key, &payload).await?;
 

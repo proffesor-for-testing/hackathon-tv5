@@ -99,7 +99,7 @@ impl MfaManager {
             UPDATE mfa_enrollments
             SET is_verified = true, verified_at = NOW()
             WHERE user_id = $1
-            "#
+            "#,
         )
         .bind(user_id)
         .execute(&self.db_pool)
@@ -141,7 +141,7 @@ impl MfaManager {
         let result: Option<(bool,)> = sqlx::query_as(
             r#"
             SELECT is_verified FROM mfa_enrollments WHERE user_id = $1
-            "#
+            "#,
         )
         .bind(user_id)
         .fetch_optional(&self.db_pool)
@@ -183,7 +183,7 @@ impl MfaManager {
             UPDATE mfa_enrollments
             SET backup_codes_hash = $1
             WHERE user_id = $2
-            "#
+            "#,
         )
         .bind(&remaining_codes)
         .bind(user_id)
@@ -197,7 +197,7 @@ impl MfaManager {
         sqlx::query(
             r#"
             DELETE FROM mfa_enrollments WHERE user_id = $1
-            "#
+            "#,
         )
         .bind(user_id)
         .execute(&self.db_pool)

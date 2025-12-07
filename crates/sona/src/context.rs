@@ -2,11 +2,11 @@
 //!
 //! Filters recommendations based on temporal context, device type, and mood.
 
-use crate::types::{ScoredContent, RecommendationContext, TemporalContext, RecommendationType};
 use crate::profile::UserProfile;
-use anyhow::{Result, Context};
-use chrono::{Utc, Timelike};
-use sqlx::PgPool;
+use crate::types::{RecommendationContext, RecommendationType, ScoredContent, TemporalContext};
+use anyhow::{Context, Result};
+use chrono::{Timelike, Utc};
+use sqlx::{PgPool, Row};
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
@@ -34,11 +34,9 @@ impl ContextAwareFilter {
 
         // Time-of-day filtering
         if let Some(time_of_day) = &context.time_of_day {
-            let temporal_candidates = self.filter_by_time_of_day(
-                profile,
-                time_of_day,
-                limit,
-            ).await?;
+            let temporal_candidates = self
+                .filter_by_time_of_day(profile, time_of_day, limit)
+                .await?;
             candidates.extend(temporal_candidates);
         }
 
@@ -208,7 +206,11 @@ impl ContextAwareFilter {
                 crate::types::DeviceType::TV => {
                     // Boost score for longer content on TV
                     if let Some(mins) = runtime {
-                        if mins > 60 { 1.0 } else { 0.8 }
+                        if mins > 60 {
+                            1.0
+                        } else {
+                            0.8
+                        }
                     } else {
                         0.7
                     }
@@ -216,7 +218,11 @@ impl ContextAwareFilter {
                 crate::types::DeviceType::Mobile | crate::types::DeviceType::Tablet => {
                     // Boost score for shorter content on mobile
                     if let Some(mins) = runtime {
-                        if mins < 30 { 1.0 } else { 0.8 }
+                        if mins < 30 {
+                            1.0
+                        } else {
+                            0.8
+                        }
                     } else {
                         0.7
                     }
@@ -244,11 +250,7 @@ impl ContextAwareFilter {
         Ok(candidates)
     }
 
-    async fn filter_by_mood(
-        &self,
-        mood: &str,
-        limit: usize,
-    ) -> Result<Vec<ScoredContent>> {
+    async fn filter_by_mood(&self, mood: &str, limit: usize) -> Result<Vec<ScoredContent>> {
         let start = std::time::Instant::now();
 
         // Map mood to genres
@@ -295,7 +297,8 @@ impl ContextAwareFilter {
                     rows.into_iter()
                         .filter_map(|row| {
                             let content_id: Uuid = row.try_get("id").ok()?;
-                            let popularity: f32 = row.try_get::<f64, _>("popularity_score").ok()? as f32;
+                            let popularity: f32 =
+                                row.try_get::<f64, _>("popularity_score").ok()? as f32;
 
                             Some(ScoredContent {
                                 content_id,
@@ -329,11 +332,7 @@ impl ContextAwareFilter {
     }
 
     /// Helper method to filter by genres
-    async fn filter_by_genres(
-        &self,
-        genres: &[&str],
-        limit: usize,
-    ) -> Result<Vec<ScoredContent>> {
+    async fn filter_by_genres(&self, genres: &[&str], limit: usize) -> Result<Vec<ScoredContent>> {
         let query = r#"
             SELECT DISTINCT c.id, c.popularity_score, COUNT(*) as genre_match_count
             FROM content c

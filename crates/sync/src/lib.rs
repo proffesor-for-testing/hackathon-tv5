@@ -8,7 +8,6 @@
 /// - WebSocket support for bidirectional sync
 /// - Device management and presence tracking
 /// - Watchlist and watch progress synchronization
-
 pub mod command_router;
 pub mod crdt;
 pub mod device;
@@ -23,10 +22,13 @@ pub mod websocket;
 pub mod ws;
 
 pub use command_router::{Command, CommandAck, CommandRouter, DeviceCommandMessage};
-pub use crdt::{HLCTimestamp, HybridLogicalClock, LWWRegister, ORSet, ORSetDelta, ORSetOperation, PlaybackPosition, PlaybackState};
+pub use crdt::{
+    HLCTimestamp, HybridLogicalClock, LWWRegister, ORSet, ORSetDelta, ORSetOperation,
+    PlaybackPosition, PlaybackState,
+};
 pub use device::{
-    AudioCodec, CommandError, CommandType, DeviceCapabilities, DeviceHandoff, DeviceInfo, DevicePlatform,
-    DeviceRegistry, DeviceType, HDRFormat, RemoteCommand, VideoResolution,
+    AudioCodec, CommandError, CommandType, DeviceCapabilities, DeviceHandoff, DeviceInfo,
+    DevicePlatform, DeviceRegistry, DeviceType, HDRFormat, RemoteCommand, VideoResolution,
 };
 pub use persistence::SyncPersistence;
 pub use pubnub::{DeviceMessage, PubNubClient, PubNubConfig, PubNubError, SyncMessage};

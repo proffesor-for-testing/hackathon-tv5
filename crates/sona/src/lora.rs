@@ -3,13 +3,13 @@
 //! Implements UpdateUserLoRA and ComputeLoRAForward algorithms from SPARC pseudocode.
 //! Provides per-user personalization with ~10KB memory footprint per user.
 
-use crate::types::ViewingEvent;
 use crate::inference::ONNXInference;
-use anyhow::{Result, anyhow};
+use crate::types::ViewingEvent;
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use ndarray::{Array1, Array2};
-use uuid::Uuid;
 use std::sync::Arc;
+use uuid::Uuid;
 
 const LORA_RANK: usize = 8;
 const LORA_ALPHA: f32 = 16.0;
@@ -28,10 +28,10 @@ const MIN_TRAINING_EVENTS: usize = 10;
 #[derive(Debug, Clone)]
 pub struct UserLoRAAdapter {
     pub user_id: Uuid,
-    pub base_layer_weights: Array2<f32>,  // [rank, input_dim]
-    pub user_layer_weights: Array2<f32>,  // [output_dim, rank]
+    pub base_layer_weights: Array2<f32>, // [rank, input_dim]
+    pub user_layer_weights: Array2<f32>, // [output_dim, rank]
     pub rank: usize,
-    pub scaling_factor: f32,              // alpha/rank
+    pub scaling_factor: f32, // alpha/rank
     pub last_trained_time: DateTime<Utc>,
     pub training_iterations: usize,
 }
@@ -116,9 +116,7 @@ impl UpdateUserLoRA {
                 let lora_output = ComputeLoRAForward::execute(adapter, embedding)?;
 
                 // Predicted engagement (dot product + sigmoid)
-                let predicted = Self::sigmoid(
-                    Self::dot_product(&lora_output, preference_vector)
-                );
+                let predicted = Self::sigmoid(Self::dot_product(&lora_output, preference_vector));
 
                 // Binary cross-entropy loss
                 let loss = -label * predicted.ln() - (1.0 - label) * (1.0 - predicted).ln();
@@ -126,15 +124,15 @@ impl UpdateUserLoRA {
 
                 // Backward pass (gradient descent on user layer only)
                 let gradient_scalar = predicted - label;
-                Self::update_user_layer_gradients(
-                    adapter,
-                    embedding,
-                    gradient_scalar,
-                )?;
+                Self::update_user_layer_gradients(adapter, embedding, gradient_scalar)?;
             }
 
             let avg_loss = total_loss / training_pairs.len() as f32;
-            tracing::debug!("LoRA training iteration {}: avg_loss={}", iteration, avg_loss);
+            tracing::debug!(
+                "LoRA training iteration {}: avg_loss={}",
+                iteration,
+                avg_loss
+            );
         }
 
         adapter.last_trained_time = Utc::now();
@@ -172,9 +170,7 @@ impl UpdateUserLoRA {
                 let lora_output = ComputeLoRAForward::execute(adapter, embedding)?;
 
                 // Predicted engagement (dot product + sigmoid)
-                let predicted = Self::sigmoid(
-                    Self::dot_product(&lora_output, preference_vector)
-                );
+                let predicted = Self::sigmoid(Self::dot_product(&lora_output, preference_vector));
 
                 // Binary cross-entropy loss
                 let loss = -label * predicted.ln() - (1.0 - label) * (1.0 - predicted).ln();
@@ -182,15 +178,15 @@ impl UpdateUserLoRA {
 
                 // Backward pass (gradient descent on user layer only)
                 let gradient_scalar = predicted - label;
-                Self::update_user_layer_gradients(
-                    adapter,
-                    embedding,
-                    gradient_scalar,
-                )?;
+                Self::update_user_layer_gradients(adapter, embedding, gradient_scalar)?;
             }
 
             let avg_loss = total_loss / training_pairs.len() as f32;
-            tracing::debug!("LoRA training iteration {}: avg_loss={}", iteration, avg_loss);
+            tracing::debug!(
+                "LoRA training iteration {}: avg_loss={}",
+                iteration,
+                avg_loss
+            );
         }
 
         adapter.last_trained_time = Utc::now();
@@ -237,7 +233,9 @@ impl UpdateUserLoRA {
         gradient_scalar: f32,
     ) -> Result<()> {
         // Compute intermediate activations
-        let intermediate = adapter.base_layer_weights.dot(&Array1::from_vec(embedding.to_vec()));
+        let intermediate = adapter
+            .base_layer_weights
+            .dot(&Array1::from_vec(embedding.to_vec()));
 
         // Update user layer weights with gradient descent
         for i in 0..OUTPUT_DIM {
@@ -259,13 +257,13 @@ impl UpdateUserLoRA {
 pub struct ComputeLoRAForward;
 
 impl ComputeLoRAForward {
-    pub fn execute(
-        adapter: &UserLoRAAdapter,
-        input_vector: &[f32],
-    ) -> Result<Vec<f32>> {
+    pub fn execute(adapter: &UserLoRAAdapter, input_vector: &[f32]) -> Result<Vec<f32>> {
         if input_vector.len() != INPUT_DIM {
-            return Err(anyhow!("Input vector dimension mismatch: expected {}, got {}",
-                INPUT_DIM, input_vector.len()));
+            return Err(anyhow!(
+                "Input vector dimension mismatch: expected {}, got {}",
+                INPUT_DIM,
+                input_vector.len()
+            ));
         }
 
         let input_array = Array1::from_vec(input_vector.to_vec());
@@ -292,7 +290,8 @@ pub fn compute_lora_score(
     let lora_output = ComputeLoRAForward::execute(adapter, content_embedding)?;
 
     // Dot product similarity
-    let score: f32 = lora_output.iter()
+    let score: f32 = lora_output
+        .iter()
         .zip(preference_vector.iter())
         .map(|(a, b)| a * b)
         .sum();

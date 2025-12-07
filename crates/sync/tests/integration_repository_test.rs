@@ -17,8 +17,9 @@ use std::env;
 use uuid::Uuid;
 
 async fn setup_test_db() -> Result<PostgresSyncRepository> {
-    let database_url = env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string());
+    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://postgres:postgres@localhost:5432/media_gateway_test".to_string()
+    });
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -26,9 +27,7 @@ async fn setup_test_db() -> Result<PostgresSyncRepository> {
         .await?;
 
     // Run migrations
-    sqlx::migrate!("../../migrations")
-        .run(&pool)
-        .await?;
+    sqlx::migrate!("../../migrations").run(&pool).await?;
 
     Ok(PostgresSyncRepository::new(pool))
 }
@@ -104,14 +103,16 @@ async fn test_watchlist_incremental_updates() -> Result<()> {
         device_id: device_id.to_string(),
     };
 
-    repo.add_watchlist_item(&user_id, "content-movie-123", &entry).await?;
+    repo.add_watchlist_item(&user_id, "content-movie-123", &entry)
+        .await?;
 
     // Load and verify
     let loaded_set = repo.load_watchlist(&user_id).await?;
     assert!(loaded_set.contains("content-movie-123"));
 
     // Remove item
-    repo.remove_watchlist_item(&user_id, &entry.unique_tag).await?;
+    repo.remove_watchlist_item(&user_id, &entry.unique_tag)
+        .await?;
 
     let loaded_set = repo.load_watchlist(&user_id).await?;
     assert!(!loaded_set.contains("content-movie-123"));
@@ -234,7 +235,10 @@ async fn test_device_persistence() -> Result<()> {
     let loaded_device = &loaded_devices[0];
     assert_eq!(loaded_device.device_id, "device-test-004");
     assert_eq!(loaded_device.device_type, DeviceType::TV);
-    assert_eq!(loaded_device.capabilities.max_resolution, VideoResolution::UHD_4K);
+    assert_eq!(
+        loaded_device.capabilities.max_resolution,
+        VideoResolution::UHD_4K
+    );
     assert_eq!(loaded_device.is_online, true);
 
     Ok(())
@@ -250,7 +254,8 @@ async fn test_device_heartbeat() -> Result<()> {
     repo.save_device(&user_id, &device).await?;
 
     // Update heartbeat
-    repo.update_device_heartbeat(&user_id, "device-test-005").await?;
+    repo.update_device_heartbeat(&user_id, "device-test-005")
+        .await?;
 
     // Verify online status updated
     let loaded = repo.get_device(&user_id, "device-test-005").await?;
@@ -290,8 +295,16 @@ async fn test_service_restart_scenario() -> Result<()> {
 
     // Simulate service running: save state
     let mut or_set = ORSet::new();
-    or_set.add("movie-1".to_string(), HLCTimestamp::from_components(1000, 0), device_id.to_string());
-    or_set.add("series-2".to_string(), HLCTimestamp::from_components(2000, 0), device_id.to_string());
+    or_set.add(
+        "movie-1".to_string(),
+        HLCTimestamp::from_components(1000, 0),
+        device_id.to_string(),
+    );
+    or_set.add(
+        "series-2".to_string(),
+        HLCTimestamp::from_components(2000, 0),
+        device_id.to_string(),
+    );
 
     let progress = PlaybackPosition::new(
         "movie-1".to_string(),
@@ -338,12 +351,20 @@ async fn test_multiple_users_isolation() -> Result<()> {
 
     // User 1: add watchlist items
     let mut or_set1 = ORSet::new();
-    or_set1.add("user1-content".to_string(), HLCTimestamp::from_components(1000, 0), "device1".to_string());
+    or_set1.add(
+        "user1-content".to_string(),
+        HLCTimestamp::from_components(1000, 0),
+        "device1".to_string(),
+    );
     repo.save_watchlist(&user1_id, &or_set1).await?;
 
     // User 2: add different watchlist items
     let mut or_set2 = ORSet::new();
-    or_set2.add("user2-content".to_string(), HLCTimestamp::from_components(1000, 0), "device2".to_string());
+    or_set2.add(
+        "user2-content".to_string(),
+        HLCTimestamp::from_components(1000, 0),
+        "device2".to_string(),
+    );
     repo.save_watchlist(&user2_id, &or_set2).await?;
 
     // Verify isolation

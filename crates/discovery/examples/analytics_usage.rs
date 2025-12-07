@@ -1,3 +1,4 @@
+use chrono::Utc;
 /// Example: Using the Search Analytics system
 ///
 /// This example demonstrates how to:
@@ -5,11 +6,9 @@
 /// 2. Log search events and clicks
 /// 3. Query analytics data
 /// 4. Generate dashboard reports
-
-use discovery::analytics::{SearchAnalytics, PeriodType};
+use discovery::analytics::{PeriodType, SearchAnalytics};
 use sqlx::PgPool;
 use std::collections::HashMap;
-use chrono::Utc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -34,8 +33,8 @@ async fn main() -> anyhow::Result<()> {
         .log_search(
             "action movies",
             Some("user123"),
-            42,     // result_count
-            156,    // latency_ms
+            42,  // result_count
+            156, // latency_ms
             filters,
         )
         .await?;
@@ -93,13 +92,20 @@ async fn main() -> anyhow::Result<()> {
 
     // Example 7: Aggregate popular searches
     println!("\n7. Aggregating popular searches...");
-    let period_start = Utc::now().date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let period_start = Utc::now()
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc();
 
     analytics
         .aggregate_popular_searches(PeriodType::Hourly, period_start)
         .await?;
 
-    println!("   Aggregated searches for hourly period starting at {}", period_start);
+    println!(
+        "   Aggregated searches for hourly period starting at {}",
+        period_start
+    );
 
     analytics
         .aggregate_popular_searches(PeriodType::Daily, period_start)
@@ -116,7 +122,10 @@ async fn main() -> anyhow::Result<()> {
     println!("Unique Queries: {}", dashboard.unique_queries);
     println!("Average Latency: {:.2}ms", dashboard.avg_latency_ms);
     println!("P95 Latency: {}ms", dashboard.p95_latency_ms);
-    println!("Zero-Result Rate: {:.2}%", dashboard.zero_result_rate * 100.0);
+    println!(
+        "Zero-Result Rate: {:.2}%",
+        dashboard.zero_result_rate * 100.0
+    );
     println!("Average CTR: {:.2}%", dashboard.avg_ctr * 100.0);
 
     println!("\nTop Queries:");

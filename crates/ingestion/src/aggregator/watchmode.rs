@@ -2,12 +2,12 @@
 //!
 //! Rate limit: 1000 requests per day
 
-use super::{AggregatorResponse, AggregatorContent};
-use crate::{Result, IngestionError};
+use super::{AggregatorContent, AggregatorResponse};
+use crate::{IngestionError, Result};
 use chrono::Utc;
+use moka::future::Cache;
 use reqwest::Client;
 use serde_json::Value;
-use moka::future::Cache;
 use std::time::Duration;
 
 /// Watchmode API client (fallback aggregator)
@@ -64,7 +64,7 @@ impl WatchmodeClient {
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
@@ -98,16 +98,14 @@ impl WatchmodeClient {
 
         let url = format!(
             "{}/title/{}/details/?apiKey={}",
-            self.base_url,
-            title_id,
-            self.api_key
+            self.base_url, title_id, self.api_key
         );
 
         let response = self.client.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
@@ -141,16 +139,14 @@ impl WatchmodeClient {
 
         let url = format!(
             "{}/title/{}/sources/?apiKey={}",
-            self.base_url,
-            title_id,
-            self.api_key
+            self.base_url, title_id, self.api_key
         );
 
         let response = self.client.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(IngestionError::HttpError(
-                response.error_for_status().unwrap_err()
+                response.error_for_status().unwrap_err(),
             ));
         }
 
@@ -169,25 +165,31 @@ impl WatchmodeClient {
 
     /// Parse search response
     fn parse_search_response(&self, data: &Value) -> Result<Vec<AggregatorContent>> {
-        let results = data.get("title_results")
+        let results = data
+            .get("title_results")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| IngestionError::NormalizationFailed(
-                "No title_results array in response".to_string()
-            ))?;
+            .ok_or_else(|| {
+                IngestionError::NormalizationFailed(
+                    "No title_results array in response".to_string(),
+                )
+            })?;
 
-        Ok(results.iter()
+        Ok(results
+            .iter()
             .filter_map(|item| self.parse_search_item(item).ok())
             .collect())
     }
 
     /// Parse search item
     fn parse_search_item(&self, item: &Value) -> Result<AggregatorContent> {
-        let id = item.get("id")
+        let id = item
+            .get("id")
             .and_then(|v| v.as_i64())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing id".to_string()))?
             .to_string();
 
-        let title = item.get("name")
+        let title = item
+            .get("name")
             .and_then(|v| v.as_str())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing name".to_string()))?
             .to_string();
@@ -197,12 +199,19 @@ impl WatchmodeClient {
             title,
             overview: None,
             year: item.get("year").and_then(|v| v.as_i64()).map(|y| y as i32),
-            content_type: item.get("type")
+            content_type: item
+                .get("type")
                 .and_then(|v| v.as_str())
                 .unwrap_or("movie")
                 .to_string(),
-            imdb_id: item.get("imdb_id").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            tmdb_id: item.get("tmdb_id").and_then(|v| v.as_i64()).map(|i| i as i32),
+            imdb_id: item
+                .get("imdb_id")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            tmdb_id: item
+                .get("tmdb_id")
+                .and_then(|v| v.as_i64())
+                .map(|i| i as i32),
             genres: vec![],
             poster_url: None,
             rating: None,
@@ -212,12 +221,14 @@ impl WatchmodeClient {
 
     /// Parse title details
     fn parse_title_details(&self, data: &Value) -> Result<AggregatorContent> {
-        let id = data.get("id")
+        let id = data
+            .get("id")
             .and_then(|v| v.as_i64())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing id".to_string()))?
             .to_string();
 
-        let title = data.get("title")
+        let title = data
+            .get("title")
             .and_then(|v| v.as_str())
             .ok_or_else(|| IngestionError::NormalizationFailed("Missing title".to_string()))?
             .to_string();
@@ -225,15 +236,26 @@ impl WatchmodeClient {
         Ok(AggregatorContent {
             id,
             title,
-            overview: data.get("plot_overview").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            overview: data
+                .get("plot_overview")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             year: data.get("year").and_then(|v| v.as_i64()).map(|y| y as i32),
-            content_type: data.get("type")
+            content_type: data
+                .get("type")
                 .and_then(|v| v.as_str())
                 .unwrap_or("movie")
                 .to_string(),
-            imdb_id: data.get("imdb_id").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            tmdb_id: data.get("tmdb_id").and_then(|v| v.as_i64()).map(|i| i as i32),
-            genres: data.get("genre_names")
+            imdb_id: data
+                .get("imdb_id")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            tmdb_id: data
+                .get("tmdb_id")
+                .and_then(|v| v.as_i64())
+                .map(|i| i as i32),
+            genres: data
+                .get("genre_names")
                 .and_then(|v| v.as_array())
                 .map(|arr| {
                     arr.iter()
@@ -241,9 +263,18 @@ impl WatchmodeClient {
                         .collect()
                 })
                 .unwrap_or_default(),
-            poster_url: data.get("poster").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            rating: data.get("user_rating").and_then(|v| v.as_f64()).map(|r| r as f32),
-            runtime: data.get("runtime_minutes").and_then(|v| v.as_i64()).map(|r| r as i32),
+            poster_url: data
+                .get("poster")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            rating: data
+                .get("user_rating")
+                .and_then(|v| v.as_f64())
+                .map(|r| r as f32),
+            runtime: data
+                .get("runtime_minutes")
+                .and_then(|v| v.as_i64())
+                .map(|r| r as i32),
         })
     }
 }

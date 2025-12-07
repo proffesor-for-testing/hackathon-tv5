@@ -44,13 +44,16 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .route("/health", web::get().to(health))
             // Search routes
             .route("/search", web::post().to(handlers::execute_search))
-            .route("/search/autocomplete", web::get().to(handlers::autocomplete))
+            .route(
+                "/search/autocomplete",
+                web::get().to(handlers::autocomplete),
+            )
             // Analytics routes
             .route("/analytics", web::get().to(handlers::get_analytics))
             // Quality routes
             .service(
                 web::scope("/quality")
-                    .route("/report", web::get().to(handlers::get_quality_report))
+                    .route("/report", web::get().to(handlers::get_quality_report)),
             )
             // Admin ranking routes
             .service(
@@ -58,11 +61,23 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route("", web::get().to(handlers::get_ranking_config))
                     .route("", web::put().to(handlers::update_ranking_config))
                     .route("/variants", web::get().to(handlers::list_ranking_variants))
-                    .route("/variants/{name}", web::get().to(handlers::get_ranking_variant))
-                    .route("/variants/{name}", web::put().to(handlers::update_ranking_variant))
-                    .route("/variants/{name}", web::delete().to(handlers::delete_ranking_variant))
-                    .route("/history/{version}", web::get().to(handlers::get_ranking_config_history))
-            )
+                    .route(
+                        "/variants/{name}",
+                        web::get().to(handlers::get_ranking_variant),
+                    )
+                    .route(
+                        "/variants/{name}",
+                        web::put().to(handlers::update_ranking_variant),
+                    )
+                    .route(
+                        "/variants/{name}",
+                        web::delete().to(handlers::delete_ranking_variant),
+                    )
+                    .route(
+                        "/history/{version}",
+                        web::get().to(handlers::get_ranking_config_history),
+                    ),
+            ),
     );
 
     // Configure catalog routes
@@ -76,15 +91,9 @@ mod tests {
 
     #[actix_web::test]
     async fn test_health_endpoint() {
-        let app = test::init_service(
-            App::new()
-                .configure(configure_routes)
-        )
-        .await;
+        let app = test::init_service(App::new().configure(configure_routes)).await;
 
-        let req = test::TestRequest::get()
-            .uri("/api/v1/health")
-            .to_request();
+        let req = test::TestRequest::get().uri("/api/v1/health").to_request();
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);

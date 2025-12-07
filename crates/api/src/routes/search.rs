@@ -4,7 +4,9 @@ use crate::rate_limit::RateLimiter;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use std::sync::Arc;
 
-fn convert_headers(actix_headers: &actix_web::http::header::HeaderMap) -> reqwest::header::HeaderMap {
+fn convert_headers(
+    actix_headers: &actix_web::http::header::HeaderMap,
+) -> reqwest::header::HeaderMap {
     let mut reqwest_headers = reqwest::header::HeaderMap::new();
     for (key, value) in actix_headers.iter() {
         if let Ok(name) = reqwest::header::HeaderName::from_bytes(key.as_str().as_bytes()) {
@@ -34,8 +36,14 @@ async fn hybrid_search(
 ) -> impl Responder {
     // Check rate limit
     let user_ctx = get_user_context(&req);
-    let user_id = user_ctx.as_ref().map(|u| u.user_id.as_str()).unwrap_or("anonymous");
-    let tier = user_ctx.as_ref().map(|u| u.tier.as_str()).unwrap_or("anonymous");
+    let user_id = user_ctx
+        .as_ref()
+        .map(|u| u.user_id.as_str())
+        .unwrap_or("anonymous");
+    let tier = user_ctx
+        .as_ref()
+        .map(|u| u.tier.as_str())
+        .unwrap_or("anonymous");
 
     match rate_limiter.check_rate_limit(user_id, tier).await {
         Ok(rate_info) => {
@@ -52,7 +60,8 @@ async fn hybrid_search(
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {
@@ -76,8 +85,14 @@ async fn semantic_search(
 ) -> impl Responder {
     // Check rate limit
     let user_ctx = get_user_context(&req);
-    let user_id = user_ctx.as_ref().map(|u| u.user_id.as_str()).unwrap_or("anonymous");
-    let tier = user_ctx.as_ref().map(|u| u.tier.as_str()).unwrap_or("anonymous");
+    let user_id = user_ctx
+        .as_ref()
+        .map(|u| u.user_id.as_str())
+        .unwrap_or("anonymous");
+    let tier = user_ctx
+        .as_ref()
+        .map(|u| u.tier.as_str())
+        .unwrap_or("anonymous");
 
     match rate_limiter.check_rate_limit(user_id, tier).await {
         Ok(rate_info) => {
@@ -94,7 +109,8 @@ async fn semantic_search(
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {
@@ -117,8 +133,14 @@ async fn autocomplete(
 ) -> impl Responder {
     // Check rate limit
     let user_ctx = get_user_context(&req);
-    let user_id = user_ctx.as_ref().map(|u| u.user_id.as_str()).unwrap_or("anonymous");
-    let tier = user_ctx.as_ref().map(|u| u.tier.as_str()).unwrap_or("anonymous");
+    let user_id = user_ctx
+        .as_ref()
+        .map(|u| u.user_id.as_str())
+        .unwrap_or("anonymous");
+    let tier = user_ctx
+        .as_ref()
+        .map(|u| u.tier.as_str())
+        .unwrap_or("anonymous");
 
     match rate_limiter.check_rate_limit(user_id, tier).await {
         Ok(rate_info) => {
@@ -128,14 +150,18 @@ async fn autocomplete(
                 method: req.method().clone(),
                 headers: convert_headers(req.headers()),
                 body: None,
-                query: req.query_string().is_empty().then(|| req.query_string().to_string()),
+                query: req
+                    .query_string()
+                    .is_empty()
+                    .then(|| req.query_string().to_string()),
             };
 
             match proxy.forward(proxy_req).await {
                 Ok(response) => {
                     let mut http_response = HttpResponse::build(response.status);
                     http_response.insert_header(("X-RateLimit-Limit", rate_info.limit.to_string()));
-                    http_response.insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
+                    http_response
+                        .insert_header(("X-RateLimit-Remaining", rate_info.remaining.to_string()));
                     http_response.insert_header(("X-RateLimit-Reset", rate_info.reset.to_string()));
 
                     for (key, value) in response.headers.iter() {

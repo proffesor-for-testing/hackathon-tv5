@@ -1,6 +1,10 @@
 use chrono::Utc;
-use media_gateway_ingestion::normalizer::{AvailabilityInfo, CanonicalContent, ContentType, ImageSet};
-use media_gateway_ingestion::quality::{QualityScorer, QualityWeights, batch_score_content, generate_quality_report};
+use media_gateway_ingestion::normalizer::{
+    AvailabilityInfo, CanonicalContent, ContentType, ImageSet,
+};
+use media_gateway_ingestion::quality::{
+    batch_score_content, generate_quality_report, QualityScorer, QualityWeights,
+};
 use std::collections::HashMap;
 
 fn create_complete_content() -> CanonicalContent {
@@ -78,7 +82,11 @@ fn test_score_content_complete() {
     let score = scorer.score_content(&content);
 
     // Complete content should have high score (close to 1.0)
-    assert!(score >= 0.8, "Complete content should score >= 0.8, got {}", score);
+    assert!(
+        score >= 0.8,
+        "Complete content should score >= 0.8, got {}",
+        score
+    );
     assert!(score <= 1.0, "Score should not exceed 1.0, got {}", score);
 }
 
@@ -90,7 +98,11 @@ fn test_score_content_minimal() {
     let score = scorer.score_content(&content);
 
     // Minimal content should have low score
-    assert!(score < 0.3, "Minimal content should score < 0.3, got {}", score);
+    assert!(
+        score < 0.3,
+        "Minimal content should score < 0.3, got {}",
+        score
+    );
     assert!(score >= 0.0, "Score should not be negative, got {}", score);
 }
 
@@ -107,8 +119,16 @@ fn test_score_with_partial_data() {
     let score = scorer.score_content(&content);
 
     // Partial content should have medium score
-    assert!(score >= 0.3, "Partial content should score >= 0.3, got {}", score);
-    assert!(score < 0.6, "Partial content should score < 0.6, got {}", score);
+    assert!(
+        score >= 0.3,
+        "Partial content should score >= 0.3, got {}",
+        score
+    );
+    assert!(
+        score < 0.6,
+        "Partial content should score < 0.6, got {}",
+        score
+    );
 }
 
 #[test]
@@ -134,7 +154,11 @@ fn test_custom_weights() {
     let score = scorer.score_content(&content);
 
     // With custom weights, should score exactly 1.0 (0.5 + 0.5)
-    assert!((score - 1.0).abs() < 0.01, "Custom weights should give score of 1.0, got {}", score);
+    assert!(
+        (score - 1.0).abs() < 0.01,
+        "Custom weights should give score of 1.0, got {}",
+        score
+    );
 }
 
 #[test]
@@ -150,7 +174,10 @@ fn test_batch_score_content() {
     let scores = futures::executor::block_on(batch_score_content(&scorer, content_items));
 
     assert_eq!(scores.len(), 2);
-    assert!(scores[0].1 > scores[1].1, "Complete content should score higher than minimal");
+    assert!(
+        scores[0].1 > scores[1].1,
+        "Complete content should score higher than minimal"
+    );
 }
 
 #[test]
@@ -158,10 +185,7 @@ fn test_quality_report_generation() {
     let complete = create_complete_content();
     let minimal = create_minimal_content();
 
-    let content_items = vec![
-        (complete.clone(), 0.9),
-        (minimal.clone(), 0.2),
-    ];
+    let content_items = vec![(complete.clone(), 0.9), (minimal.clone(), 0.2)];
 
     let report = generate_quality_report(content_items, 0.6);
 
@@ -199,17 +223,15 @@ fn test_missing_fields_summary() {
     let mut minimal2 = create_minimal_content();
     minimal2.title = "Movie 2".to_string();
 
-    let content_items = vec![
-        (minimal1, 0.1),
-        (minimal2, 0.2),
-    ];
+    let content_items = vec![(minimal1, 0.1), (minimal2, 0.2)];
 
     let report = generate_quality_report(content_items, 0.5);
 
     assert!(!report.missing_fields_summary.is_empty());
 
     // Both items should be missing overview, so count should be 2
-    let overview_missing = report.missing_fields_summary
+    let overview_missing = report
+        .missing_fields_summary
         .iter()
         .find(|f| f.field == "overview");
 
@@ -233,7 +255,10 @@ fn test_freshness_decay() {
     let old_score = score_canonical_with_decay(&content, old_date, &scorer.weights);
 
     // Recent content should score higher due to freshness
-    assert!(recent_score > old_score, "Recent content should score higher than old content");
+    assert!(
+        recent_score > old_score,
+        "Recent content should score higher than old content"
+    );
 }
 
 #[test]
@@ -253,7 +278,10 @@ fn test_image_quality_scoring() {
     let medium_res_score = scorer.score_content(&content_medium_res);
 
     // High-res should score higher
-    assert!(high_res_score > medium_res_score, "High-res images should score higher");
+    assert!(
+        high_res_score > medium_res_score,
+        "High-res images should score higher"
+    );
 }
 
 #[test]
@@ -263,7 +291,9 @@ fn test_external_ratings_scoring() {
     // Content with IMDB rating
     let mut content_with_rating = create_minimal_content();
     content_with_rating.user_rating = Some(8.5);
-    content_with_rating.external_ids.insert("imdb_id".to_string(), "tt1234567".to_string());
+    content_with_rating
+        .external_ids
+        .insert("imdb_id".to_string(), "tt1234567".to_string());
 
     // Content without rating
     let content_without_rating = create_minimal_content();
@@ -272,7 +302,10 @@ fn test_external_ratings_scoring() {
     let without_rating_score = scorer.score_content(&content_without_rating);
 
     // Content with external ratings should score higher
-    assert!(with_rating_score > without_rating_score, "Content with external ratings should score higher");
+    assert!(
+        with_rating_score > without_rating_score,
+        "Content with external ratings should score higher"
+    );
 }
 
 #[test]
@@ -285,17 +318,26 @@ fn test_metadata_completeness_dimensions() {
     // Add description
     content.overview = Some("A great movie about adventure".to_string());
     let with_description = scorer.score_content(&content);
-    assert!(with_description > base_score, "Adding description should increase score");
+    assert!(
+        with_description > base_score,
+        "Adding description should increase score"
+    );
 
     // Add poster
     content.images.poster_medium = Some("http://example.com/poster.jpg".to_string());
     let with_poster = scorer.score_content(&content);
-    assert!(with_poster > with_description, "Adding poster should increase score");
+    assert!(
+        with_poster > with_description,
+        "Adding poster should increase score"
+    );
 
     // Add runtime
     content.runtime_minutes = Some(120);
     let with_runtime = scorer.score_content(&content);
-    assert!(with_runtime > with_poster, "Adding runtime should increase score");
+    assert!(
+        with_runtime > with_poster,
+        "Adding runtime should increase score"
+    );
 }
 
 #[test]
@@ -303,10 +345,7 @@ fn test_score_clamping() {
     // Test that scores are always between 0.0 and 1.0
     let scorer = QualityScorer::default();
 
-    let content_items = vec![
-        create_complete_content(),
-        create_minimal_content(),
-    ];
+    let content_items = vec![create_complete_content(), create_minimal_content()];
 
     for content in content_items {
         let score = scorer.score_content(&content);
@@ -320,10 +359,7 @@ fn test_low_quality_threshold() {
     let complete = create_complete_content();
     let minimal = create_minimal_content();
 
-    let content_items = vec![
-        (complete.clone(), 0.9),
-        (minimal.clone(), 0.2),
-    ];
+    let content_items = vec![(complete.clone(), 0.9), (minimal.clone(), 0.2)];
 
     // Test with strict threshold (0.8)
     let strict_report = generate_quality_report(content_items.clone(), 0.8);

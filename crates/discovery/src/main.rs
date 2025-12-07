@@ -4,11 +4,11 @@
 //! SLA: 99.9% availability
 //! Latency target: <500ms p95
 
-use actix_web::{web, App, HttpServer, HttpResponse};
-use tracing::info;
-use std::sync::Arc;
+use actix_web::{web, App, HttpResponse, HttpServer};
 use media_gateway_discovery::{catalog, config, server};
 use qdrant_client::Qdrant;
+use std::sync::Arc;
+use tracing::info;
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
@@ -33,13 +33,15 @@ async fn main() -> anyhow::Result<()> {
     let qdrant_client = Arc::new(
         Qdrant::from_url(&config.vector.qdrant_url)
             .build()
-            .map_err(|e| anyhow::anyhow!("Failed to create Qdrant client: {}", e))?
+            .map_err(|e| anyhow::anyhow!("Failed to create Qdrant client: {}", e))?,
     );
 
     // Initialize database pool for catalog service
     let db_pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(config.database.max_connections)
-        .acquire_timeout(std::time::Duration::from_secs(config.database.connect_timeout_sec))
+        .acquire_timeout(std::time::Duration::from_secs(
+            config.database.connect_timeout_sec,
+        ))
         .connect(&config.database.url)
         .await?;
 
@@ -61,16 +63,16 @@ async fn main() -> anyhow::Result<()> {
     let catalog_service = Arc::new(catalog_service);
 
     // Get JWT secret from environment
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| {
-            tracing::warn!("JWT_SECRET not set, using default (INSECURE for production)");
-            "default-jwt-secret-change-in-production".to_string()
-        });
+    let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| {
+        tracing::warn!("JWT_SECRET not set, using default (INSECURE for production)");
+        "default-jwt-secret-change-in-production".to_string()
+    });
 
     // Create application state
     let app_state = web::Data::new(server::AppState {
         config: config.clone(),
         search_service,
+        ranking_store: None,
     });
 
     // Create catalog state

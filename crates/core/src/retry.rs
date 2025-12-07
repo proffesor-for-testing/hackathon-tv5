@@ -167,7 +167,9 @@ impl RetryPolicy {
     /// Duration to wait before the next retry attempt
     fn calculate_delay(&self, attempt: u32) -> Duration {
         // Calculate exponential backoff: base * 2^attempt
-        let exponential_delay = self.base_delay_ms.saturating_mul(2_u64.saturating_pow(attempt));
+        let exponential_delay = self
+            .base_delay_ms
+            .saturating_mul(2_u64.saturating_pow(attempt));
 
         // Cap at maximum delay
         let capped_delay = exponential_delay.min(self.max_delay_ms);
@@ -435,7 +437,7 @@ mod tests {
                 }
             },
             RetryPolicy::new(5, 10, 100, false), // Fast retries for testing
-            |_: &str| true,
+            |_: &&str| true,
         )
         .await;
 
@@ -458,7 +460,7 @@ mod tests {
                 }
             },
             RetryPolicy::new(3, 10, 100, false),
-            |_: &str| true,
+            |_: &&str| true,
         )
         .await;
 
@@ -481,7 +483,7 @@ mod tests {
                 }
             },
             RetryPolicy::default(),
-            |err: &str| err != "non-retryable", // This error is NOT retryable
+            |err: &&str| *err != "non-retryable", // This error is NOT retryable
         )
         .await;
 
@@ -562,7 +564,7 @@ mod tests {
                 }
             },
             RetryPolicy::aggressive(),
-            |_: &str| true,
+            |_: &&str| true,
         )
         .await;
 
@@ -584,7 +586,7 @@ mod tests {
                 }
             },
             RetryPolicy::gentle(),
-            |_: &str| true,
+            |_: &&str| true,
         )
         .await;
 
@@ -606,7 +608,7 @@ mod tests {
                 }
             },
             RetryPolicy::new(0, 100, 1000, false),
-            |_: &str| true,
+            |_: &&str| true,
         )
         .await;
 

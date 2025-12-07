@@ -40,8 +40,8 @@ async fn test_ranking_config_validation_negative_error() {
 
 #[tokio::test]
 async fn test_ranking_config_store_get_default() {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://localhost/media_gateway".to_string());
 
@@ -68,8 +68,8 @@ async fn test_ranking_config_store_get_default() {
 
 #[tokio::test]
 async fn test_ranking_config_store_update_default() {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://localhost/media_gateway".to_string());
 
@@ -116,8 +116,8 @@ async fn test_ranking_config_store_update_default() {
 
 #[tokio::test]
 async fn test_ranking_config_store_named_config() {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://localhost/media_gateway".to_string());
 
@@ -165,8 +165,8 @@ async fn test_ranking_config_store_named_config() {
 
 #[tokio::test]
 async fn test_ranking_config_store_list_named_configs() {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://localhost/media_gateway".to_string());
 
@@ -211,8 +211,8 @@ async fn test_ranking_config_store_list_named_configs() {
 
 #[tokio::test]
 async fn test_ranking_config_store_delete_named_config() {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://localhost/media_gateway".to_string());
 
@@ -258,8 +258,8 @@ async fn test_ranking_config_store_delete_named_config() {
 
 #[tokio::test]
 async fn test_ranking_config_store_get_config_for_variant() {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://localhost/media_gateway".to_string());
 
@@ -280,12 +280,24 @@ async fn test_ranking_config_store_get_config_for_variant() {
     };
 
     let admin_id = Uuid::new_v4();
-    let variant_config =
-        RankingConfig::new(0.6, 0.2, 0.1, 0.1, Some(admin_id), Some("Variant".to_string()))
-            .unwrap();
+    let variant_config = RankingConfig::new(
+        0.6,
+        0.2,
+        0.1,
+        0.1,
+        Some(admin_id),
+        Some("Variant".to_string()),
+    )
+    .unwrap();
 
     store
-        .set_named_config("test_variant", &variant_config, true, Some(100), Some(admin_id))
+        .set_named_config(
+            "test_variant",
+            &variant_config,
+            true,
+            Some(100),
+            Some(admin_id),
+        )
         .await
         .unwrap();
 
@@ -306,8 +318,8 @@ async fn test_ranking_config_store_get_config_for_variant() {
 
 #[tokio::test]
 async fn test_ranking_config_store_inactive_variant_falls_back_to_default() {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://localhost/media_gateway".to_string());
 
@@ -328,9 +340,15 @@ async fn test_ranking_config_store_inactive_variant_falls_back_to_default() {
     };
 
     let admin_id = Uuid::new_v4();
-    let inactive_config =
-        RankingConfig::new(0.6, 0.2, 0.1, 0.1, Some(admin_id), Some("Inactive".to_string()))
-            .unwrap();
+    let inactive_config = RankingConfig::new(
+        0.6,
+        0.2,
+        0.1,
+        0.1,
+        Some(admin_id),
+        Some("Inactive".to_string()),
+    )
+    .unwrap();
 
     store
         .set_named_config(
@@ -359,8 +377,8 @@ async fn test_ranking_config_store_inactive_variant_falls_back_to_default() {
 
 #[tokio::test]
 async fn test_ranking_config_versioning() {
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://localhost/media_gateway".to_string());
 

@@ -3,7 +3,9 @@ use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use std::sync::Arc;
 
 /// Convert actix_http HeaderMap to reqwest HeaderMap
-fn convert_headers(actix_headers: &actix_web::http::header::HeaderMap) -> reqwest::header::HeaderMap {
+fn convert_headers(
+    actix_headers: &actix_web::http::header::HeaderMap,
+) -> reqwest::header::HeaderMap {
     let mut reqwest_headers = reqwest::header::HeaderMap::new();
 
     for (key, value) in actix_headers.iter() {
@@ -22,7 +24,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/sessions/{id}", web::get().to(get_session))
             .route("/sessions/{id}", web::delete().to(delete_session))
             .route("/sessions/{id}/position", web::patch().to(update_position))
-            .route("/users/{user_id}/sessions", web::get().to(get_user_sessions))
+            .route(
+                "/users/{user_id}/sessions",
+                web::get().to(get_user_sessions),
+            ),
     );
 }
 
@@ -41,8 +46,7 @@ async fn create_session(
     };
 
     match proxy.forward(proxy_req).await {
-        Ok(response) => HttpResponse::build(response.status)
-            .body(response.body),
+        Ok(response) => HttpResponse::build(response.status).body(response.body),
         Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
             "error": e.to_string()
         })),
@@ -65,8 +69,7 @@ async fn get_session(
     };
 
     match proxy.forward(proxy_req).await {
-        Ok(response) => HttpResponse::build(response.status)
-            .body(response.body),
+        Ok(response) => HttpResponse::build(response.status).body(response.body),
         Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
             "error": e.to_string()
         })),
@@ -89,8 +92,7 @@ async fn delete_session(
     };
 
     match proxy.forward(proxy_req).await {
-        Ok(response) => HttpResponse::build(response.status)
-            .body(response.body),
+        Ok(response) => HttpResponse::build(response.status).body(response.body),
         Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
             "error": e.to_string()
         })),
@@ -114,8 +116,7 @@ async fn update_position(
     };
 
     match proxy.forward(proxy_req).await {
-        Ok(response) => HttpResponse::build(response.status)
-            .body(response.body),
+        Ok(response) => HttpResponse::build(response.status).body(response.body),
         Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
             "error": e.to_string()
         })),
@@ -138,8 +139,7 @@ async fn get_user_sessions(
     };
 
     match proxy.forward(proxy_req).await {
-        Ok(response) => HttpResponse::build(response.status)
-            .body(response.body),
+        Ok(response) => HttpResponse::build(response.status).body(response.body),
         Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
             "error": e.to_string()
         })),

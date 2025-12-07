@@ -3,7 +3,7 @@
 //! Port: 8085
 //! SLA: 99.5% availability
 
-use actix_web::{web, App, HttpServer, HttpResponse};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use tracing::info;
 
 #[actix_web::main]
@@ -15,13 +15,10 @@ async fn main() -> std::io::Result<()> {
 
     info!("Starting Ingestion Service on port 8085");
 
-    HttpServer::new(|| {
-        App::new()
-            .route("/health", web::get().to(health_check))
-    })
-    .bind(("0.0.0.0", 8085))?
-    .run()
-    .await
+    HttpServer::new(|| App::new().route("/health", web::get().to(health_check)))
+        .bind(("0.0.0.0", 8085))?
+        .run()
+        .await
 }
 
 async fn health_check() -> HttpResponse {

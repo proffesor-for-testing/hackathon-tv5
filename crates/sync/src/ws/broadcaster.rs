@@ -1,8 +1,9 @@
 /// WebSocket broadcaster for relaying PubNub messages to connected clients
 ///
 /// Subscribes to PubNub channels and broadcasts messages to WebSocket connections
-
-use crate::pubnub::{DeviceMessage, MessageHandler, PubNubClient, SyncMessage as PubNubSyncMessage};
+use crate::pubnub::{
+    DeviceMessage, MessageHandler, PubNubClient, SyncMessage as PubNubSyncMessage,
+};
 use crate::ws::registry::{ConnectionRegistry, SyncMessage, SyncMessageType};
 use chrono::Utc;
 use std::sync::Arc;
@@ -31,9 +32,7 @@ impl BroadcastMetrics {
 
     pub fn record_latency(&self, latency_ms: f64) {
         let mut samples = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                self.latency_samples.write().await
-            })
+            tokio::runtime::Handle::current().block_on(async { self.latency_samples.write().await })
         });
         samples.push(latency_ms);
 
@@ -50,9 +49,8 @@ impl BroadcastMetrics {
 
     pub fn average_latency_ms(&self) -> f64 {
         let samples = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                self.latency_samples.read().await.clone()
-            })
+            tokio::runtime::Handle::current()
+                .block_on(async { self.latency_samples.read().await.clone() })
         });
 
         if samples.is_empty() {
@@ -76,9 +74,8 @@ impl BroadcastMetrics {
 
     fn percentile_latency(&self, p: f64) -> f64 {
         let mut samples = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                self.latency_samples.read().await.clone()
-            })
+            tokio::runtime::Handle::current()
+                .block_on(async { self.latency_samples.read().await.clone() })
         });
 
         if samples.is_empty() {
@@ -105,10 +102,7 @@ pub struct WebSocketBroadcaster {
 
 impl WebSocketBroadcaster {
     /// Create new WebSocket broadcaster
-    pub fn new(
-        registry: Arc<ConnectionRegistry>,
-        pubnub_client: Arc<PubNubClient>,
-    ) -> Self {
+    pub fn new(registry: Arc<ConnectionRegistry>, pubnub_client: Arc<PubNubClient>) -> Self {
         Self {
             registry,
             pubnub_client,
@@ -303,7 +297,10 @@ mod tests {
         let ws_msg = broadcaster.convert_pubnub_message(pubnub_msg).unwrap();
 
         match ws_msg.message_type {
-            SyncMessageType::WatchlistUpdate { content_id: cid, action } => {
+            SyncMessageType::WatchlistUpdate {
+                content_id: cid,
+                action,
+            } => {
                 assert_eq!(cid, content_id);
                 assert_eq!(action, "add");
             }
@@ -327,7 +324,9 @@ mod tests {
         let ws_msg = broadcaster.convert_pubnub_message(pubnub_msg).unwrap();
 
         match ws_msg.message_type {
-            SyncMessageType::ProgressUpdate { position, duration, .. } => {
+            SyncMessageType::ProgressUpdate {
+                position, duration, ..
+            } => {
                 assert_eq!(position, 120);
                 assert_eq!(duration, 3600);
             }
@@ -351,7 +350,10 @@ mod tests {
         let ws_msg = broadcaster.convert_pubnub_message(pubnub_msg).unwrap();
 
         match ws_msg.message_type {
-            SyncMessageType::DeviceCommand { command, target_device } => {
+            SyncMessageType::DeviceCommand {
+                command,
+                target_device,
+            } => {
                 assert!(command.contains("handoff"));
                 assert_eq!(target_device, Some(target_id));
             }

@@ -124,11 +124,7 @@ impl Default for ShutdownConfig {
 
 impl ShutdownConfig {
     /// Create a new shutdown configuration
-    pub fn new(
-        drain_timeout: Duration,
-        wait_timeout: Duration,
-        force_timeout: Duration,
-    ) -> Self {
+    pub fn new(drain_timeout: Duration, wait_timeout: Duration, force_timeout: Duration) -> Self {
         Self {
             drain_timeout,
             wait_timeout,
@@ -259,10 +255,10 @@ impl ShutdownCoordinator {
         {
             use tokio::signal::unix::{signal, SignalKind};
 
-            let mut sigterm = signal(SignalKind::terminate())
-                .expect("Failed to register SIGTERM handler");
-            let mut sigint = signal(SignalKind::interrupt())
-                .expect("Failed to register SIGINT handler");
+            let mut sigterm =
+                signal(SignalKind::terminate()).expect("Failed to register SIGTERM handler");
+            let mut sigint =
+                signal(SignalKind::interrupt()).expect("Failed to register SIGINT handler");
 
             tokio::select! {
                 _ = sigterm.recv() => {
@@ -461,9 +457,18 @@ mod tests {
     #[test]
     fn test_shutdown_config_default() {
         let config = ShutdownConfig::default();
-        assert_eq!(config.drain_timeout, Duration::from_millis(DEFAULT_DRAIN_TIMEOUT_MS));
-        assert_eq!(config.wait_timeout, Duration::from_millis(DEFAULT_WAIT_TIMEOUT_MS));
-        assert_eq!(config.force_timeout, Duration::from_millis(DEFAULT_FORCE_TIMEOUT_MS));
+        assert_eq!(
+            config.drain_timeout,
+            Duration::from_millis(DEFAULT_DRAIN_TIMEOUT_MS)
+        );
+        assert_eq!(
+            config.wait_timeout,
+            Duration::from_millis(DEFAULT_WAIT_TIMEOUT_MS)
+        );
+        assert_eq!(
+            config.force_timeout,
+            Duration::from_millis(DEFAULT_FORCE_TIMEOUT_MS)
+        );
     }
 
     #[test]

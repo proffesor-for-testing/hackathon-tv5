@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{PgPool, FromRow};
+use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
 use crate::TestContext;
@@ -48,7 +48,7 @@ pub async fn create_test_user(ctx: &TestContext) -> Result<TestUser> {
         INSERT INTO users (id, email, password_hash, display_name, email_verified)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING id, email, password_hash, display_name, email_verified, created_at
-        "#
+        "#,
     )
     .bind(id)
     .bind(email)
@@ -73,7 +73,7 @@ pub async fn create_unverified_user(ctx: &TestContext) -> Result<TestUser> {
         INSERT INTO users (id, email, password_hash, display_name, email_verified)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING id, email, password_hash, display_name, email_verified, created_at
-        "#
+        "#,
     )
     .bind(id)
     .bind(email)
@@ -102,7 +102,7 @@ pub async fn create_test_content(ctx: &TestContext) -> Result<TestContent> {
         INSERT INTO content (id, title, content_type, url, metadata)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING id, title, content_type, url, metadata, created_at
-        "#
+        "#,
     )
     .bind(id)
     .bind(title)
@@ -133,7 +133,7 @@ pub async fn create_test_content_with_type(
         INSERT INTO content (id, title, content_type, url, metadata)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING id, title, content_type, url, metadata, created_at
-        "#
+        "#,
     )
     .bind(id)
     .bind(title)
@@ -234,10 +234,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_test_user() {
-        let ctx = TestContext::new().await.expect("Failed to create test context");
-        ctx.run_migrations().await.expect("Failed to run migrations");
+        let ctx = TestContext::new()
+            .await
+            .expect("Failed to create test context");
+        ctx.run_migrations()
+            .await
+            .expect("Failed to run migrations");
 
-        let user = create_test_user(&ctx).await.expect("Failed to create test user");
+        let user = create_test_user(&ctx)
+            .await
+            .expect("Failed to create test user");
         assert!(user.email_verified);
         assert!(user.email.contains("@example.com"));
         assert!(!user.display_name.is_empty());
@@ -247,10 +253,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_test_content() {
-        let ctx = TestContext::new().await.expect("Failed to create test context");
-        ctx.run_migrations().await.expect("Failed to run migrations");
+        let ctx = TestContext::new()
+            .await
+            .expect("Failed to create test context");
+        ctx.run_migrations()
+            .await
+            .expect("Failed to run migrations");
 
-        let content = create_test_content(&ctx).await.expect("Failed to create test content");
+        let content = create_test_content(&ctx)
+            .await
+            .expect("Failed to create test content");
         assert_eq!(content.content_type, "video/mp4");
         assert!(content.url.starts_with("https://"));
 
@@ -259,11 +271,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_test_session() {
-        let ctx = TestContext::new().await.expect("Failed to create test context");
-        ctx.run_migrations().await.expect("Failed to run migrations");
+        let ctx = TestContext::new()
+            .await
+            .expect("Failed to create test context");
+        ctx.run_migrations()
+            .await
+            .expect("Failed to run migrations");
 
-        let user = create_test_user(&ctx).await.expect("Failed to create test user");
-        let content = create_test_content(&ctx).await.expect("Failed to create test content");
+        let user = create_test_user(&ctx)
+            .await
+            .expect("Failed to create test user");
+        let content = create_test_content(&ctx)
+            .await
+            .expect("Failed to create test content");
         let session = create_test_session(&ctx, &user, &content)
             .await
             .expect("Failed to create test session");

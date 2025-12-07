@@ -8,14 +8,13 @@
 /// - POST /api/v1/sync/progress - Sync watch progress
 /// - GET /api/v1/devices - List user devices
 /// - POST /api/v1/devices/handoff - Device handoff
-
 use crate::crdt::{HybridLogicalClock, PlaybackState};
 use crate::device::{DeviceHandoff, DeviceInfo, DeviceRegistry, RemoteCommand};
-use crate::sync::{ProgressSync, ProgressUpdate, WatchlistOperation, WatchlistSync, WatchlistUpdate};
-use crate::websocket::SyncWebSocket;
-use actix_web::{
-    get, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder, Result,
+use crate::sync::{
+    ProgressSync, ProgressUpdate, WatchlistOperation, WatchlistSync, WatchlistUpdate,
 };
+use crate::websocket::SyncWebSocket;
+use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder, Result};
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -83,7 +82,9 @@ async fn sync_watchlist(
 ) -> impl Responder {
     let response = match req.operation.as_str() {
         "add" => {
-            let update = state.watchlist_sync.add_to_watchlist(req.content_id.clone());
+            let update = state
+                .watchlist_sync
+                .add_to_watchlist(req.content_id.clone());
             WatchlistSyncResponse {
                 success: true,
                 operation: "add".to_string(),
@@ -323,12 +324,8 @@ mod tests {
             "test-device".to_string(),
         ));
 
-        let app = test::init_service(
-            App::new()
-                .app_data(state.clone())
-                .service(sync_watchlist),
-        )
-        .await;
+        let app =
+            test::init_service(App::new().app_data(state.clone()).service(sync_watchlist)).await;
 
         let req = test::TestRequest::post()
             .uri("/api/v1/sync/watchlist")
@@ -349,12 +346,8 @@ mod tests {
             "test-device".to_string(),
         ));
 
-        let app = test::init_service(
-            App::new()
-                .app_data(state.clone())
-                .service(sync_progress),
-        )
-        .await;
+        let app =
+            test::init_service(App::new().app_data(state.clone()).service(sync_progress)).await;
 
         let req = test::TestRequest::post()
             .uri("/api/v1/sync/progress")

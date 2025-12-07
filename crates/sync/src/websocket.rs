@@ -1,7 +1,6 @@
 /// WebSocket handler for real-time synchronization
 ///
 /// Manages WebSocket connections with clients for bidirectional sync
-
 use crate::command_router::{Command, CommandRouter};
 use crate::device::CommandType;
 use actix::{Actor, ActorContext, AsyncContext, Handler, StreamHandler};
@@ -173,7 +172,11 @@ impl Actor for SyncWebSocket {
 impl Handler<crate::ws::BroadcastMessage> for SyncWebSocket {
     type Result = ();
 
-    fn handle(&mut self, msg: crate::ws::BroadcastMessage, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: crate::ws::BroadcastMessage,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
         // Send JSON message to WebSocket client
         ctx.text(msg.0);
     }
@@ -271,7 +274,9 @@ mod tests {
 
         let deserialized: WebSocketMessage = serde_json::from_str(&json).unwrap();
         match deserialized {
-            WebSocketMessage::ProgressUpdate { position_seconds, .. } => {
+            WebSocketMessage::ProgressUpdate {
+                position_seconds, ..
+            } => {
                 assert_eq!(position_seconds, 100);
             }
             _ => panic!("Wrong message type"),

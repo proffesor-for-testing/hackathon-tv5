@@ -89,7 +89,9 @@ impl DeviceCapabilities {
     /// Check if a platform app is installed
     pub fn has_platform_app(&self, platform: Platform) -> bool {
         let app_name = platform.as_str();
-        self.installed_apps.iter().any(|app| app.to_lowercase().contains(app_name))
+        self.installed_apps
+            .iter()
+            .any(|app| app.to_lowercase().contains(app_name))
     }
 
     /// Check if the device supports deep linking for the platform
@@ -185,7 +187,9 @@ impl DeepLinkGenerator {
             PlatformUrlTemplates {
                 deep_link_template: "music://itunes.apple.com/{country}/{type}/{id}".to_string(),
                 web_template: "https://music.apple.com/{country}/{type}/{id}".to_string(),
-                universal_template: Some("https://music.apple.com/{country}/{type}/{id}".to_string()),
+                universal_template: Some(
+                    "https://music.apple.com/{country}/{type}/{id}".to_string(),
+                ),
             },
         );
 
@@ -234,31 +238,28 @@ impl DeepLinkGenerator {
 
     /// Generate a deep link for the given request
     pub fn generate(&self, request: &DeepLinkRequest) -> Result<DeepLink, DeepLinkError> {
-        let templates = self.url_templates.get(&request.platform)
-            .ok_or_else(|| DeepLinkError::UnsupportedPlatform(
-                format!("{:?}", request.platform)
-            ))?;
+        let templates = self
+            .url_templates
+            .get(&request.platform)
+            .ok_or_else(|| DeepLinkError::UnsupportedPlatform(format!("{:?}", request.platform)))?;
 
         // Check device support
-        let is_supported = request.device_capabilities
+        let is_supported = request
+            .device_capabilities
             .as_ref()
             .map(|caps| caps.supports_deep_link(request.platform))
             .unwrap_or(true); // Assume supported if no capabilities provided
 
         // Generate deep link URL
-        let deep_link_url = self.build_url(
-            &templates.deep_link_template,
-            request,
-        )?;
+        let deep_link_url = self.build_url(&templates.deep_link_template, request)?;
 
         // Generate web fallback URL
-        let web_fallback_url = self.build_url(
-            &templates.web_template,
-            request,
-        )?;
+        let web_fallback_url = self.build_url(&templates.web_template, request)?;
 
         // Generate universal link if available
-        let universal_link = templates.universal_template.as_ref()
+        let universal_link = templates
+            .universal_template
+            .as_ref()
             .map(|template| self.build_url(template, request))
             .transpose()?;
 
@@ -272,7 +273,11 @@ impl DeepLinkGenerator {
     }
 
     /// Build a URL from a template
-    fn build_url(&self, template: &str, request: &DeepLinkRequest) -> Result<String, DeepLinkError> {
+    fn build_url(
+        &self,
+        template: &str,
+        request: &DeepLinkRequest,
+    ) -> Result<String, DeepLinkError> {
         let mut url = template.to_string();
 
         // Replace content ID
@@ -319,7 +324,8 @@ impl DeepLinkGenerator {
             Platform::PrimeVideo,
         ];
 
-        platforms.into_iter()
+        platforms
+            .into_iter()
             .filter_map(|platform| {
                 let request = DeepLinkRequest {
                     platform,
@@ -329,9 +335,7 @@ impl DeepLinkGenerator {
                     device_capabilities: device_capabilities.clone(),
                 };
 
-                self.generate(&request)
-                    .ok()
-                    .map(|link| (platform, link))
+                self.generate(&request).ok().map(|link| (platform, link))
             })
             .collect()
     }
@@ -360,7 +364,10 @@ mod tests {
 
         let result = generator.generate(&request).unwrap();
         assert_eq!(result.deep_link_url, "netflix://title/80123456");
-        assert_eq!(result.web_fallback_url, "https://www.netflix.com/watch/80123456");
+        assert_eq!(
+            result.web_fallback_url,
+            "https://www.netflix.com/watch/80123456"
+        );
         assert!(result.universal_link.is_some());
     }
 
@@ -376,8 +383,14 @@ mod tests {
         };
 
         let result = generator.generate(&request).unwrap();
-        assert_eq!(result.deep_link_url, "spotify://track/3n3Ppam7vgaVa1iaRUc9Lp");
-        assert_eq!(result.web_fallback_url, "https://open.spotify.com/track/3n3Ppam7vgaVa1iaRUc9Lp");
+        assert_eq!(
+            result.deep_link_url,
+            "spotify://track/3n3Ppam7vgaVa1iaRUc9Lp"
+        );
+        assert_eq!(
+            result.web_fallback_url,
+            "https://open.spotify.com/track/3n3Ppam7vgaVa1iaRUc9Lp"
+        );
     }
 
     #[test]
@@ -392,8 +405,14 @@ mod tests {
         };
 
         let result = generator.generate(&request).unwrap();
-        assert_eq!(result.deep_link_url, "spotify://album/6DEjYFkNZh67HP7R9PSZvv");
-        assert_eq!(result.web_fallback_url, "https://open.spotify.com/album/6DEjYFkNZh67HP7R9PSZvv");
+        assert_eq!(
+            result.deep_link_url,
+            "spotify://album/6DEjYFkNZh67HP7R9PSZvv"
+        );
+        assert_eq!(
+            result.web_fallback_url,
+            "https://open.spotify.com/album/6DEjYFkNZh67HP7R9PSZvv"
+        );
     }
 
     #[test]
@@ -408,8 +427,14 @@ mod tests {
         };
 
         let result = generator.generate(&request).unwrap();
-        assert_eq!(result.deep_link_url, "music://itunes.apple.com/us/track/1234567890");
-        assert_eq!(result.web_fallback_url, "https://music.apple.com/us/track/1234567890");
+        assert_eq!(
+            result.deep_link_url,
+            "music://itunes.apple.com/us/track/1234567890"
+        );
+        assert_eq!(
+            result.web_fallback_url,
+            "https://music.apple.com/us/track/1234567890"
+        );
     }
 
     #[test]
@@ -441,7 +466,10 @@ mod tests {
 
         let result = generator.generate(&request).unwrap();
         assert_eq!(result.deep_link_url, "disneyplus://content/xyz789");
-        assert_eq!(result.web_fallback_url, "https://www.disneyplus.com/video/xyz789");
+        assert_eq!(
+            result.web_fallback_url,
+            "https://www.disneyplus.com/video/xyz789"
+        );
     }
 
     #[test]
@@ -473,7 +501,10 @@ mod tests {
 
         let result = generator.generate(&request).unwrap();
         assert_eq!(result.deep_link_url, "primevideo://detail?id=B08XYZ");
-        assert_eq!(result.web_fallback_url, "https://www.amazon.com/gp/video/detail/B08XYZ");
+        assert_eq!(
+            result.web_fallback_url,
+            "https://www.amazon.com/gp/video/detail/B08XYZ"
+        );
     }
 
     #[test]
@@ -519,11 +550,7 @@ mod tests {
     #[test]
     fn test_generate_all_platforms() {
         let generator = DeepLinkGenerator::new();
-        let links = generator.generate_all(
-            "test123",
-            ContentType::Video,
-            None,
-        );
+        let links = generator.generate_all("test123", ContentType::Video, None);
 
         assert_eq!(links.len(), 7);
         assert!(links.contains_key(&Platform::Netflix));

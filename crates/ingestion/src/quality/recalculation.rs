@@ -2,7 +2,7 @@ use crate::normalizer::CanonicalContent;
 use crate::quality::QualityScorer;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
-use tracing::{info, error};
+use tracing::{error, info};
 
 pub struct RecalculationJob {
     scorer: QualityScorer,
@@ -27,14 +27,19 @@ impl RecalculationJob {
             match self.recalculate_single_score(&content, last_updated).await {
                 Ok(_) => updated_count += 1,
                 Err(e) => {
-                    error!("Failed to recalculate score for {}: {}", content.platform_content_id, e);
+                    error!(
+                        "Failed to recalculate score for {}: {}",
+                        content.platform_content_id, e
+                    );
                     failed_count += 1;
                 }
             }
         }
 
-        info!("Recalculation complete: {} updated, {} failed out of {} total",
-              updated_count, failed_count, total_items);
+        info!(
+            "Recalculation complete: {} updated, {} failed out of {} total",
+            updated_count, failed_count, total_items
+        );
 
         Ok(RecalculationReport {
             total_items,
@@ -44,7 +49,9 @@ impl RecalculationJob {
         })
     }
 
-    async fn fetch_all_content(&self) -> Result<Vec<(CanonicalContent, DateTime<Utc>)>, RecalculationError> {
+    async fn fetch_all_content(
+        &self,
+    ) -> Result<Vec<(CanonicalContent, DateTime<Utc>)>, RecalculationError> {
         #[derive(sqlx::FromRow)]
         struct ContentRow {
             platform_id: String,
@@ -85,7 +92,7 @@ impl RecalculationJob {
             FROM content
             WHERE deleted_at IS NULL
             ORDER BY updated_at ASC
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await
@@ -100,19 +107,18 @@ impl RecalculationJob {
                 _ => continue,
             };
 
-            let images = serde_json::from_value(row.images)
-                .unwrap_or(crate::normalizer::ImageSet {
+            let images =
+                serde_json::from_value(row.images).unwrap_or(crate::normalizer::ImageSet {
                     poster_small: None,
                     poster_medium: None,
                     poster_large: None,
                     backdrop: None,
                 });
 
-            let external_ids = serde_json::from_value(row.external_ids)
-                .unwrap_or_default();
+            let external_ids = serde_json::from_value(row.external_ids).unwrap_or_default();
 
-            let availability = serde_json::from_value(row.availability)
-                .unwrap_or(crate::normalizer::AvailabilityInfo {
+            let availability = serde_json::from_value(row.availability).unwrap_or(
+                crate::normalizer::AvailabilityInfo {
                     regions: vec![],
                     subscription_required: false,
                     purchase_price: None,
@@ -120,13 +126,13 @@ impl RecalculationJob {
                     currency: None,
                     available_from: None,
                     available_until: None,
-                });
+                },
+            );
 
-            let genres: Vec<String> = serde_json::from_value(row.genres)
-                .unwrap_or_default();
+            let genres: Vec<String> = serde_json::from_value(row.genres).unwrap_or_default();
 
-            let embedding: Option<Vec<f32>> = row.embedding
-                .and_then(|e| serde_json::from_value(e).ok());
+            let embedding: Option<Vec<f32>> =
+                row.embedding.and_then(|e| serde_json::from_value(e).ok());
 
             let content = CanonicalContent {
                 platform_id: row.platform_id,
@@ -138,7 +144,7 @@ impl RecalculationJob {
                 runtime_minutes: row.runtime_minutes,
                 genres,
                 rating: None,
-                user_rating: row.user_rating,
+                user_rating: row.user_rating.map(|r| r as f32),
                 images,
                 external_ids,
                 availability,
@@ -158,14 +164,16 @@ impl RecalculationJob {
         content: &CanonicalContent,
         last_updated: DateTime<Utc>,
     ) -> Result<(), RecalculationError> {
-        let new_score = self.scorer.score_content_with_freshness(content, last_updated);
+        let new_score = self
+            .scorer
+            .score_content_with_freshness(content, last_updated);
 
         sqlx::query(
             r#"
             UPDATE content
             SET quality_score = $1
             WHERE platform_id = $2 AND platform_content_id = $3
-            "#
+            "#,
         )
         .bind(new_score)
         .bind(&content.platform_id)
@@ -177,8 +185,14 @@ impl RecalculationJob {
         Ok(())
     }
 
-    pub async fn recalculate_outdated_scores(&self, days_threshold: i64) -> Result<RecalculationReport, RecalculationError> {
-        info!("Recalculating scores for content updated more than {} days ago", days_threshold);
+    pub async fn recalculate_outdated_scores(
+        &self,
+        days_threshold: i64,
+    ) -> Result<RecalculationReport, RecalculationError> {
+        info!(
+            "Recalculating scores for content updated more than {} days ago",
+            days_threshold
+        );
 
         let threshold_date = Utc::now() - chrono::Duration::days(days_threshold);
 
@@ -192,14 +206,19 @@ impl RecalculationJob {
             match self.recalculate_single_score(&content, last_updated).await {
                 Ok(_) => updated_count += 1,
                 Err(e) => {
-                    error!("Failed to recalculate score for {}: {}", content.platform_content_id, e);
+                    error!(
+                        "Failed to recalculate score for {}: {}",
+                        content.platform_content_id, e
+                    );
                     failed_count += 1;
                 }
             }
         }
 
-        info!("Outdated content recalculation complete: {} updated, {} failed out of {} total",
-              updated_count, failed_count, total_items);
+        info!(
+            "Outdated content recalculation complete: {} updated, {} failed out of {} total",
+            updated_count, failed_count, total_items
+        );
 
         Ok(RecalculationReport {
             total_items,
@@ -209,7 +228,10 @@ impl RecalculationJob {
         })
     }
 
-    async fn fetch_outdated_content(&self, threshold_date: DateTime<Utc>) -> Result<Vec<(CanonicalContent, DateTime<Utc>)>, RecalculationError> {
+    async fn fetch_outdated_content(
+        &self,
+        threshold_date: DateTime<Utc>,
+    ) -> Result<Vec<(CanonicalContent, DateTime<Utc>)>, RecalculationError> {
         #[derive(sqlx::FromRow)]
         struct ContentRow {
             platform_id: String,
@@ -251,7 +273,7 @@ impl RecalculationJob {
             WHERE deleted_at IS NULL
               AND updated_at < $1
             ORDER BY updated_at ASC
-            "#
+            "#,
         )
         .bind(threshold_date)
         .fetch_all(&self.pool)
@@ -267,19 +289,18 @@ impl RecalculationJob {
                 _ => continue,
             };
 
-            let images = serde_json::from_value(row.images)
-                .unwrap_or(crate::normalizer::ImageSet {
+            let images =
+                serde_json::from_value(row.images).unwrap_or(crate::normalizer::ImageSet {
                     poster_small: None,
                     poster_medium: None,
                     poster_large: None,
                     backdrop: None,
                 });
 
-            let external_ids = serde_json::from_value(row.external_ids)
-                .unwrap_or_default();
+            let external_ids = serde_json::from_value(row.external_ids).unwrap_or_default();
 
-            let availability = serde_json::from_value(row.availability)
-                .unwrap_or(crate::normalizer::AvailabilityInfo {
+            let availability = serde_json::from_value(row.availability).unwrap_or(
+                crate::normalizer::AvailabilityInfo {
                     regions: vec![],
                     subscription_required: false,
                     purchase_price: None,
@@ -287,13 +308,13 @@ impl RecalculationJob {
                     currency: None,
                     available_from: None,
                     available_until: None,
-                });
+                },
+            );
 
-            let genres: Vec<String> = serde_json::from_value(row.genres)
-                .unwrap_or_default();
+            let genres: Vec<String> = serde_json::from_value(row.genres).unwrap_or_default();
 
-            let embedding: Option<Vec<f32>> = row.embedding
-                .and_then(|e| serde_json::from_value(e).ok());
+            let embedding: Option<Vec<f32>> =
+                row.embedding.and_then(|e| serde_json::from_value(e).ok());
 
             let content = CanonicalContent {
                 platform_id: row.platform_id,
@@ -305,7 +326,7 @@ impl RecalculationJob {
                 runtime_minutes: row.runtime_minutes,
                 genres,
                 rating: None,
-                user_rating: row.user_rating,
+                user_rating: row.user_rating.map(|r| r as f32),
                 images,
                 external_ids,
                 availability,

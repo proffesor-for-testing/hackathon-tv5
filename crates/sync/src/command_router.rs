@@ -2,14 +2,13 @@
 ///
 /// Routes remote commands to target devices via PubNub with validation,
 /// TTL management, and acknowledgment tracking.
-
 use crate::device::{CommandError, CommandType, DeviceInfo, DeviceRegistry};
 use crate::pubnub::PubNubClient;
 use chrono::{DateTime, Utc};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 use uuid::Uuid;
 
 /// Command router for managing remote device commands
@@ -78,7 +77,9 @@ impl CommandRouter {
         device: &DeviceInfo,
     ) -> Result<(), CommandError> {
         match command_type {
-            CommandType::CastTo { target_device_id, .. } => {
+            CommandType::CastTo {
+                target_device_id, ..
+            } => {
                 // Check if source device can cast
                 if !device.capabilities.can_cast {
                     return Err(CommandError::NotSupported);
@@ -100,7 +101,9 @@ impl CommandRouter {
                     return Err(CommandError::InvalidParameters);
                 }
             }
-            CommandType::Seek { position_seconds: _ } => {
+            CommandType::Seek {
+                position_seconds: _,
+            } => {
                 // Seek command validation - position will be validated by player
                 // No device-specific capability check needed
             }
@@ -190,9 +193,7 @@ impl CommandRouter {
         let now = Utc::now();
 
         // Remove acks older than 30 seconds
-        acks.retain(|_, ack| {
-            now.signed_duration_since(ack.sent_at).num_seconds() < 30
-        });
+        acks.retain(|_, ack| now.signed_duration_since(ack.sent_at).num_seconds() < 30);
     }
 }
 
@@ -666,7 +667,10 @@ mod tests {
             acknowledged: false,
             error: None,
         };
-        router.pending_acks.write().insert(ack2.command_id, ack2.clone());
+        router
+            .pending_acks
+            .write()
+            .insert(ack2.command_id, ack2.clone());
 
         let pending = router.get_pending_acks();
         assert_eq!(pending.len(), 1);
@@ -684,7 +688,10 @@ mod tests {
             acknowledged: false,
             error: None,
         };
-        router.pending_acks.write().insert(old_ack.command_id, old_ack);
+        router
+            .pending_acks
+            .write()
+            .insert(old_ack.command_id, old_ack);
 
         // Add recent ack
         let recent_ack = CommandAck {
@@ -693,7 +700,10 @@ mod tests {
             acknowledged: false,
             error: None,
         };
-        router.pending_acks.write().insert(recent_ack.command_id, recent_ack.clone());
+        router
+            .pending_acks
+            .write()
+            .insert(recent_ack.command_id, recent_ack.clone());
 
         // Cleanup
         router.cleanup_expired_acks();
@@ -706,7 +716,9 @@ mod tests {
     #[test]
     fn test_command_serialization() {
         let command = Command::new(
-            CommandType::Seek { position_seconds: 100 },
+            CommandType::Seek {
+                position_seconds: 100,
+            },
             "device-1".to_string(),
             "device-2".to_string(),
         );

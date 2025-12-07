@@ -135,10 +135,7 @@ mod tests {
 
     #[test]
     fn test_password_reset_token_creation() {
-        let token = PasswordResetToken::new(
-            "user123".to_string(),
-            "test@example.com".to_string(),
-        );
+        let token = PasswordResetToken::new("user123".to_string(), "test@example.com".to_string());
 
         assert_eq!(token.user_id, "user123");
         assert_eq!(token.email, "test@example.com");
@@ -149,19 +146,14 @@ mod tests {
 
     #[test]
     fn test_password_reset_token_not_expired() {
-        let token = PasswordResetToken::new(
-            "user123".to_string(),
-            "test@example.com".to_string(),
-        );
+        let token = PasswordResetToken::new("user123".to_string(), "test@example.com".to_string());
         assert!(!token.is_expired());
     }
 
     #[test]
     fn test_password_reset_token_expired() {
-        let mut token = PasswordResetToken::new(
-            "user123".to_string(),
-            "test@example.com".to_string(),
-        );
+        let mut token =
+            PasswordResetToken::new("user123".to_string(), "test@example.com".to_string());
         // Set expiration to past
         token.expires_at = token.created_at - 1;
         assert!(token.is_expired());
@@ -188,20 +180,14 @@ mod tests {
     fn test_password_validator_no_uppercase() {
         let result = PasswordValidator::validate("password123");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("uppercase letter"));
+        assert!(result.unwrap_err().to_string().contains("uppercase letter"));
     }
 
     #[test]
     fn test_password_validator_no_lowercase() {
         let result = PasswordValidator::validate("PASSWORD123");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("lowercase letter"));
+        assert!(result.unwrap_err().to_string().contains("lowercase letter"));
     }
 
     #[test]
