@@ -84,7 +84,7 @@ gcloud run deploy $BACKEND_SERVICE \
     --min-instances 0 \
     --max-instances 10 \
     --port 8080 \
-    --set-env-vars "NODE_ENV=production"
+    --set-env-vars "NODE_ENV=production,PORT=8080"
 
 # Get backend URL
 BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE --region $REGION --format="value(status.url)")

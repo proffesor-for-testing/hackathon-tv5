@@ -33,10 +33,11 @@ COPY --from=builder /app/src/persistence/schema.sql ./dist/persistence/schema.sq
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=4000
+# Cloud Run provides PORT env var (default 8080), don't hardcode
+# ENV PORT=8080
 
-# Expose port
-EXPOSE 4000
+# Expose port (documentation only, Cloud Run uses PORT env var)
+EXPOSE 8080
 
 # Start the server
 CMD ["node", "dist/server.js"]
