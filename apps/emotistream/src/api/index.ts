@@ -20,8 +20,17 @@ export function createApp(): Express {
 
   // Security middleware
   app.use(helmet());
+
+  // CORS configuration - allow Cloud Run frontend and local development
+  const defaultOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://emotistream-web-727540765498.europe-west1.run.app',
+  ];
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || defaultOrigins;
+
   app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
+    origin: allowedOrigins,
     credentials: true,
   }));
 
