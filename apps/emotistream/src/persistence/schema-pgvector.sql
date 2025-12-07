@@ -1,9 +1,9 @@
--- EmotiStream PostgreSQL Schema
--- This schema supports the RL-based content recommendation system
--- Uses ruvector extension for SIMD-optimized emotion vector operations
+-- EmotiStream PostgreSQL Schema (pgvector version)
+-- Compatible with Neon, Supabase, Railway, and other cloud PostgreSQL providers
+-- Uses pgvector extension instead of ruvector for vector operations
 
--- Enable ruvector extension (provides vector similarity, temporal compression, attention mechanisms)
-CREATE EXTENSION IF NOT EXISTS ruvector;
+-- Enable pgvector extension (standard vector extension for PostgreSQL)
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- Emotion analyses table
--- Note: user_id is VARCHAR to support anonymous/guest users like other tables
 CREATE TABLE IF NOT EXISTS emotion_analyses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id VARCHAR(255) NOT NULL,
@@ -38,13 +37,13 @@ CREATE TABLE IF NOT EXISTS emotion_analyses (
 CREATE INDEX IF NOT EXISTS idx_emotion_user ON emotion_analyses(user_id);
 CREATE INDEX IF NOT EXISTS idx_emotion_created ON emotion_analyses(created_at DESC);
 
--- Emotion embeddings table (using ruvector for fast similarity search)
+-- Emotion embeddings table (using pgvector for similarity search)
 -- Stores 8-dimensional emotion vectors for content and user states
 CREATE TABLE IF NOT EXISTS emotion_embeddings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     entity_type VARCHAR(20) NOT NULL CHECK (entity_type IN ('user_state', 'content', 'desired_state')),
     entity_id VARCHAR(255) NOT NULL,
-    embedding ruvector(8),  -- 8-dim emotion vector: [joy, sadness, anger, fear, surprise, disgust, trust, anticipation]
+    embedding vector(8),  -- 8-dim emotion vector: [joy, sadness, anger, fear, surprise, disgust, trust, anticipation]
     valence REAL,
     arousal REAL,
     stress REAL,
@@ -58,8 +57,8 @@ CREATE INDEX IF NOT EXISTS idx_embeddings_entity ON emotion_embeddings(entity_ty
 CREATE TABLE IF NOT EXISTS user_emotion_ema (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id VARCHAR(255) NOT NULL,
-    ema_embedding ruvector(8),  -- Exponential moving average of user's emotional state
-    alpha REAL DEFAULT 0.3,     -- EMA smoothing factor
+    ema_embedding vector(8),  -- Exponential moving average of user's emotional state
+    alpha REAL DEFAULT 0.3,   -- EMA smoothing factor
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id)
 );
@@ -80,7 +79,6 @@ CREATE TABLE IF NOT EXISTS content (
 CREATE INDEX IF NOT EXISTS idx_content_category ON content(category);
 
 -- Feedback/experiences table
--- Note: Foreign keys relaxed for MVP to allow flexible content sources (TMDB, mock)
 CREATE TABLE IF NOT EXISTS feedback (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id VARCHAR(255) NOT NULL,
@@ -122,7 +120,6 @@ CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_feedback_user_content ON feedback(user_id, content_id);
 
 -- Q-values table (RL policy storage)
--- Note: Foreign keys relaxed for MVP
 CREATE TABLE IF NOT EXISTS q_values (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id VARCHAR(255) NOT NULL,
@@ -138,7 +135,6 @@ CREATE TABLE IF NOT EXISTS q_values (
 CREATE INDEX IF NOT EXISTS idx_qvalues_user_state ON q_values(user_id, state_key);
 
 -- Watch sessions table
--- Note: Foreign keys relaxed for MVP
 CREATE TABLE IF NOT EXISTS watch_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id VARCHAR(255) NOT NULL,

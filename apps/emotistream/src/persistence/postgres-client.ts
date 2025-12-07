@@ -11,16 +11,34 @@ import path from 'path';
 const { Pool } = pg;
 
 // Database configuration
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'emotistream',
-  user: process.env.DB_USER || 'emotistream',
-  password: process.env.DB_PASSWORD || 'emotistream_pass',
-  max: 20, // Maximum pool size
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+// Supports both DATABASE_URL (cloud providers) and individual vars (docker-compose)
+const getDatabaseConfig = () => {
+  // If DATABASE_URL is provided (Neon, Supabase, Railway, etc.)
+  if (process.env.DATABASE_URL) {
+    return {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
+      max: 10, // Lower pool size for serverless
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 10000,
+    };
+  }
+
+  // Individual environment variables (docker-compose, Cloud SQL)
+  return {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME || 'emotistream',
+    user: process.env.DB_USER || 'emotistream',
+    password: process.env.DB_PASSWORD || 'emotistream_pass',
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    max: 20, // Maximum pool size
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  };
 };
+
+const dbConfig = getDatabaseConfig();
 
 let pool: pg.Pool | null = null;
 
@@ -91,12 +109,20 @@ export async function queryAll<T = any>(
 
 /**
  * Initialize database schema
+ * Supports both ruvector (local/docker) and pgvector (cloud providers)
  */
 export async function initializeDatabase(): Promise<void> {
   console.log('Initializing database schema...');
 
+  // Check if we should use pgvector schema (for cloud providers like Neon, Supabase)
+  const usePgVector = process.env.USE_PGVECTOR === 'true' || process.env.DATABASE_URL;
+
   // Determine schema file location (works in both dev and production)
+  const schemaFileName = usePgVector ? 'schema-pgvector.sql' : 'schema.sql';
   const possiblePaths = [
+    path.join(process.cwd(), 'dist', 'persistence', schemaFileName),
+    path.join(process.cwd(), 'src', 'persistence', schemaFileName),
+    // Fallback to standard schema if pgvector schema not found
     path.join(process.cwd(), 'dist', 'persistence', 'schema.sql'),
     path.join(process.cwd(), 'src', 'persistence', 'schema.sql'),
   ];
@@ -105,6 +131,7 @@ export async function initializeDatabase(): Promise<void> {
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) {
       schemaPath = p;
+      console.log(`Using schema: ${p}`);
       break;
     }
   }
