@@ -28,8 +28,9 @@ COPY --from=builder /app/package.json ./
 # Create data directory for persistence
 RUN mkdir -p /app/data
 
-# Copy schema for database initialization
+# Copy schemas for database initialization (ruvector for local, pgvector for cloud)
 COPY --from=builder /app/src/persistence/schema.sql ./dist/persistence/schema.sql
+COPY --from=builder /app/src/persistence/schema-pgvector.sql ./dist/persistence/schema-pgvector.sql
 
 # Set environment variables
 ENV NODE_ENV=production
